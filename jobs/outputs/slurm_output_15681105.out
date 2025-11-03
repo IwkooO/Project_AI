@@ -1,0 +1,2537 @@
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+accepted Terms of Service for https://repo.anaconda.com/pkgs/main
+accepted Terms of Service for https://repo.anaconda.com/pkgs/r
+/var/spool/slurm/slurmd/job15681105/slurm_script: line 18: cd: /home/pnair/Project_AI/: No such file or directory
+2 channel Terms of Service accepted
+Channels:
+ - conda-forge
+ - defaults
+Platform: linux-64
+Collecting package metadata (repodata.json): - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - done
+Solving environment: | / - \ done
+
+
+==> WARNING: A newer version of conda exists. <==
+    current version: 25.5.1
+    latest version: 25.9.1
+
+Please update conda by running
+
+    $ conda update -n base -c defaults conda
+
+
+
+Downloading and Extracting Packages: ...working...libllvm15-15.0.7     | 35.4 MB   |            |   0% 
+scipy-1.16.1         | 16.5 MB   |            |   0% [A
+
+qtdeclarative-6.7.3  | 16.2 MB   |            |   0% [A[A
+
+
+pandas-2.3.2         | 14.6 MB   |            |   0% [A[A[A
+
+
+
+libgdal-core-3.11.0  | 11.9 MB   |            |   0% [A[A[A[A
+
+
+
+
+qtbase-6.7.3         | 11.9 MB   |            |   0% [A[A[A[A[A
+
+
+
+
+
+scikit-learn-1.7.1   | 9.4 MB    |            |   0% [A[A[A[A[A[A
+
+
+
+
+
+
+numpy-base-2.0.1     | 9.1 MB    |            |   0% [A[A[A[A[A[A[A
+
+
+
+
+
+
+
+mesalib-25.1.5       | 8.9 MB    |            |   0% [A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+matplotlib-base-3.10 | 8.3 MB    |            |   0% [A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+qttools-6.7.3        | 6.6 MB    |            |   0% [A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+pyqt-6.7.1           | 5.1 MB    |            |   0% [A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+libcups-2.4.2        | 4.5 MB    |            |   0% [A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+libspatialite-5.1.0  | 4.2 MB    |            |   0% [A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+libstdcxx-15.1.0     | 3.7 MB    |            |   0% [A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+libprotobuf-5.29.3   | 3.5 MB    |            |   0% [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+xerces-c-3.2.4       | 3.3 MB    |            |   0% [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+proj-9.3.1           | 3.2 MB    |            |   0% [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+fonttools-4.55.3     | 3.0 MB    |            |   0% [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ... (more hidden) ...[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[Alibllvm15-15.0.7     | 35.4 MB   | 1          |   1% 
+scipy-1.16.1         | 16.5 MB   | #1         |  11% [A
+
+qtdeclarative-6.7.3  | 16.2 MB   | 4          |   4% [A[A
+
+
+pandas-2.3.2         | 14.6 MB   | 8          |   9% [A[A[A
+
+
+
+libgdal-core-3.11.0  | 11.9 MB   |            |   0% [A[A[A[Alibllvm15-15.0.7     | 35.4 MB   | ##5        |  25% 
+scipy-1.16.1         | 16.5 MB   | ########6  |  87% [A
+
+qtdeclarative-6.7.3  | 16.2 MB   | ########1  |  82% [A[A
+
+
+pandas-2.3.2         | 14.6 MB   | ########8  |  89% [A[A[A
+
+
+
+libgdal-core-3.11.0  | 11.9 MB   | ######7    |  67% [A[A[A[A
+
+
+pandas-2.3.2         | 14.6 MB   | ########## | 100% [A[A[A
+scipy-1.16.1         | 16.5 MB   | ########## | 100% [A
+
+qtdeclarative-6.7.3  | 16.2 MB   | ########## | 100% [A[Alibllvm15-15.0.7     | 35.4 MB   | ####5      |  46% 
+
+
+
+
+qtbase-6.7.3         | 11.9 MB   |            |   0% [A[A[A[A[A
+
+
+
+
+
+scikit-learn-1.7.1   | 9.4 MB    |            |   0% [A[A[A[A[A[A
+
+
+
+
+
+
+numpy-base-2.0.1     | 9.1 MB    |            |   0% [A[A[A[A[A[A[Alibllvm15-15.0.7     | 35.4 MB   | #######3   |  73% 
+
+
+
+
+qtbase-6.7.3         | 11.9 MB   | ########   |  81% [A[A[A[A[A
+
+
+
+
+
+scikit-learn-1.7.1   | 9.4 MB    | #####6     |  56% [A[A[A[A[A[A
+
+
+
+libgdal-core-3.11.0  | 11.9 MB   | ########## | 100% [A[A[A[A
+
+
+
+
+
+
+numpy-base-2.0.1     | 9.1 MB    | ########5  |  85% [A[A[A[A[A[A[A
+
+
+
+
+
+
+numpy-base-2.0.1     | 9.1 MB    | ########## | 100% [A[A[A[A[A[A[A
+
+
+
+
+qtbase-6.7.3         | 11.9 MB   | ########## | 100% [A[A[A[A[A
+
+
+
+
+
+
+
+mesalib-25.1.5       | 8.9 MB    |            |   0% [A[A[A[A[A[A[A[A
+
+
+
+
+
+scikit-learn-1.7.1   | 9.4 MB    | ########## | 100% [A[A[A[A[A[A
+
+
+
+
+
+
+
+
+matplotlib-base-3.10 | 8.3 MB    |            |   0% [A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+qttools-6.7.3        | 6.6 MB    |            |   0% [A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+pyqt-6.7.1           | 5.1 MB    |            |   0% [A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+mesalib-25.1.5       | 8.9 MB    | ########## | 100% [A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+mesalib-25.1.5       | 8.9 MB    | ########## | 100% [A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+pyqt-6.7.1           | 5.1 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+qttools-6.7.3        | 6.6 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+matplotlib-base-3.10 | 8.3 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+matplotlib-base-3.10 | 8.3 MB    | ########## | 100% [A[A[A[A[A[A[A[A[Alibllvm15-15.0.7     | 35.4 MB   | ########## | 100% libllvm15-15.0.7     | 35.4 MB   | ########## | 100% 
+
+
+
+
+
+
+
+
+
+
+
+
+libspatialite-5.1.0  | 4.2 MB    |            |   0% [A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+libstdcxx-15.1.0     | 3.7 MB    |            |   0% [A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+libprotobuf-5.29.3   | 3.5 MB    |            |   0% [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+libcups-2.4.2        | 4.5 MB    |            |   0% [A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+libspatialite-5.1.0  | 4.2 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+xerces-c-3.2.4       | 3.3 MB    |            |   0% [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+libstdcxx-15.1.0     | 3.7 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+libprotobuf-5.29.3   | 3.5 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+xerces-c-3.2.4       | 3.3 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+proj-9.3.1           | 3.2 MB    |            |   0% [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+fonttools-4.55.3     | 3.0 MB    |            |   1% [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+libcups-2.4.2        | 4.5 MB    | ######2    |  62% [A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ... (more hidden) ...[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+proj-9.3.1           | 3.2 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+fonttools-4.55.3     | 3.0 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+libcups-2.4.2        | 4.5 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ... (more hidden) ...[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+scipy-1.16.1         | 16.5 MB   | ########## | 100% [A
+
+
+
+libgdal-core-3.11.0  | 11.9 MB   | ########## | 100% [A[A[A[A
+
+qtdeclarative-6.7.3  | 16.2 MB   | ########## | 100% [A[A
+
+
+pandas-2.3.2         | 14.6 MB   | ########## | 100% [A[A[A
+
+
+
+
+qtbase-6.7.3         | 11.9 MB   | ########## | 100% [A[A[A[A[A
+
+
+
+
+
+
+
+mesalib-25.1.5       | 8.9 MB    | ########## | 100% [A[A[A[A[A[A[A[A
+
+
+
+
+
+
+numpy-base-2.0.1     | 9.1 MB    | ########## | 100% [A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+qttools-6.7.3        | 6.6 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+qttools-6.7.3        | 6.6 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+pyqt-6.7.1           | 5.1 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+pyqt-6.7.1           | 5.1 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[Alibllvm15-15.0.7     | 35.4 MB   | ########## | 100% 
+
+
+
+
+
+scikit-learn-1.7.1   | 9.4 MB    | ########## | 100% [A[A[A[A[A[A
+
+
+
+
+
+scikit-learn-1.7.1   | 9.4 MB    | ########## | 100% [A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+libspatialite-5.1.0  | 4.2 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+libspatialite-5.1.0  | 4.2 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+libstdcxx-15.1.0     | 3.7 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+libstdcxx-15.1.0     | 3.7 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+matplotlib-base-3.10 | 8.3 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+proj-9.3.1           | 3.2 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+proj-9.3.1           | 3.2 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+libprotobuf-5.29.3   | 3.5 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+libprotobuf-5.29.3   | 3.5 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+libcups-2.4.2        | 4.5 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+libcups-2.4.2        | 4.5 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+xerces-c-3.2.4       | 3.3 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+xerces-c-3.2.4       | 3.3 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ... (more hidden) ...[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ... (more hidden) ...[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+fonttools-4.55.3     | 3.0 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+fonttools-4.55.3     | 3.0 MB    | ########## | 100% [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                      [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A                                                     
+                                                     [A
+
+                                                     [A[A
+
+
+                                                     [A[A[A
+
+
+
+                                                     [A[A[A[A
+
+
+
+
+                                                     [A[A[A[A[A
+
+
+
+
+
+                                                     [A[A[A[A[A[A
+
+
+
+
+
+
+                                                     [A[A[A[A[A[A[A
+
+
+
+
+
+
+
+                                                     [A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+                                                     [A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+                                                     [A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+                                                     [A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+                                                     [A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+                                                     [A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                     [A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                     [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                     [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                     [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                     [A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+[A
+
+[A[A
+
+
+[A[A[A
+
+
+
+[A[A[A[A
+
+
+
+
+[A[A[A[A[A
+
+
+
+
+
+[A[A[A[A[A[A
+
+
+
+
+
+
+[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+[A
+
+[A[A
+
+
+[A[A[A
+
+
+
+[A[A[A[A
+
+
+
+
+[A[A[A[A[A
+
+
+
+
+
+[A[A[A[A[A[A
+
+
+
+
+
+
+[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+[A
+
+[A[A
+
+
+[A[A[A
+
+
+
+[A[A[A[A
+
+
+
+
+[A[A[A[A[A
+
+
+
+
+
+[A[A[A[A[A[A
+
+
+
+
+
+
+[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+[A
+
+[A[A
+
+
+[A[A[A
+
+
+
+[A[A[A[A
+
+
+
+
+[A[A[A[A[A
+
+
+
+
+
+[A[A[A[A[A[A
+
+
+
+
+
+
+[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+[A
+
+[A[A
+
+
+[A[A[A
+
+
+
+[A[A[A[A
+
+
+
+
+[A[A[A[A[A
+
+
+
+
+
+[A[A[A[A[A[A
+
+
+
+
+
+
+[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+[A
+
+[A[A
+
+
+[A[A[A
+
+
+
+[A[A[A[A
+
+
+
+
+[A[A[A[A[A
+
+
+
+
+
+[A[A[A[A[A[A
+
+
+
+
+
+
+[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[A[A[A[A[A[A[A[A[A[A[A[A[A[A[A done
+Preparing transaction: / - \ | / - \ | / - \ done
+Verifying transaction: / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ done
+Executing transaction: / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - done
+Installing pip dependencies: | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | Ran pip subprocess with arguments:
+['/scratch-shared/fomo_prad/conda/envs/streetview/bin/python', '-m', 'pip', 'install', '-U', '-r', '/gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt', '--exists-action=b']
+Pip subprocess output:
+Collecting annotated-types==0.7.0 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 1))
+  Downloading annotated_types-0.7.0-py3-none-any.whl.metadata (15 kB)
+Requirement already satisfied: anyio==4.10.0 in /home/pnair/.local/lib/python3.11/site-packages (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 2)) (4.10.0)
+Collecting argon2-cffi==25.1.0 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 3))
+  Downloading argon2_cffi-25.1.0-py3-none-any.whl.metadata (4.1 kB)
+Collecting argon2-cffi-bindings==25.1.0 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 4))
+  Downloading argon2_cffi_bindings-25.1.0-cp39-abi3-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl.metadata (7.4 kB)
+Collecting arrow==1.3.0 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 5))
+  Downloading arrow-1.3.0-py3-none-any.whl.metadata (7.5 kB)
+Collecting asttokens==3.0.0 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 6))
+  Using cached asttokens-3.0.0-py3-none-any.whl.metadata (4.7 kB)
+Collecting async-lru==2.0.5 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 7))
+  Downloading async_lru-2.0.5-py3-none-any.whl.metadata (4.5 kB)
+Collecting attrs==25.3.0 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 8))
+  Downloading attrs-25.3.0-py3-none-any.whl.metadata (10 kB)
+Collecting babel==2.17.0 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 9))
+  Downloading babel-2.17.0-py3-none-any.whl.metadata (2.0 kB)
+Collecting beautifulsoup4==4.13.5 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 10))
+  Downloading beautifulsoup4-4.13.5-py3-none-any.whl.metadata (3.8 kB)
+Collecting bleach==6.2.0 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 11))
+  Downloading bleach-6.2.0-py3-none-any.whl.metadata (30 kB)
+Collecting comm==0.2.3 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 12))
+  Using cached comm-0.2.3-py3-none-any.whl.metadata (3.7 kB)
+Collecting debugpy==1.8.16 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 13))
+  Downloading debugpy-1.8.16-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (1.3 kB)
+Collecting decorator==5.2.1 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 14))
+  Using cached decorator-5.2.1-py3-none-any.whl.metadata (3.9 kB)
+Collecting defusedxml==0.7.1 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 15))
+  Downloading defusedxml-0.7.1-py2.py3-none-any.whl.metadata (32 kB)
+Collecting executing==2.2.1 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 16))
+  Using cached executing-2.2.1-py2.py3-none-any.whl.metadata (8.9 kB)
+Collecting fastjsonschema==2.21.2 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 17))
+  Downloading fastjsonschema-2.21.2-py3-none-any.whl.metadata (2.3 kB)
+Requirement already satisfied: fqdn==1.5.1 in /home/pnair/.local/lib/python3.11/site-packages (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 18)) (1.5.1)
+Requirement already satisfied: h11==0.16.0 in /home/pnair/.local/lib/python3.11/site-packages (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 19)) (0.16.0)
+Requirement already satisfied: httpcore==1.0.9 in /home/pnair/.local/lib/python3.11/site-packages (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 20)) (1.0.9)
+Requirement already satisfied: httpx==0.28.1 in /home/pnair/.local/lib/python3.11/site-packages (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 21)) (0.28.1)
+Collecting ipykernel==6.30.1 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 22))
+  Using cached ipykernel-6.30.1-py3-none-any.whl.metadata (6.2 kB)
+Collecting ipython==9.5.0 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 23))
+  Downloading ipython-9.5.0-py3-none-any.whl.metadata (4.4 kB)
+Collecting ipython-pygments-lexers==1.1.1 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 24))
+  Downloading ipython_pygments_lexers-1.1.1-py3-none-any.whl.metadata (1.1 kB)
+Collecting ipywidgets==8.1.7 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 25))
+  Downloading ipywidgets-8.1.7-py3-none-any.whl.metadata (2.4 kB)
+Requirement already satisfied: isoduration==20.11.0 in /home/pnair/.local/lib/python3.11/site-packages (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 26)) (20.11.0)
+Collecting jedi==0.19.2 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 27))
+  Using cached jedi-0.19.2-py2.py3-none-any.whl.metadata (22 kB)
+Collecting json5==0.12.1 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 28))
+  Downloading json5-0.12.1-py3-none-any.whl.metadata (36 kB)
+Collecting jsonpointer==3.0.0 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 29))
+  Downloading jsonpointer-3.0.0-py2.py3-none-any.whl.metadata (2.3 kB)
+Requirement already satisfied: jsonschema==4.25.1 in /home/pnair/.local/lib/python3.11/site-packages (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 30)) (4.25.1)
+Requirement already satisfied: jsonschema-specifications==2025.4.1 in /home/pnair/.local/lib/python3.11/site-packages (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 31)) (2025.4.1)
+Collecting jupyter==1.1.1 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 32))
+  Downloading jupyter-1.1.1-py2.py3-none-any.whl.metadata (2.0 kB)
+Collecting jupyter-client==8.6.3 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 33))
+  Using cached jupyter_client-8.6.3-py3-none-any.whl.metadata (8.3 kB)
+Collecting jupyter-console==6.6.3 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 34))
+  Downloading jupyter_console-6.6.3-py3-none-any.whl.metadata (5.8 kB)
+Collecting jupyter-core==5.8.1 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 35))
+  Using cached jupyter_core-5.8.1-py3-none-any.whl.metadata (1.6 kB)
+Collecting jupyter-events==0.12.0 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 36))
+  Downloading jupyter_events-0.12.0-py3-none-any.whl.metadata (5.8 kB)
+Collecting jupyter-lsp==2.3.0 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 37))
+  Downloading jupyter_lsp-2.3.0-py3-none-any.whl.metadata (1.8 kB)
+Collecting jupyter-server==2.17.0 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 38))
+  Downloading jupyter_server-2.17.0-py3-none-any.whl.metadata (8.5 kB)
+Collecting jupyter-server-terminals==0.5.3 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 39))
+  Downloading jupyter_server_terminals-0.5.3-py3-none-any.whl.metadata (5.6 kB)
+Collecting jupyterlab==4.4.7 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 40))
+  Downloading jupyterlab-4.4.7-py3-none-any.whl.metadata (16 kB)
+Collecting jupyterlab-pygments==0.3.0 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 41))
+  Downloading jupyterlab_pygments-0.3.0-py3-none-any.whl.metadata (4.4 kB)
+Collecting jupyterlab-server==2.27.3 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 42))
+  Downloading jupyterlab_server-2.27.3-py3-none-any.whl.metadata (5.9 kB)
+Collecting jupyterlab-widgets==3.0.15 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 43))
+  Downloading jupyterlab_widgets-3.0.15-py3-none-any.whl.metadata (20 kB)
+Requirement already satisfied: lark==1.2.2 in /home/pnair/.local/lib/python3.11/site-packages (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 44)) (1.2.2)
+Collecting matplotlib-inline==0.1.7 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 45))
+  Using cached matplotlib_inline-0.1.7-py3-none-any.whl.metadata (3.9 kB)
+Collecting mistune==3.1.4 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 46))
+  Downloading mistune-3.1.4-py3-none-any.whl.metadata (1.8 kB)
+Collecting nbclient==0.10.2 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 47))
+  Downloading nbclient-0.10.2-py3-none-any.whl.metadata (8.3 kB)
+Collecting nbconvert==7.16.6 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 48))
+  Downloading nbconvert-7.16.6-py3-none-any.whl.metadata (8.5 kB)
+Collecting nbformat==5.10.4 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 49))
+  Downloading nbformat-5.10.4-py3-none-any.whl.metadata (3.6 kB)
+Requirement already satisfied: nest-asyncio==1.6.0 in /home/pnair/.local/lib/python3.11/site-packages (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 50)) (1.6.0)
+Collecting notebook==7.4.5 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 51))
+  Downloading notebook-7.4.5-py3-none-any.whl.metadata (10 kB)
+Collecting notebook-shim==0.2.4 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 52))
+  Downloading notebook_shim-0.2.4-py3-none-any.whl.metadata (4.0 kB)
+Collecting overrides==7.7.0 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 53))
+  Downloading overrides-7.7.0-py3-none-any.whl.metadata (5.8 kB)
+Collecting pandocfilters==1.5.1 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 54))
+  Downloading pandocfilters-1.5.1-py2.py3-none-any.whl.metadata (9.0 kB)
+Collecting parso==0.8.5 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 55))
+  Using cached parso-0.8.5-py2.py3-none-any.whl.metadata (8.3 kB)
+Requirement already satisfied: pexpect==4.9.0 in /home/pnair/.local/lib/python3.11/site-packages (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 56)) (4.9.0)
+Requirement already satisfied: prometheus-client==0.22.1 in /home/pnair/.local/lib/python3.11/site-packages (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 57)) (0.22.1)
+Collecting prompt-toolkit==3.0.52 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 58))
+  Using cached prompt_toolkit-3.0.52-py3-none-any.whl.metadata (6.4 kB)
+Collecting psutil==7.0.0 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 59))
+  Using cached psutil-7.0.0-cp36-abi3-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (22 kB)
+Collecting ptyprocess==0.7.0 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 60))
+  Using cached ptyprocess-0.7.0-py2.py3-none-any.whl.metadata (1.3 kB)
+Collecting pure-eval==0.2.3 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 61))
+  Using cached pure_eval-0.2.3-py3-none-any.whl.metadata (6.3 kB)
+Collecting pydantic==2.11.7 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 62))
+  Downloading pydantic-2.11.7-py3-none-any.whl.metadata (67 kB)
+Requirement already satisfied: pydantic-core==2.33.2 in /home/pnair/.local/lib/python3.11/site-packages (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 63)) (2.33.2)
+Collecting pygments==2.19.2 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 64))
+  Using cached pygments-2.19.2-py3-none-any.whl.metadata (2.5 kB)
+Collecting python-json-logger==3.3.0 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 65))
+  Downloading python_json_logger-3.3.0-py3-none-any.whl.metadata (4.0 kB)
+Collecting pyyaml==6.0.2 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 66))
+  Downloading PyYAML-6.0.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (2.1 kB)
+Collecting pyzmq==27.0.2 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 67))
+  Downloading pyzmq-27.0.2-cp311-cp311-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl.metadata (6.0 kB)
+Requirement already satisfied: referencing==0.36.2 in /home/pnair/.local/lib/python3.11/site-packages (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 68)) (0.36.2)
+Collecting rfc3339-validator==0.1.4 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 69))
+  Downloading rfc3339_validator-0.1.4-py2.py3-none-any.whl.metadata (1.5 kB)
+Collecting rfc3986-validator==0.1.1 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 70))
+  Downloading rfc3986_validator-0.1.1-py2.py3-none-any.whl.metadata (1.7 kB)
+Collecting rfc3987-syntax==1.1.0 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 71))
+  Downloading rfc3987_syntax-1.1.0-py3-none-any.whl.metadata (7.7 kB)
+Requirement already satisfied: rpds-py==0.27.1 in /home/pnair/.local/lib/python3.11/site-packages (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 72)) (0.27.1)
+Collecting send2trash==1.8.3 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 73))
+  Downloading Send2Trash-1.8.3-py3-none-any.whl.metadata (4.0 kB)
+Collecting sniffio==1.3.1 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 74))
+  Downloading sniffio-1.3.1-py3-none-any.whl.metadata (3.9 kB)
+Collecting soupsieve==2.8 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 75))
+  Downloading soupsieve-2.8-py3-none-any.whl.metadata (4.6 kB)
+Requirement already satisfied: stack-data==0.6.3 in /home/pnair/.local/lib/python3.11/site-packages (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 76)) (0.6.3)
+Collecting streetview==0.0.16 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 77))
+  Downloading streetview-0.0.16-py3-none-any.whl.metadata (3.5 kB)
+Collecting terminado==0.18.1 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 78))
+  Downloading terminado-0.18.1-py3-none-any.whl.metadata (5.8 kB)
+Collecting tinycss2==1.4.0 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 79))
+  Downloading tinycss2-1.4.0-py3-none-any.whl.metadata (3.0 kB)
+Collecting tornado==6.5.2 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 80))
+  Using cached tornado-6.5.2-cp39-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (2.8 kB)
+Requirement already satisfied: tqdm==4.67.1 in /home/pnair/.local/lib/python3.11/site-packages (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 81)) (4.67.1)
+Collecting traitlets==5.14.3 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 82))
+  Using cached traitlets-5.14.3-py3-none-any.whl.metadata (10 kB)
+Collecting types-python-dateutil==2.9.0.20250822 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 83))
+  Downloading types_python_dateutil-2.9.0.20250822-py3-none-any.whl.metadata (1.8 kB)
+Requirement already satisfied: typing-extensions==4.15.0 in /home/pnair/.local/lib/python3.11/site-packages (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 84)) (4.15.0)
+Collecting typing-inspection==0.4.1 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 85))
+  Downloading typing_inspection-0.4.1-py3-none-any.whl.metadata (2.6 kB)
+Requirement already satisfied: uri-template==1.3.0 in /home/pnair/.local/lib/python3.11/site-packages (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 86)) (1.3.0)
+Requirement already satisfied: wcwidth==0.2.13 in /home/pnair/.local/lib/python3.11/site-packages (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 87)) (0.2.13)
+Requirement already satisfied: webcolors==24.11.1 in /home/pnair/.local/lib/python3.11/site-packages (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 88)) (24.11.1)
+Collecting webencodings==0.5.1 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 89))
+  Downloading webencodings-0.5.1-py2.py3-none-any.whl.metadata (2.1 kB)
+Collecting websocket-client==1.8.0 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 90))
+  Downloading websocket_client-1.8.0-py3-none-any.whl.metadata (8.0 kB)
+Collecting widgetsnbextension==4.0.14 (from -r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 91))
+  Downloading widgetsnbextension-4.0.14-py3-none-any.whl.metadata (1.6 kB)
+Requirement already satisfied: idna>=2.8 in /home/pnair/.local/lib/python3.11/site-packages (from anyio==4.10.0->-r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 2)) (3.6)
+Requirement already satisfied: cffi>=1.0.1 in /scratch-shared/fomo_prad/conda/envs/streetview/lib/python3.11/site-packages (from argon2-cffi-bindings==25.1.0->-r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 4)) (1.17.1)
+Requirement already satisfied: python-dateutil>=2.7.0 in /scratch-shared/fomo_prad/conda/envs/streetview/lib/python3.11/site-packages (from arrow==1.3.0->-r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 5)) (2.9.0.post0)
+Requirement already satisfied: certifi in /home/pnair/.local/lib/python3.11/site-packages (from httpcore==1.0.9->-r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 20)) (2023.11.17)
+Requirement already satisfied: packaging>=22 in /home/pnair/.local/lib/python3.11/site-packages (from ipykernel==6.30.1->-r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 22)) (25.0)
+Requirement already satisfied: platformdirs>=2.5 in /home/pnair/.local/lib/python3.11/site-packages (from jupyter-core==5.8.1->-r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 35)) (4.2.0)
+Requirement already satisfied: jinja2>=3.0.3 in /scratch-shared/fomo_prad/conda/envs/streetview/lib/python3.11/site-packages (from jupyter-server==2.17.0->-r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 38)) (3.1.6)
+Requirement already satisfied: setuptools>=41.1.0 in /scratch-shared/fomo_prad/conda/envs/streetview/lib/python3.11/site-packages (from jupyterlab==4.4.7->-r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 40)) (78.1.1)
+Requirement already satisfied: requests>=2.31 in /scratch-shared/fomo_prad/conda/envs/streetview/lib/python3.11/site-packages (from jupyterlab-server==2.27.3->-r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 42)) (2.32.5)
+Requirement already satisfied: markupsafe>=2.0 in /scratch-shared/fomo_prad/conda/envs/streetview/lib/python3.11/site-packages (from nbconvert==7.16.6->-r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 48)) (3.0.2)
+Requirement already satisfied: six in /scratch-shared/fomo_prad/conda/envs/streetview/lib/python3.11/site-packages (from rfc3339-validator==0.1.4->-r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 69)) (1.17.0)
+Requirement already satisfied: pillow>=11.3.0 in /scratch-shared/fomo_prad/conda/envs/streetview/lib/python3.11/site-packages (from streetview==0.0.16->-r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 77)) (11.3.0)
+Requirement already satisfied: pycparser in /scratch-shared/fomo_prad/conda/envs/streetview/lib/python3.11/site-packages (from cffi>=1.0.1->argon2-cffi-bindings==25.1.0->-r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 4)) (2.22)
+Requirement already satisfied: charset_normalizer<4,>=2 in /home/pnair/.local/lib/python3.11/site-packages (from requests>=2.31->jupyterlab-server==2.27.3->-r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 42)) (3.3.2)
+Requirement already satisfied: urllib3<3,>=1.21.1 in /home/pnair/.local/lib/python3.11/site-packages (from requests>=2.31->jupyterlab-server==2.27.3->-r /gpfs/scratch1/shared/pnair/Project_AI/condaenv.d_va0g0y.requirements.txt (line 42)) (2.1.0)
+Downloading annotated_types-0.7.0-py3-none-any.whl (13 kB)
+Downloading argon2_cffi-25.1.0-py3-none-any.whl (14 kB)
+Downloading argon2_cffi_bindings-25.1.0-cp39-abi3-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl (87 kB)
+Downloading arrow-1.3.0-py3-none-any.whl (66 kB)
+Using cached asttokens-3.0.0-py3-none-any.whl (26 kB)
+Downloading async_lru-2.0.5-py3-none-any.whl (6.1 kB)
+Downloading attrs-25.3.0-py3-none-any.whl (63 kB)
+Downloading babel-2.17.0-py3-none-any.whl (10.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 10.2/10.2 MB 97.7 MB/s  0:00:00
+Downloading beautifulsoup4-4.13.5-py3-none-any.whl (105 kB)
+Downloading bleach-6.2.0-py3-none-any.whl (163 kB)
+Using cached comm-0.2.3-py3-none-any.whl (7.3 kB)
+Downloading debugpy-1.8.16-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl (3.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.1/3.1 MB 68.0 MB/s  0:00:00
+Using cached decorator-5.2.1-py3-none-any.whl (9.2 kB)
+Downloading defusedxml-0.7.1-py2.py3-none-any.whl (25 kB)
+Using cached executing-2.2.1-py2.py3-none-any.whl (28 kB)
+Downloading fastjsonschema-2.21.2-py3-none-any.whl (24 kB)
+Using cached ipykernel-6.30.1-py3-none-any.whl (117 kB)
+Downloading ipython-9.5.0-py3-none-any.whl (612 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 612.4/612.4 kB 45.8 MB/s  0:00:00
+Using cached prompt_toolkit-3.0.52-py3-none-any.whl (391 kB)
+Downloading ipython_pygments_lexers-1.1.1-py3-none-any.whl (8.1 kB)
+Downloading ipywidgets-8.1.7-py3-none-any.whl (139 kB)
+Downloading jupyterlab_widgets-3.0.15-py3-none-any.whl (216 kB)
+Downloading widgetsnbextension-4.0.14-py3-none-any.whl (2.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 61.7 MB/s  0:00:00
+Using cached jedi-0.19.2-py2.py3-none-any.whl (1.6 MB)
+Using cached parso-0.8.5-py2.py3-none-any.whl (106 kB)
+Downloading json5-0.12.1-py3-none-any.whl (36 kB)
+Downloading jsonpointer-3.0.0-py2.py3-none-any.whl (7.6 kB)
+Downloading jupyter-1.1.1-py2.py3-none-any.whl (2.7 kB)
+Using cached jupyter_client-8.6.3-py3-none-any.whl (106 kB)
+Downloading jupyter_console-6.6.3-py3-none-any.whl (24 kB)
+Using cached jupyter_core-5.8.1-py3-none-any.whl (28 kB)
+Downloading jupyter_events-0.12.0-py3-none-any.whl (19 kB)
+Downloading jupyter_lsp-2.3.0-py3-none-any.whl (76 kB)
+Downloading jupyter_server-2.17.0-py3-none-any.whl (388 kB)
+Downloading jupyter_server_terminals-0.5.3-py3-none-any.whl (13 kB)
+Downloading jupyterlab-4.4.7-py3-none-any.whl (12.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 12.3/12.3 MB 74.7 MB/s  0:00:00
+Downloading jupyterlab_server-2.27.3-py3-none-any.whl (59 kB)
+Downloading jupyterlab_pygments-0.3.0-py3-none-any.whl (15 kB)
+Using cached matplotlib_inline-0.1.7-py3-none-any.whl (9.9 kB)
+Downloading mistune-3.1.4-py3-none-any.whl (53 kB)
+Downloading nbclient-0.10.2-py3-none-any.whl (25 kB)
+Downloading nbconvert-7.16.6-py3-none-any.whl (258 kB)
+Downloading nbformat-5.10.4-py3-none-any.whl (78 kB)
+Downloading notebook-7.4.5-py3-none-any.whl (14.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 14.3/14.3 MB 81.7 MB/s  0:00:00
+Downloading notebook_shim-0.2.4-py3-none-any.whl (13 kB)
+Downloading overrides-7.7.0-py3-none-any.whl (17 kB)
+Downloading pandocfilters-1.5.1-py2.py3-none-any.whl (8.7 kB)
+Using cached psutil-7.0.0-cp36-abi3-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl (277 kB)
+Using cached ptyprocess-0.7.0-py2.py3-none-any.whl (13 kB)
+Using cached pure_eval-0.2.3-py3-none-any.whl (11 kB)
+Downloading pydantic-2.11.7-py3-none-any.whl (444 kB)
+Using cached pygments-2.19.2-py3-none-any.whl (1.2 MB)
+Downloading python_json_logger-3.3.0-py3-none-any.whl (15 kB)
+Downloading PyYAML-6.0.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (762 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 763.0/763.0 kB 2.7 MB/s  0:00:00
+Downloading pyzmq-27.0.2-cp311-cp311-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl (856 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 857.0/857.0 kB 613.3 kB/s  0:00:00
+Downloading rfc3339_validator-0.1.4-py2.py3-none-any.whl (3.5 kB)
+Downloading rfc3986_validator-0.1.1-py2.py3-none-any.whl (4.2 kB)
+Downloading rfc3987_syntax-1.1.0-py3-none-any.whl (8.0 kB)
+Downloading Send2Trash-1.8.3-py3-none-any.whl (18 kB)
+Downloading sniffio-1.3.1-py3-none-any.whl (10 kB)
+Downloading soupsieve-2.8-py3-none-any.whl (36 kB)
+Downloading streetview-0.0.16-py3-none-any.whl (8.3 kB)
+Downloading terminado-0.18.1-py3-none-any.whl (14 kB)
+Downloading tinycss2-1.4.0-py3-none-any.whl (26 kB)
+Using cached tornado-6.5.2-cp39-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl (443 kB)
+Using cached traitlets-5.14.3-py3-none-any.whl (85 kB)
+Downloading types_python_dateutil-2.9.0.20250822-py3-none-any.whl (17 kB)
+Downloading typing_inspection-0.4.1-py3-none-any.whl (14 kB)
+Downloading webencodings-0.5.1-py2.py3-none-any.whl (11 kB)
+Downloading websocket_client-1.8.0-py3-none-any.whl (58 kB)
+Installing collected packages: webencodings, pure-eval, ptyprocess, fastjsonschema, widgetsnbextension, websocket-client, typing-inspection, types-python-dateutil, traitlets, tornado, tinycss2, soupsieve, sniffio, send2trash, rfc3987-syntax, rfc3986-validator, rfc3339-validator, pyzmq, pyyaml, python-json-logger, pygments, psutil, prompt-toolkit, parso, pandocfilters, overrides, mistune, jupyterlab-widgets, jupyterlab-pygments, jsonpointer, json5, executing, defusedxml, decorator, debugpy, comm, bleach, babel, attrs, async-lru, asttokens, annotated-types, terminado, pydantic, matplotlib-inline, jupyter-core, jedi, ipython-pygments-lexers, beautifulsoup4, arrow, argon2-cffi-bindings, jupyter-server-terminals, jupyter-client, ipython, argon2-cffi, ipywidgets, ipykernel, nbformat, jupyter-console, nbclient, jupyter-events, nbconvert, jupyter-server, notebook-shim, jupyterlab-server, jupyter-lsp, jupyterlab, notebook, jupyter, streetview
+  Attempting uninstall: fastjsonschema
+    Found existing installation: fastjsonschema 2.21.1
+    Uninstalling fastjsonschema-2.21.1:
+      Successfully uninstalled fastjsonschema-2.21.1
+  Attempting uninstall: typing-inspection
+    Found existing installation: typing-inspection 0.4.0
+    Uninstalling typing-inspection-0.4.0:
+      Successfully uninstalled typing-inspection-0.4.0
+  Attempting uninstall: traitlets
+    Found existing installation: traitlets 5.14.1
+    Uninstalling traitlets-5.14.1:
+      Successfully uninstalled traitlets-5.14.1
+  Attempting uninstall: tornado
+    Found existing installation: tornado 6.4
+    Uninstalling tornado-6.4:
+      Successfully uninstalled tornado-6.4
+  Attempting uninstall: soupsieve
+    Found existing installation: soupsieve 2.5
+    Uninstalling soupsieve-2.5:
+      Successfully uninstalled soupsieve-2.5
+  Attempting uninstall: pyzmq
+    Found existing installation: pyzmq 25.1.2
+    Uninstalling pyzmq-25.1.2:
+      Successfully uninstalled pyzmq-25.1.2
+  Attempting uninstall: pyyaml
+    Found existing installation: PyYAML 6.0.1
+    Uninstalling PyYAML-6.0.1:
+      Successfully uninstalled PyYAML-6.0.1
+  Attempting uninstall: pygments
+    Found existing installation: Pygments 2.17.2
+    Uninstalling Pygments-2.17.2:
+      Successfully uninstalled Pygments-2.17.2
+  Attempting uninstall: psutil
+    Found existing installation: psutil 5.9.7
+    Uninstalling psutil-5.9.7:
+      Successfully uninstalled psutil-5.9.7
+  Attempting uninstall: prompt-toolkit
+    Found existing installation: prompt-toolkit 3.0.43
+    Uninstalling prompt-toolkit-3.0.43:
+      Successfully uninstalled prompt-toolkit-3.0.43
+  Attempting uninstall: executing
+    Found existing installation: executing 2.0.1
+    Uninstalling executing-2.0.1:
+      Successfully uninstalled executing-2.0.1
+  Attempting uninstall: debugpy
+    Found existing installation: debugpy 1.8.1
+    Uninstalling debugpy-1.8.1:
+      Successfully uninstalled debugpy-1.8.1
+  Attempting uninstall: comm
+    Found existing installation: comm 0.2.1
+    Uninstalling comm-0.2.1:
+      Successfully uninstalled comm-0.2.1
+  Attempting uninstall: attrs
+    Found existing installation: attrs 23.2.0
+    Uninstalling attrs-23.2.0:
+      Successfully uninstalled attrs-23.2.0
+  Attempting uninstall: asttokens
+    Found existing installation: asttokens 2.4.1
+    Uninstalling asttokens-2.4.1:
+      Successfully uninstalled asttokens-2.4.1
+  Attempting uninstall: annotated-types
+    Found existing installation: annotated-types 0.6.0
+    Uninstalling annotated-types-0.6.0:
+      Successfully uninstalled annotated-types-0.6.0
+  Attempting uninstall: pydantic
+    Found existing installation: pydantic 2.11.4
+    Uninstalling pydantic-2.11.4:
+      Successfully uninstalled pydantic-2.11.4
+  Attempting uninstall: jupyter-core
+    Found existing installation: jupyter_core 5.7.1
+    Uninstalling jupyter_core-5.7.1:
+      Successfully uninstalled jupyter_core-5.7.1
+  Attempting uninstall: jedi
+    Found existing installation: jedi 0.19.1
+    Uninstalling jedi-0.19.1:
+      Successfully uninstalled jedi-0.19.1
+  Attempting uninstall: beautifulsoup4
+    Found existing installation: beautifulsoup4 4.12.3
+    Uninstalling beautifulsoup4-4.12.3:
+      Successfully uninstalled beautifulsoup4-4.12.3
+  Attempting uninstall: jupyter-client
+    Found existing installation: jupyter_client 8.6.0
+    Uninstalling jupyter_client-8.6.0:
+      Successfully uninstalled jupyter_client-8.6.0
+  Attempting uninstall: ipython
+    Found existing installation: ipython 8.20.0
+    Uninstalling ipython-8.20.0:
+      Successfully uninstalled ipython-8.20.0
+  Attempting uninstall: ipykernel
+    Found existing installation: ipykernel 6.29.2
+    Uninstalling ipykernel-6.29.2:
+      Successfully uninstalled ipykernel-6.29.2
+
+Successfully installed annotated-types-0.7.0 argon2-cffi-25.1.0 argon2-cffi-bindings-25.1.0 arrow-1.3.0 asttokens-3.0.0 async-lru-2.0.5 attrs-25.3.0 babel-2.17.0 beautifulsoup4-4.13.5 bleach-6.2.0 comm-0.2.3 debugpy-1.8.16 decorator-5.2.1 defusedxml-0.7.1 executing-2.2.1 fastjsonschema-2.21.2 ipykernel-6.30.1 ipython-9.5.0 ipython-pygments-lexers-1.1.1 ipywidgets-8.1.7 jedi-0.19.2 json5-0.12.1 jsonpointer-3.0.0 jupyter-1.1.1 jupyter-client-8.6.3 jupyter-console-6.6.3 jupyter-core-5.8.1 jupyter-events-0.12.0 jupyter-lsp-2.3.0 jupyter-server-2.17.0 jupyter-server-terminals-0.5.3 jupyterlab-4.4.7 jupyterlab-pygments-0.3.0 jupyterlab-server-2.27.3 jupyterlab-widgets-3.0.15 matplotlib-inline-0.1.7 mistune-3.1.4 nbclient-0.10.2 nbconvert-7.16.6 nbformat-5.10.4 notebook-7.4.5 notebook-shim-0.2.4 overrides-7.7.0 pandocfilters-1.5.1 parso-0.8.5 prompt-toolkit-3.0.52 psutil-7.0.0 ptyprocess-0.7.0 pure-eval-0.2.3 pydantic-2.11.7 pygments-2.19.2 python-json-logger-3.3.0 pyyaml-6.0.2 pyzmq-27.0.2 rfc3339-validator-0.1.4 rfc3986-validator-0.1.1 rfc3987-syntax-1.1.0 send2trash-1.8.3 sniffio-1.3.1 soupsieve-2.8 streetview-0.0.16 terminado-0.18.1 tinycss2-1.4.0 tornado-6.5.2 traitlets-5.14.3 types-python-dateutil-2.9.0.20250822 typing-inspection-0.4.1 webencodings-0.5.1 websocket-client-1.8.0 widgetsnbextension-4.0.14
+
+done
+#
+# To activate this environment, use
+#
+#     $ conda activate streetview
+#
+# To deactivate an active environment, use
+#
+#     $ conda deactivate
+
