@@ -1,11 +1,12 @@
 #!/bin/bash
 #SBATCH --partition=gpu_mig
 #SBATCH --gpus=1
-#SBATCH --job-name=scrape_loc
+#SBATCH --job-name=preprocess_pano
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=9
 #SBATCH --time=04:00:00
-#SBATCH --output=jobs/outputs/scraping_%A.out
+#SBATCH --mem=32GB
+#SBATCH --output=jobs/outputs/preprocess_pano.log
 
 module purge
 module load 2025
@@ -14,6 +15,6 @@ module load Anaconda3/2025.06-1
 cd $HOME/Project_AI/
 source activate streetview
 
-python scrape_lm_async.py
+python preprocess_panorama.py --panorama-folder /scratch-shared/pnair/Project_AI/data/6906237dc7731161a37282b2/panorama
 
 
