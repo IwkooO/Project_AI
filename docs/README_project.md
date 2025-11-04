@@ -7,9 +7,9 @@ Steps:
 - Create a personal map on learnablemeta.com (this requires making a map on geoguessr, as a geoguessrid is needed)
 - Go to the learnablemeta maps you'd like to import the metas from, and add their metas to your map
 - (This step might be optional, didn't test if it works without) Go to your geoguessr map and import (using the learnablemeta userscript) the locations into your geoguessr map
-- Ensure scrape_lm.py contains the right geoguessrId for your map, and then run it.
+- Ensure scripts/data_collection/scrape_lm.py contains the right geoguessrId for your map, and then run it.
 - To download the panorama images associated with each meta: 
-    - Ensure download_pano.py has correct geoguessrId for your map
+    - Ensure scripts/data_collection/download_pano.py has correct geoguessrId for your map
     - run download_pano.py
 
 # Installation
