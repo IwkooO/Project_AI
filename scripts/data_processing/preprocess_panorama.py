@@ -8,6 +8,7 @@ from PIL import Image
 from pathlib import Path
 from tqdm import tqdm
 import argparse
+from multiprocessing import Pool, cpu_count
 
 def find_bounding_box_vectorized(image_array, threshold=10):
     """
@@ -54,12 +55,47 @@ def crop_black_borders(image, threshold=10):
     cropped = image.crop((left, top, right, bottom))
     return cropped
 
-def analyze_images(panorama_folder, threshold=10):
+def _analyze_single_image(args):
+    """Worker function to analyze a single image."""
+    img_path, threshold = args
+    img_path = Path(img_path)  # Convert to Path if string
+    try:
+        img = Image.open(img_path)
+        width, height = img.size
+        aspect_ratio = width / height
+        
+        # Check if image is completely black
+        img_array = np.array(img)
+        is_black = find_bounding_box_vectorized(img_array, threshold) is None
+        
+        # Check if image has black borders
+        cropped = crop_black_borders(img, threshold)
+        has_borders = False
+        if cropped:
+            cropped_width, cropped_height = cropped.size
+            has_borders = (cropped_width < width or cropped_height < height)
+            cropped.close()
+        img.close()
+        
+        return {
+            'size': (width, height),
+            'aspect_ratio': aspect_ratio,
+            'is_black': is_black,
+            'has_borders': has_borders,
+            'name': img_path.name
+        }
+    except Exception as e:
+        return {'error': str(e), 'name': img_path.name}
+
+def analyze_images(panorama_folder, threshold=10, num_workers=None):
     """
     Analyze images to find statistics and identify problematic ones.
     """
     panorama_path = Path(panorama_folder)
     image_files = list(panorama_path.glob("*.jpg"))
+    
+    if num_workers is None:
+        num_workers = cpu_count()
     
     stats = {
         'total': len(image_files),
@@ -69,32 +105,93 @@ def analyze_images(panorama_folder, threshold=10):
         'aspect_ratios': []
     }
     
-    print(f"Analyzing {stats['total']} images...")
+    print(f"Analyzing {stats['total']} images with {num_workers} workers...")
     
-    for img_path in tqdm(image_files, desc="Analyzing"):
-        try:
-            img = Image.open(img_path)
-            width, height = img.size
-            stats['sizes'].append((width, height))
-            stats['aspect_ratios'].append(width / height)
-            
-            # Check if image is completely black
-            img_array = np.array(img)
-            if find_bounding_box_vectorized(img_array, threshold) is None:
-                stats['black_images'].append(img_path.name)
-            
-            # Check if image has black borders (cropped size < original size)
-            cropped = crop_black_borders(img, threshold)
-            if cropped:
-                cropped_width, cropped_height = cropped.size
-                if cropped_width < width or cropped_height < height:
-                    stats['images_with_borders'].append(img_path.name)
-        except Exception as e:
-            print(f"Error analyzing {img_path.name}: {e}")
+    # Prepare arguments for worker function (convert Path to str for pickling)
+    worker_args = [(str(img_path), threshold) for img_path in image_files]
+    
+    # Process in parallel
+    with Pool(num_workers) as pool:
+        results = list(tqdm(
+            pool.imap(_analyze_single_image, worker_args),
+            total=len(worker_args),
+            desc="Analyzing"
+        ))
+    
+    # Aggregate results
+    for result in results:
+        if 'error' in result:
+            print(f"Error analyzing {result['name']}: {result['error']}")
+            continue
+        
+        stats['sizes'].append(result['size'])
+        stats['aspect_ratios'].append(result['aspect_ratio'])
+        
+        if result['is_black']:
+            stats['black_images'].append(result['name'])
+        
+        if result['has_borders']:
+            stats['images_with_borders'].append(result['name'])
     
     return stats
 
-def preprocess_images(panorama_folder, output_folder=None, target_size=None, threshold=10, backup=True, inplace=False):
+def _get_cropped_size(args):
+    """Worker function to get cropped size of a single image."""
+    img_path, threshold = args
+    img_path = Path(img_path)  # Convert to Path if string
+    try:
+        img = Image.open(img_path)
+        cropped = crop_black_borders(img, threshold)
+        if cropped:
+            size = cropped.size
+            cropped.close()
+        else:
+            size = None
+        img.close()
+        return size
+    except Exception as e:
+        return None
+
+def _process_single_image(args):
+    """Worker function to process a single image."""
+    img_path, threshold, target_size, backup_path, output_path, backup, inplace = args
+    img_path = Path(img_path)  # Convert to Path if string
+    backup_path = Path(backup_path) if backup_path else None
+    output_path = Path(output_path) if output_path else None
+    try:
+        img = Image.open(img_path)
+        
+        # Backup original if requested
+        if backup and not inplace and backup_path:
+            backup_file = backup_path / img_path.name
+            if not backup_file.exists():
+                img.save(backup_file, "JPEG")
+        
+        # Crop black borders
+        cropped = crop_black_borders(img, threshold)
+        img.close()
+        
+        if cropped is None:
+            return {'status': 'skipped', 'name': img_path.name, 'reason': 'completely black'}
+        
+        # Resize to target size
+        resized = cropped.resize(target_size, Image.LANCZOS)
+        cropped.close()
+        
+        # Save processed image
+        if inplace:
+            output_file = img_path
+        else:
+            output_file = output_path / img_path.name
+        
+        resized.save(output_file, "JPEG", quality=95)
+        resized.close()
+        
+        return {'status': 'processed', 'name': img_path.name}
+    except Exception as e:
+        return {'status': 'error', 'name': img_path.name, 'error': str(e)}
+
+def preprocess_images(panorama_folder, output_folder=None, target_size=None, threshold=10, backup=True, inplace=False, num_workers=None):
     """
     Preprocess images: crop black borders and resize to uniform size.
     
@@ -105,7 +202,11 @@ def preprocess_images(panorama_folder, output_folder=None, target_size=None, thr
         threshold: Black pixel threshold (0-255)
         backup: Whether to backup original images
         inplace: If True, overwrite original images (output_folder ignored)
+        num_workers: Number of parallel workers (default: CPU count)
     """
+    if num_workers is None:
+        num_workers = cpu_count()
+    
     panorama_path = Path(panorama_folder)
     
     if inplace:
@@ -113,6 +214,8 @@ def preprocess_images(panorama_folder, output_folder=None, target_size=None, thr
         if backup:
             backup_path = panorama_path.parent / f"{panorama_path.name}_original"
             backup_path.mkdir(exist_ok=True)
+        else:
+            backup_path = None
     else:
         if output_folder is None:
             output_path = panorama_path.parent / f"{panorama_path.name}_processed"
@@ -123,23 +226,24 @@ def preprocess_images(panorama_folder, output_folder=None, target_size=None, thr
         if backup:
             backup_path = panorama_path.parent / f"{panorama_path.name}_original"
             backup_path.mkdir(exist_ok=True)
+        else:
+            backup_path = None
     
     image_files = list(panorama_path.glob("*.jpg"))
     
-    # First pass: collect sizes only (memory-efficient)
-    print("First pass: analyzing sizes...")
-    cropped_sizes = []
+    # First pass: collect sizes only (parallelized)
+    print(f"First pass: analyzing sizes with {num_workers} workers...")
+    worker_args = [(str(img_path), threshold) for img_path in image_files]
     
-    for img_path in tqdm(image_files, desc="Analyzing"):
-        try:
-            img = Image.open(img_path)
-            cropped = crop_black_borders(img, threshold)
-            if cropped:
-                cropped_sizes.append(cropped.size)
-            img.close()  # Explicitly close to free memory
-            del img, cropped
-        except Exception as e:
-            print(f"Error analyzing {img_path.name}: {e}")
+    cropped_sizes = []
+    with Pool(num_workers) as pool:
+        results = list(tqdm(
+            pool.imap(_get_cropped_size, worker_args),
+            total=len(worker_args),
+            desc="Analyzing sizes"
+        ))
+    
+    cropped_sizes = [size for size in results if size is not None]
     
     if not cropped_sizes:
         print("No valid images found after cropping!")
@@ -154,51 +258,34 @@ def preprocess_images(panorama_folder, output_folder=None, target_size=None, thr
     
     print(f"Target size: {target_size[0]}x{target_size[1]}")
     
-    # Second pass: process and save images immediately (memory-efficient)
-    print("Second pass: processing and saving images...")
+    # Second pass: process and save images (parallelized)
+    print(f"Second pass: processing and saving images with {num_workers} workers...")
+    worker_args = [
+        (str(img_path), threshold, target_size, str(backup_path) if backup_path else None, str(output_path), backup, inplace)
+        for img_path in image_files
+    ]
+    
     processed_count = 0
     skipped_count = 0
     
-    for img_path in tqdm(image_files, desc="Processing"):
-        try:
-            img = Image.open(img_path)
-            
-            # Backup original if requested
-            if backup and not inplace:
-                backup_file = backup_path / img_path.name
-                if not backup_file.exists():
-                    img.save(backup_file, "JPEG")
-            
-            # Crop black borders
-            cropped = crop_black_borders(img, threshold)
-            img.close()  # Close original immediately
-            del img
-            
-            if cropped is None:
-                print(f"Warning: {img_path.name} is completely black, skipping...")
-                skipped_count += 1
-                continue
-            
-            # Resize to target size (using LANCZOS for high quality)
-            resized = cropped.resize(target_size, Image.LANCZOS)
-            cropped.close()  # Close cropped immediately
-            del cropped
-            
-            # Save processed image
-            if inplace:
-                output_file = img_path
-            else:
-                output_file = output_path / img_path.name
-            
-            resized.save(output_file, "JPEG", quality=95)
-            resized.close()  # Close resized immediately
-            del resized
-            
+    with Pool(num_workers) as pool:
+        results = list(tqdm(
+            pool.imap(_process_single_image, worker_args),
+            total=len(worker_args),
+            desc="Processing"
+        ))
+    
+    # Aggregate results
+    for result in results:
+        if result['status'] == 'processed':
             processed_count += 1
-            
-        except Exception as e:
-            print(f"Error processing {img_path.name}: {e}")
+        elif result['status'] == 'skipped':
             skipped_count += 1
+            if 'reason' in result:
+                print(f"Warning: {result['name']} - {result['reason']}")
+        elif result['status'] == 'error':
+            skipped_count += 1
+            print(f"Error processing {result['name']}: {result.get('error', 'Unknown error')}")
     
     print(f"\nProcessing complete!")
     print(f"Processed: {processed_count}")
@@ -223,11 +310,13 @@ def main():
                        help='Overwrite original images in place')
     parser.add_argument('--analyze-only', action='store_true',
                        help='Only analyze images, do not process')
+    parser.add_argument('--num-workers', type=int, default=None,
+                       help='Number of parallel workers (default: CPU count)')
     
     args = parser.parse_args()
     
     if args.analyze_only:
-        stats = analyze_images(args.panorama_folder, args.threshold)
+        stats = analyze_images(args.panorama_folder, args.threshold, args.num_workers)
         print("\n=== Analysis Results ===")
         print(f"Total images: {stats['total']}")
         print(f"Completely black images: {len(stats['black_images'])}")
@@ -258,7 +347,8 @@ def main():
             target_size,
             args.threshold,
             backup=not args.no_backup,
-            inplace=args.inplace
+            inplace=args.inplace,
+            num_workers=args.num_workers
         )
 
 if __name__ == '__main__':
