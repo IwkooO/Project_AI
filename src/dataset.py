@@ -32,16 +32,19 @@ class PanoramaCBMDataset(Dataset):
     def __init__(self,
                  transform=None,
                  image_size: Tuple[int, int] = (224, 224),
-                 max_samples: Optional[int] = None):
+                 max_samples: Optional[int] = None,
+                 country: Optional[str] = None):
         """
         Args:
             transform: Optional torchvision transforms
             image_size: Target size for images (width, height)
             max_samples: Limit number of samples for debugging
+            country: Optional country name to filter samples by
         """
         self.transform = transform
         self.image_size = image_size
         self.max_samples = max_samples
+        self.country = country
 
         # Load and filter samples
         self.samples = self._load_samples()
@@ -79,6 +82,10 @@ class PanoramaCBMDataset(Dataset):
 
                 # Check required fields exist
                 if 'metaName' not in meta or 'country' not in meta:
+                    continue
+
+                # Filter by country if specified
+                if self.country is not None and meta['country'] != self.country:
                     continue
 
                 # Extract coordinates if available
@@ -283,12 +290,18 @@ class SubsetDataset(Dataset):
 
 if __name__ == "__main__":
     # Test the dataset
-    dataset = PanoramaCBMDataset(max_samples=1000)  # Use more samples for statistics
+    dataset = PanoramaCBMDataset(country="Australia")  
 
     # Test statistics
     stats = get_statistics(dataset.samples)
     print_statistics(stats)
-    print()
+    
+    # print an example sample
+    print(dataset.samples[0])
+    print(f"Image shape: {dataset.samples[0]['image_path']}")
+    print(f"Concept idx: {dataset.samples[0]['meta_name']}")
+    print(f"Target idx: {dataset.samples[0]['country']}")
+    print(f"Metadata keys: {list(dataset.samples[0].keys())}")
 
     # Test splits
     train_samples, val_samples, test_samples = create_splits(dataset.samples)
