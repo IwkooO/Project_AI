@@ -1,0 +1,37 @@
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+Starting StreetCLIP CBM training
+INFO:__main__:Set random seed to 42 for reproducibility
+INFO:__main__:Checkpoint directory: results/dinov3-australia-spherical-loss/sequential/dinov3/Australia/2025-11-16_17-33-51
+INFO:__main__:Logging to results/dinov3-australia-spherical-loss/sequential/dinov3/Australia/2025-11-16_17-33-51/logs/training.log
+wandb: Currently logged in as: pradyut-nair (project-ai-geoguessr) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.23.0
+wandb: Run data is saved locally in results/dinov3-australia-spherical-loss/sequential/dinov3/Australia/2025-11-16_17-33-51/wandb/run-20251116_173351-b37c4iqy
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run train-cbm-Australia-dinov3-sphere-20251116-173351
+wandb: ⭐️ View project at https://wandb.ai/project-ai-geoguessr/streetclip-cbm-geolocation
+wandb: 🚀 View run at https://wandb.ai/project-ai-geoguessr/streetclip-cbm-geolocation/runs/b37c4iqy
+INFO:__main__:Initialized wandb run: train-cbm-Australia-dinov3-sphere-20251116-173351
+Loaded processor for facebook/dinov3-vit7b16-pretrain-lvd1689m
+  Image size: (336, 336)
+  Normalization mean: [0.485, 0.456, 0.406]
+  Normalization std: [0.229, 0.224, 0.225]
+Loading samples:   0%|          | 0/5538 [00:00<?, ?it/s]Loading samples:   1%|          | 47/5538 [00:00<00:11, 468.62it/s]Loading samples:   2%|▏         | 94/5538 [00:00<00:22, 245.11it/s]Loading samples:   4%|▎         | 202/5538 [00:00<00:10, 487.34it/s]Loading samples:   5%|▌         | 298/5538 [00:00<00:08, 627.93it/s]Loading samples:   9%|▊         | 479/5538 [00:00<00:06, 800.91it/s]Loading samples:  11%|█         | 584/5538 [00:00<00:05, 862.84it/s]Loading samples:  13%|█▎        | 710/5538 [00:00<00:05, 882.07it/s]Loading samples:  16%|█▋        | 912/5538 [00:01<00:03, 1176.07it/s]Loading samples:  19%|█▉        | 1039/5538 [00:01<00:04, 1041.96it/s]Loading samples:  22%|██▏       | 1210/5538 [00:01<00:03, 1149.69it/s]Loading samples:  24%|██▍       | 1332/5538 [00:01<00:04, 1044.05it/s]Loading samples:  27%|██▋       | 1501/5538 [00:01<00:03, 1201.95it/s]Loading samples:  29%|██▉       | 1629/5538 [00:01<00:03, 1126.07it/s]Loading samples:  32%|███▏      | 1756/5538 [00:01<00:04, 887.76it/s] Loading samples:  34%|███▎      | 1856/5538 [00:02<00:04, 857.25it/s]Loading samples:  38%|███▊      | 2122/5538 [00:02<00:02, 1250.58it/s]Loading samples:  43%|████▎     | 2405/5538 [00:02<00:01, 1632.07it/s]Loading samples:  47%|████▋     | 2589/5538 [00:02<00:02, 1317.46it/s]Loading samples:  50%|████▉     | 2745/5538 [00:02<00:02, 1183.02it/s]Loading samples:  53%|█████▎    | 2915/5538 [00:02<00:02, 1294.30it/s]Loading samples:  55%|█████▌    | 3062/5538 [00:02<00:02, 1171.97it/s]Loading samples:  61%|██████▏   | 3404/5538 [00:03<00:01, 1663.24it/s]Loading samples:  65%|██████▍   | 3598/5538 [00:03<00:01, 1730.54it/s]Loading samples:  68%|██████▊   | 3788/5538 [00:03<00:01, 1727.22it/s]Loading samples:  72%|███████▏  | 3973/5538 [00:03<00:01, 1431.37it/s]Loading samples:  75%|███████▌  | 4165/5538 [00:03<00:00, 1545.19it/s]Loading samples:  80%|████████  | 4458/5538 [00:03<00:00, 1754.69it/s]Loading samples:  84%|████████▍ | 4645/5538 [00:03<00:00, 1323.32it/s]Loading samples:  90%|████████▉ | 4966/5538 [00:04<00:00, 1675.20it/s]Loading samples:  93%|█████████▎| 5159/5538 [00:04<00:00, 1571.16it/s]Loading samples:  98%|█████████▊| 5422/5538 [00:04<00:00, 1774.21it/s]Loading samples: 100%|██████████| 5538/5538 [00:04<00:00, 1288.09it/s]
+INFO:__main__:Dataset image size: (336, 336)
+Loaded 251 samples
+Concepts: 32
+Countries: 1
+Loading checkpoint shards:   0%|          | 0/6 [00:00<?, ?it/s]Loading checkpoint shards:  17%|█▋        | 1/6 [00:03<00:17,  3.44s/it]Loading checkpoint shards:  33%|███▎      | 2/6 [00:05<00:11,  2.84s/it]Loading checkpoint shards:  50%|█████     | 3/6 [00:08<00:08,  2.85s/it]Loading checkpoint shards:  67%|██████▋   | 4/6 [00:11<00:05,  2.94s/it]Loading checkpoint shards:  83%|████████▎ | 5/6 [00:14<00:02,  2.84s/it]Loading checkpoint shards: 100%|██████████| 6/6 [00:15<00:00,  2.27s/it]Loading checkpoint shards: 100%|██████████| 6/6 [00:15<00:00,  2.61s/it]

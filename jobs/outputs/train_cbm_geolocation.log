@@ -14,139 +14,189 @@ already available
 on the system, please use 'module avail' or 'module spider' to search for it.
 ============================================================================================== 
 Starting StreetCLIP CBM training
-2025-11-16 11:03:25.464222: I tensorflow/core/util/port.cc:113] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
-2025-11-16 11:03:25.722234: E external/local_xla/xla/stream_executor/cuda/cuda_dnn.cc:9261] Unable to register cuDNN factory: Attempting to register factory for plugin cuDNN when one has already been registered
-2025-11-16 11:03:25.722351: E external/local_xla/xla/stream_executor/cuda/cuda_fft.cc:607] Unable to register cuFFT factory: Attempting to register factory for plugin cuFFT when one has already been registered
-2025-11-16 11:03:25.734476: E external/local_xla/xla/stream_executor/cuda/cuda_blas.cc:1515] Unable to register cuBLAS factory: Attempting to register factory for plugin cuBLAS when one has already been registered
-2025-11-16 11:03:25.764802: I tensorflow/core/platform/cpu_feature_guard.cc:182] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
-To enable the following instructions: AVX2 AVX512F AVX512_VNNI AVX512_BF16 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
-2025-11-16 11:03:27.862472: W tensorflow/compiler/tf2tensorrt/utils/py_utils.cc:38] TF-TRT Warning: Could not find TensorRT
-INFO:__main__:Checkpoint directory: results/checkpoints/sequential/16-11-25-11-03-41-train-cbm-Australia
-wandb: Currently logged in as: pradyut-nair (project-ai-geoguessr). Use `wandb login --relogin` to force relogin
-wandb: wandb version 0.23.0 is available!  To upgrade, please run:
-wandb:  $ pip install wandb --upgrade
-wandb: Tracking run with wandb version 0.16.1
-wandb: Run data is saved locally in results/checkpoints/sequential/16-11-25-11-03-41-train-cbm-Australia/wandb/run-20251116_110343-cper1164
+INFO:__main__:Set random seed to 42 for reproducibility
+INFO:__main__:Checkpoint directory: results/dinov3-australia-spherical-loss/sequential/dinov3/Australia/2025-11-16_16-22-58
+INFO:__main__:Logging to results/dinov3-australia-spherical-loss/sequential/dinov3/Australia/2025-11-16_16-22-58/logs/training.log
+wandb: Currently logged in as: pradyut-nair (project-ai-geoguessr) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.23.0
+wandb: Run data is saved locally in results/dinov3-australia-spherical-loss/sequential/dinov3/Australia/2025-11-16_16-22-58/wandb/run-20251116_162300-wahkfjv5
 wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run train-cbm-Australia-20251116-110341
+wandb: Syncing run train-cbm-Australia-20251116-162258
 wandb: ⭐️ View project at https://wandb.ai/project-ai-geoguessr/streetclip-cbm-geolocation
-wandb: 🚀 View run at https://wandb.ai/project-ai-geoguessr/streetclip-cbm-geolocation/runs/cper1164
-INFO:__main__:Initialized wandb run: train-cbm-Australia-20251116-110341
-Loading samples:   0%|          | 0/5538 [00:00<?, ?it/s]Loading samples:   2%|▏         | 97/5538 [00:00<00:05, 966.88it/s]Loading samples:   5%|▌         | 303/5538 [00:00<00:03, 1608.59it/s]Loading samples:   9%|▉         | 523/5538 [00:00<00:02, 1875.33it/s]Loading samples:  13%|█▎        | 746/5538 [00:00<00:02, 2011.38it/s]Loading samples:  18%|█▊        | 975/5538 [00:00<00:02, 2110.33it/s]Loading samples:  21%|██▏       | 1187/5538 [00:00<00:02, 2092.93it/s]Loading samples:  26%|██▌       | 1415/5538 [00:00<00:01, 2151.01it/s]Loading samples:  29%|██▉       | 1631/5538 [00:00<00:01, 2138.86it/s]Loading samples:  33%|███▎      | 1845/5538 [00:00<00:01, 2113.99it/s]Loading samples:  37%|███▋      | 2065/5538 [00:01<00:01, 2139.54it/s]Loading samples:  41%|████▏     | 2289/5538 [00:01<00:01, 2169.51it/s]Loading samples:  45%|████▌     | 2507/5538 [00:01<00:01, 2168.42it/s]Loading samples:  49%|████▉     | 2727/5538 [00:01<00:01, 2176.67it/s]Loading samples:  53%|█████▎    | 2945/5538 [00:01<00:01, 2167.58it/s]Loading samples:  57%|█████▋    | 3166/5538 [00:01<00:01, 2179.98it/s]Loading samples:  61%|██████    | 3385/5538 [00:01<00:00, 2161.01it/s]Loading samples:  65%|██████▌   | 3602/5538 [00:01<00:00, 2145.29it/s]Loading samples:  69%|██████▉   | 3820/5538 [00:01<00:00, 2153.72it/s]Loading samples:  73%|███████▎  | 4036/5538 [00:01<00:00, 2153.74it/s]Loading samples:  77%|███████▋  | 4280/5538 [00:02<00:00, 2237.93it/s]Loading samples:  81%|████████▏ | 4509/5538 [00:02<00:00, 2251.38it/s]Loading samples:  86%|████████▌ | 4756/5538 [00:02<00:00, 2315.36it/s]Loading samples:  90%|█████████ | 4988/5538 [00:02<00:00, 2302.79it/s]Loading samples:  94%|█████████▍| 5227/5538 [00:02<00:00, 2328.13it/s]Loading samples:  99%|█████████▉| 5473/5538 [00:02<00:00, 2366.40it/s]Loading samples: 100%|██████████| 5538/5538 [00:02<00:00, 2170.55it/s]
-INFO:__main__:Encoder feature dimension: 1024
-INFO:__main__:Model dimensions: concepts=32, countries=1, feature_dim=1024
-INFO:__main__:Parameter counts - Total: 427,977,092, Trainable: 32,899
-INFO:__main__:  Encoder: 0, Concept layer: 32,800, Country head: 33, Coordinate head: 66
+wandb: 🚀 View run at https://wandb.ai/project-ai-geoguessr/streetclip-cbm-geolocation/runs/wahkfjv5
+INFO:__main__:Initialized wandb run: train-cbm-Australia-20251116-162258
+Loaded processor for facebook/dinov3-vit7b16-pretrain-lvd1689m
+  Image size: (336, 336)
+  Normalization mean: [0.485, 0.456, 0.406]
+  Normalization std: [0.229, 0.224, 0.225]
+Loading samples:   0%|          | 0/5538 [00:00<?, ?it/s]Loading samples:   0%|          | 3/5538 [00:00<03:15, 28.24it/s]Loading samples:   0%|          | 18/5538 [00:00<00:59, 92.27it/s]Loading samples:   1%|          | 28/5538 [00:00<01:23, 66.02it/s]Loading samples:   1%|          | 36/5538 [00:00<01:29, 61.71it/s]Loading samples:   1%|          | 48/5538 [00:00<01:11, 76.26it/s]Loading samples:   1%|          | 59/5538 [00:00<01:08, 79.66it/s]Loading samples:   1%|          | 68/5538 [00:01<01:27, 62.54it/s]Loading samples:   1%|▏         | 75/5538 [00:01<01:48, 50.45it/s]Loading samples:   1%|▏         | 81/5538 [00:01<02:10, 41.84it/s]Loading samples:   2%|▏         | 86/5538 [00:01<02:06, 43.27it/s]Loading samples:   2%|▏         | 91/5538 [00:01<02:10, 41.87it/s]Loading samples:   2%|▏         | 100/5538 [00:01<01:56, 46.57it/s]Loading samples:   2%|▏         | 106/5538 [00:01<01:52, 48.09it/s]Loading samples:   2%|▏         | 112/5538 [00:02<02:30, 36.05it/s]Loading samples:   2%|▏         | 118/5538 [00:02<02:20, 38.62it/s]Loading samples:   2%|▏         | 130/5538 [00:02<02:03, 43.83it/s]Loading samples:   2%|▏         | 135/5538 [00:02<02:06, 42.82it/s]Loading samples:   3%|▎         | 141/5538 [00:02<02:01, 44.29it/s]Loading samples:   3%|▎         | 146/5538 [00:03<02:32, 35.30it/s]Loading samples:   3%|▎         | 156/5538 [00:03<01:57, 45.88it/s]Loading samples:   3%|▎         | 170/5538 [00:03<01:21, 65.65it/s]Loading samples:   3%|▎         | 178/5538 [00:03<01:58, 45.41it/s]Loading samples:   4%|▎         | 202/5538 [00:03<01:14, 71.88it/s]Loading samples:   4%|▍         | 211/5538 [00:03<01:11, 74.85it/s]Loading samples:   4%|▍         | 220/5538 [00:04<01:36, 54.90it/s]Loading samples:   4%|▍         | 228/5538 [00:04<01:55, 46.15it/s]Loading samples:   4%|▍         | 234/5538 [00:04<02:09, 41.03it/s]Loading samples:   4%|▍         | 245/5538 [00:04<01:41, 52.21it/s]Loading samples:   5%|▍         | 261/5538 [00:04<01:16, 69.31it/s]Loading samples:   5%|▍         | 274/5538 [00:05<01:06, 79.31it/s]Loading samples:   5%|▌         | 284/5538 [00:05<01:05, 80.12it/s]Loading samples:   6%|▌         | 312/5538 [00:05<00:45, 115.94it/s]Loading samples:   6%|▌         | 325/5538 [00:05<00:48, 107.54it/s]Loading samples:   6%|▌         | 337/5538 [00:05<00:52, 99.75it/s] Loading samples:   7%|▋         | 363/5538 [00:05<00:38, 133.48it/s]Loading samples:   7%|▋         | 383/5538 [00:05<00:34, 147.54it/s]Loading samples:   7%|▋         | 404/5538 [00:05<00:33, 153.15it/s]Loading samples:   8%|▊         | 420/5538 [00:06<00:37, 138.12it/s]Loading samples:   8%|▊         | 435/5538 [00:06<00:54, 93.86it/s] Loading samples:   8%|▊         | 447/5538 [00:06<00:58, 87.17it/s]Loading samples:   9%|▊         | 472/5538 [00:06<00:44, 114.84it/s]Loading samples:   9%|▉         | 486/5538 [00:06<00:53, 94.83it/s] Loading samples:   9%|▉         | 505/5538 [00:07<00:53, 94.27it/s]Loading samples:  10%|▉         | 539/5538 [00:07<00:36, 137.41it/s]Loading samples:  10%|█         | 573/5538 [00:07<00:27, 178.49it/s]Loading samples:  11%|█         | 595/5538 [00:07<00:30, 162.11it/s]Loading samples:  11%|█         | 615/5538 [00:07<00:30, 160.88it/s]Loading samples:  11%|█▏        | 634/5538 [00:07<00:36, 133.59it/s]Loading samples:  12%|█▏        | 650/5538 [00:07<00:40, 121.02it/s]Loading samples:  13%|█▎        | 696/5538 [00:08<00:28, 171.57it/s]Loading samples:  13%|█▎        | 715/5538 [00:08<00:27, 175.05it/s]Loading samples:  13%|█▎        | 746/5538 [00:08<00:24, 196.89it/s]Loading samples:  14%|█▍        | 785/5538 [00:08<00:19, 240.27it/s]Loading samples:  15%|█▍        | 819/5538 [00:08<00:18, 251.99it/s]Loading samples:  15%|█▌        | 846/5538 [00:08<00:20, 229.66it/s]Loading samples:  16%|█▌        | 895/5538 [00:08<00:15, 292.19it/s]Loading samples:  17%|█▋        | 927/5538 [00:08<00:17, 264.18it/s]Loading samples:  17%|█▋        | 956/5538 [00:09<00:21, 215.14it/s]Loading samples:  18%|█▊        | 980/5538 [00:09<00:26, 175.11it/s]Loading samples:  18%|█▊        | 1008/5538 [00:09<00:23, 195.62it/s]Loading samples:  19%|█▊        | 1031/5538 [00:09<00:24, 185.31it/s]Loading samples:  19%|█▉        | 1052/5538 [00:09<00:27, 162.12it/s]Loading samples:  19%|█▉        | 1074/5538 [00:09<00:25, 173.57it/s]Loading samples:  20%|█▉        | 1093/5538 [00:10<00:27, 159.14it/s]Loading samples:  21%|██        | 1136/5538 [00:10<00:20, 209.78it/s]Loading samples:  21%|██        | 1159/5538 [00:10<00:22, 194.53it/s]Loading samples:  21%|██▏       | 1180/5538 [00:10<00:22, 190.29it/s]Loading samples:  23%|██▎       | 1256/5538 [00:10<00:13, 315.33it/s]Loading samples:  23%|██▎       | 1290/5538 [00:10<00:19, 222.00it/s]Loading samples:  24%|██▍       | 1342/5538 [00:10<00:15, 278.41it/s]Loading samples:  25%|██▍       | 1376/5538 [00:11<00:19, 217.29it/s]Loading samples:  25%|██▌       | 1404/5538 [00:11<00:19, 210.75it/s]Loading samples:  26%|██▌       | 1434/5538 [00:11<00:17, 228.23it/s]Loading samples:  27%|██▋       | 1488/5538 [00:11<00:13, 297.02it/s]Loading samples:  28%|██▊       | 1523/5538 [00:11<00:17, 234.28it/s]Loading samples:  28%|██▊       | 1561/5538 [00:11<00:16, 241.91it/s]Loading samples:  29%|██▉       | 1620/5538 [00:12<00:12, 311.04it/s]Loading samples:  30%|██▉       | 1657/5538 [00:12<00:16, 238.13it/s]Loading samples:  30%|███       | 1687/5538 [00:12<00:17, 220.40it/s]Loading samples:  32%|███▏      | 1746/5538 [00:12<00:13, 288.15it/s]Loading samples:  32%|███▏      | 1781/5538 [00:12<00:14, 252.09it/s]Loading samples:  33%|███▎      | 1834/5538 [00:12<00:12, 296.91it/s]Loading samples:  34%|███▍      | 1893/5538 [00:13<00:10, 353.22it/s]Loading samples:  35%|███▌      | 1942/5538 [00:13<00:09, 372.78it/s]Loading samples:  38%|███▊      | 2090/5538 [00:13<00:05, 624.63it/s]Loading samples:  39%|███▉      | 2158/5538 [00:13<00:07, 435.33it/s]Loading samples:  42%|████▏     | 2304/5538 [00:13<00:05, 597.60it/s]Loading samples:  43%|████▎     | 2409/5538 [00:13<00:04, 637.27it/s]Loading samples:  46%|████▌     | 2553/5538 [00:13<00:03, 770.12it/s]Loading samples:  48%|████▊     | 2648/5538 [00:14<00:03, 808.92it/s]Loading samples:  49%|████▉     | 2736/5538 [00:14<00:03, 789.19it/s]Loading samples:  51%|█████     | 2820/5538 [00:14<00:04, 650.74it/s]Loading samples:  52%|█████▏    | 2892/5538 [00:14<00:04, 618.16it/s]Loading samples:  54%|█████▍    | 2999/5538 [00:14<00:03, 720.65it/s]Loading samples:  58%|█████▊    | 3194/5538 [00:14<00:02, 910.47it/s]Loading samples:  60%|█████▉    | 3322/5538 [00:14<00:02, 961.15it/s]Loading samples:  62%|██████▏   | 3421/5538 [00:14<00:02, 875.09it/s]Loading samples:  65%|██████▌   | 3627/5538 [00:15<00:01, 1065.63it/s]Loading samples:  69%|██████▊   | 3802/5538 [00:15<00:01, 1199.89it/s]Loading samples:  72%|███████▏  | 3988/5538 [00:15<00:01, 1109.52it/s]Loading samples:  75%|███████▍  | 4127/5538 [00:15<00:01, 1153.34it/s]Loading samples:  77%|███████▋  | 4247/5538 [00:15<00:01, 1085.45it/s]Loading samples:  81%|████████  | 4466/5538 [00:15<00:00, 1144.28it/s]Loading samples:  85%|████████▍ | 4686/5538 [00:15<00:00, 1383.11it/s]Loading samples:  89%|████████▉ | 4954/5538 [00:16<00:00, 1692.54it/s]Loading samples:  93%|█████████▎| 5136/5538 [00:16<00:00, 1475.47it/s]Loading samples:  99%|█████████▊| 5461/5538 [00:16<00:00, 1792.05it/s]Loading samples: 100%|██████████| 5538/5538 [00:16<00:00, 338.61it/s] 
+INFO:__main__:Dataset image size: (336, 336)
 Loaded 251 samples
 Concepts: 32
 Countries: 1
+Loading checkpoint shards:   0%|          | 0/6 [00:00<?, ?it/s]Loading checkpoint shards:  17%|█▋        | 1/6 [00:03<00:16,  3.36s/it]Loading checkpoint shards:  33%|███▎      | 2/6 [00:06<00:12,  3.13s/it]Loading checkpoint shards:  50%|█████     | 3/6 [00:08<00:08,  2.86s/it]Loading checkpoint shards:  67%|██████▋   | 4/6 [00:11<00:05,  2.76s/it]Loading checkpoint shards:  83%|████████▎ | 5/6 [00:14<00:02,  2.76s/it]Loading checkpoint shards: 100%|██████████| 6/6 [00:15<00:00,  2.14s/it]Loading checkpoint shards: 100%|██████████| 6/6 [00:15<00:00,  2.53s/it]
+INFO:__main__:Using encoder: facebook/dinov3-vit7b16-pretrain-lvd1689m
+INFO:__main__:Encoder type: auto
+INFO:__main__:Encoder feature dimension: 4096
+INFO:__main__:Model dimensions: concepts=32, countries=1, feature_dim=4096
+INFO:__main__:Parameter counts - Total: 6,716,166,308, Trainable: 131,236
+INFO:__main__:  Encoder: 0, Concept layer: 131,104, Country head: 33, Coordinate head: 99
 Starting stage: concept for 5 epochs
 Epoch 1/5 (Stage: concept)
-Train:   0%|          | 0/12 [00:00<?, ?it/s]Train:   8%|▊         | 1/12 [00:11<02:05, 11.45s/it]Train:  17%|█▋        | 2/12 [00:11<00:48,  4.82s/it]Train:  25%|██▌       | 3/12 [00:11<00:24,  2.70s/it]Train:  33%|███▎      | 4/12 [00:11<00:13,  1.70s/it]Train:  42%|████▏     | 5/12 [00:20<00:30,  4.31s/it]Train:  50%|█████     | 6/12 [00:21<00:17,  3.00s/it]Train:  58%|█████▊    | 7/12 [00:21<00:10,  2.07s/it]Train:  67%|██████▋   | 8/12 [00:21<00:05,  1.47s/it]Train:  75%|███████▌  | 9/12 [00:30<00:11,  3.91s/it]Train:  83%|████████▎ | 10/12 [00:31<00:05,  2.88s/it]Train:  92%|█████████▏| 11/12 [00:31<00:02,  2.05s/it]                                                      Eval:   0%|          | 0/3 [00:00<?, ?it/s]Eval:  33%|███▎      | 1/3 [00:10<00:21, 10.94s/it]Eval:  67%|██████▋   | 2/3 [00:11<00:04,  4.61s/it]Eval: 100%|██████████| 3/3 [00:11<00:00,  2.56s/it]                                                   Train Loss: 3.6352 | Val Loss: 3.3527
-  concept_accuracy: 0.1458
+Train:   0%|          | 0/13 [00:00<?, ?it/s]Train:   8%|▊         | 1/13 [00:16<03:14, 16.18s/it]Train:  15%|█▌        | 2/13 [00:18<01:26,  7.88s/it]Train:  23%|██▎       | 3/13 [00:20<00:52,  5.23s/it]Train:  31%|███       | 4/13 [00:22<00:35,  3.98s/it]Train:  38%|███▊      | 5/13 [00:24<00:26,  3.30s/it]Train:  46%|████▌     | 6/13 [00:26<00:20,  2.88s/it]Train:  54%|█████▍    | 7/13 [00:28<00:15,  2.62s/it]Train:  62%|██████▏   | 8/13 [00:30<00:12,  2.45s/it]Train:  69%|██████▉   | 9/13 [00:32<00:09,  2.33s/it]Train:  77%|███████▋  | 10/13 [00:34<00:06,  2.25s/it]Train:  85%|████████▍ | 11/13 [00:36<00:04,  2.20s/it]Train:  92%|█████████▏| 12/13 [00:39<00:02,  2.16s/it]Train: 100%|██████████| 13/13 [00:39<00:00,  1.80s/it]                                                      Eval:   0%|          | 0/2 [00:00<?, ?it/s]Eval:  50%|█████     | 1/2 [00:11<00:11, 11.08s/it]Eval: 100%|██████████| 2/2 [00:12<00:00,  5.21s/it]                                                   Train Loss: 3.7966 | Val Loss: 4.8971
+  concept_accuracy: 0.0000
   country_accuracy: 1.0000
-  coord_mse: 0.0429
-  coord_mae: 0.1680
-  median_km: 2936.5022
+  coord_mse: 0.0054
+  coord_mae: 0.0615
+  median_km: 1215.5690
   acc@1km: 0.0000
   acc@10km: 0.0000
   acc@100km: 0.0000
-  acc@1000km: 0.0000
+  acc@1000km: 0.3125
 Epoch 2/5 (Stage: concept)
-Train:   0%|          | 0/12 [00:00<?, ?it/s]Train:   8%|▊         | 1/12 [00:10<01:51, 10.17s/it]Train:  17%|█▋        | 2/12 [00:10<00:42,  4.29s/it]Train:  25%|██▌       | 3/12 [00:10<00:21,  2.41s/it]Train:  33%|███▎      | 4/12 [00:10<00:12,  1.53s/it]Train:  42%|████▏     | 5/12 [00:20<00:31,  4.43s/it]Train:  50%|█████     | 6/12 [00:20<00:17,  2.99s/it]Train:  58%|█████▊    | 7/12 [00:20<00:10,  2.07s/it]Train:  67%|██████▋   | 8/12 [00:20<00:05,  1.46s/it]Train:  75%|███████▌  | 9/12 [00:30<00:12,  4.09s/it]Train:  83%|████████▎ | 10/12 [00:30<00:05,  2.88s/it]Train:  92%|█████████▏| 11/12 [00:31<00:02,  2.05s/it]                                                      Eval:   0%|          | 0/3 [00:00<?, ?it/s]Eval:  33%|███▎      | 1/3 [00:10<00:21, 10.73s/it]Eval:  67%|██████▋   | 2/3 [00:10<00:04,  4.52s/it]Eval: 100%|██████████| 3/3 [00:11<00:00,  2.51s/it]                                                   Train Loss: 3.1174 | Val Loss: 3.1284
-  concept_accuracy: 0.1042
+Train:   0%|          | 0/13 [00:00<?, ?it/s]Train:   8%|▊         | 1/13 [00:09<01:55,  9.63s/it]Train:  15%|█▌        | 2/13 [00:11<00:57,  5.18s/it]Train:  23%|██▎       | 3/13 [00:13<00:37,  3.77s/it]Train:  31%|███       | 4/13 [00:15<00:27,  3.10s/it]Train:  38%|███▊      | 5/13 [00:17<00:21,  2.73s/it]Train:  46%|████▌     | 6/13 [00:20<00:17,  2.51s/it]Train:  54%|█████▍    | 7/13 [00:22<00:14,  2.37s/it]Train:  62%|██████▏   | 8/13 [00:24<00:11,  2.27s/it]Train:  69%|██████▉   | 9/13 [00:26<00:08,  2.21s/it]Train:  77%|███████▋  | 10/13 [00:28<00:06,  2.17s/it]Train:  85%|████████▍ | 11/13 [00:30<00:04,  2.14s/it]Train:  92%|█████████▏| 12/13 [00:32<00:02,  2.12s/it]Train: 100%|██████████| 13/13 [00:33<00:00,  1.75s/it]                                                      Eval:   0%|          | 0/2 [00:00<?, ?it/s]Eval:  50%|█████     | 1/2 [00:09<00:09,  9.40s/it]Eval: 100%|██████████| 2/2 [00:10<00:00,  4.52s/it]                                                   Train Loss: 2.6761 | Val Loss: 6.1880
+  concept_accuracy: 0.0000
   country_accuracy: 1.0000
-  coord_mse: 0.0491
-  coord_mae: 0.1689
-  median_km: 2808.1610
+  coord_mse: 0.0051
+  coord_mae: 0.0562
+  median_km: 1031.4759
   acc@1km: 0.0000
   acc@10km: 0.0000
   acc@100km: 0.0000
-  acc@1000km: 0.0000
+  acc@1000km: 0.4375
 Epoch 3/5 (Stage: concept)
-Train:   0%|          | 0/12 [00:00<?, ?it/s]Train:   8%|▊         | 1/12 [00:10<01:50, 10.06s/it]Train:  17%|█▋        | 2/12 [00:10<00:42,  4.25s/it]Train:  25%|██▌       | 3/12 [00:10<00:21,  2.39s/it]Train:  33%|███▎      | 4/12 [00:10<00:12,  1.51s/it]Train:  42%|████▏     | 5/12 [00:19<00:29,  4.22s/it]Train:  50%|█████     | 6/12 [00:19<00:17,  2.84s/it]Train:  58%|█████▊    | 7/12 [00:19<00:09,  1.97s/it]Train:  67%|██████▋   | 8/12 [00:20<00:05,  1.40s/it]Train:  75%|███████▌  | 9/12 [00:29<00:11,  3.97s/it]Train:  83%|████████▎ | 10/12 [00:29<00:05,  2.80s/it]Train:  92%|█████████▏| 11/12 [00:30<00:01,  1.99s/it]                                                      Eval:   0%|          | 0/3 [00:00<?, ?it/s]Eval:  33%|███▎      | 1/3 [00:10<00:20, 10.43s/it]Eval:  67%|██████▋   | 2/3 [00:10<00:04,  4.40s/it]Eval: 100%|██████████| 3/3 [00:10<00:00,  2.45s/it]                                                   Train Loss: 2.6962 | Val Loss: 2.8920
-  concept_accuracy: 0.1250
+Train:   0%|          | 0/13 [00:00<?, ?it/s]Train:   8%|▊         | 1/13 [00:09<01:56,  9.73s/it]Train:  15%|█▌        | 2/13 [00:11<00:57,  5.23s/it]Train:  23%|██▎       | 3/13 [00:13<00:37,  3.79s/it]Train:  31%|███       | 4/13 [00:15<00:28,  3.11s/it]Train:  38%|███▊      | 5/13 [00:18<00:21,  2.74s/it]Train:  46%|████▌     | 6/13 [00:20<00:17,  2.52s/it]Train:  54%|█████▍    | 7/13 [00:22<00:14,  2.37s/it]Train:  62%|██████▏   | 8/13 [00:24<00:11,  2.28s/it]Train:  69%|██████▉   | 9/13 [00:26<00:08,  2.22s/it]Train:  77%|███████▋  | 10/13 [00:28<00:06,  2.17s/it]Train:  85%|████████▍ | 11/13 [00:30<00:04,  2.14s/it]Train:  92%|█████████▏| 12/13 [00:32<00:02,  2.12s/it]Train: 100%|██████████| 13/13 [00:33<00:00,  1.75s/it]                                                      Eval:   0%|          | 0/2 [00:00<?, ?it/s]Eval:  50%|█████     | 1/2 [00:10<00:10, 10.63s/it]Eval: 100%|██████████| 2/2 [00:11<00:00,  5.03s/it]                                                   Train Loss: 2.1146 | Val Loss: 6.4566
+  concept_accuracy: 0.0000
   country_accuracy: 1.0000
-  coord_mse: 0.0180
-  coord_mae: 0.1102
-  median_km: 2130.3534
+  coord_mse: 0.0081
+  coord_mae: 0.0762
+  median_km: 1507.5240
   acc@1km: 0.0000
   acc@10km: 0.0000
   acc@100km: 0.0000
-  acc@1000km: 0.0625
+  acc@1000km: 0.2500
 Epoch 4/5 (Stage: concept)
-Train:   0%|          | 0/12 [00:00<?, ?it/s]Train:   8%|▊         | 1/12 [00:09<01:46,  9.70s/it]Train:  17%|█▋        | 2/12 [00:09<00:40,  4.10s/it]Train:  25%|██▌       | 3/12 [00:10<00:20,  2.30s/it]Train:  33%|███▎      | 4/12 [00:10<00:11,  1.46s/it]Train:  42%|████▏     | 5/12 [00:18<00:28,  4.04s/it]Train:  50%|█████     | 6/12 [00:19<00:16,  2.81s/it]Train:  58%|█████▊    | 7/12 [00:19<00:09,  1.95s/it]Train:  67%|██████▋   | 8/12 [00:19<00:05,  1.39s/it]Train:  75%|███████▌  | 9/12 [00:28<00:10,  3.62s/it]Train:  83%|████████▎ | 10/12 [00:28<00:05,  2.65s/it]Train:  92%|█████████▏| 11/12 [00:28<00:01,  1.93s/it]                                                      Eval:   0%|          | 0/3 [00:00<?, ?it/s]Eval:  33%|███▎      | 1/3 [00:10<00:20, 10.03s/it]Eval:  67%|██████▋   | 2/3 [00:10<00:04,  4.23s/it]Eval: 100%|██████████| 3/3 [00:10<00:00,  2.36s/it]                                                   Train Loss: 2.4452 | Val Loss: 2.8029
-  concept_accuracy: 0.1667
+Train:   0%|          | 0/13 [00:00<?, ?it/s]Train:   8%|▊         | 1/13 [00:09<01:53,  9.47s/it]Train:  15%|█▌        | 2/13 [00:11<00:56,  5.12s/it]Train:  23%|██▎       | 3/13 [00:13<00:37,  3.73s/it]Train:  31%|███       | 4/13 [00:15<00:27,  3.08s/it]Train:  38%|███▊      | 5/13 [00:17<00:21,  2.72s/it]Train:  46%|████▌     | 6/13 [00:19<00:17,  2.50s/it]Train:  54%|█████▍    | 7/13 [00:21<00:14,  2.36s/it]Train:  62%|██████▏   | 8/13 [00:24<00:11,  2.27s/it]Train:  69%|██████▉   | 9/13 [00:26<00:08,  2.21s/it]Train:  77%|███████▋  | 10/13 [00:28<00:06,  2.17s/it]Train:  85%|████████▍ | 11/13 [00:30<00:04,  2.14s/it]Train:  92%|█████████▏| 12/13 [00:32<00:02,  2.12s/it]Train: 100%|██████████| 13/13 [00:33<00:00,  1.75s/it]                                                      Eval:   0%|          | 0/2 [00:00<?, ?it/s]Eval:  50%|█████     | 1/2 [00:09<00:09,  9.52s/it]Eval: 100%|██████████| 2/2 [00:10<00:00,  4.57s/it]                                                   Train Loss: 1.7323 | Val Loss: 6.6042
+  concept_accuracy: 0.0000
   country_accuracy: 1.0000
-  coord_mse: 0.0244
-  coord_mae: 0.1357
-  median_km: 2544.6739
+  coord_mse: 0.0075
+  coord_mae: 0.0688
+  median_km: 1338.7585
   acc@1km: 0.0000
   acc@10km: 0.0000
   acc@100km: 0.0000
-  acc@1000km: 0.0208
+  acc@1000km: 0.3438
 Epoch 5/5 (Stage: concept)
-Train:   0%|          | 0/12 [00:00<?, ?it/s]Train:   8%|▊         | 1/12 [00:09<01:45,  9.57s/it]Train:  17%|█▋        | 2/12 [00:09<00:40,  4.06s/it]Train:  25%|██▌       | 3/12 [00:09<00:20,  2.29s/it]Train:  33%|███▎      | 4/12 [00:10<00:11,  1.45s/it]Train:  42%|████▏     | 5/12 [00:19<00:29,  4.19s/it]Train:  50%|█████     | 6/12 [00:19<00:17,  2.86s/it]Train:  58%|█████▊    | 7/12 [00:19<00:09,  1.98s/it]Train:  67%|██████▋   | 8/12 [00:19<00:05,  1.41s/it]Train:  75%|███████▌  | 9/12 [00:28<00:11,  3.71s/it]Train:  83%|████████▎ | 10/12 [00:28<00:05,  2.63s/it]Train:  92%|█████████▏| 11/12 [00:29<00:01,  1.98s/it]                                                      Eval:   0%|          | 0/3 [00:00<?, ?it/s]Eval:  33%|███▎      | 1/3 [00:09<00:19,  9.95s/it]Eval:  67%|██████▋   | 2/3 [00:10<00:04,  4.20s/it]Eval: 100%|██████████| 3/3 [00:10<00:00,  2.34s/it]                                                   Train Loss: 2.2268 | Val Loss: 2.7016
-  concept_accuracy: 0.1875
+Train:   0%|          | 0/13 [00:00<?, ?it/s]Train:   8%|▊         | 1/13 [00:09<01:54,  9.57s/it]Train:  15%|█▌        | 2/13 [00:11<00:56,  5.16s/it]Train:  23%|██▎       | 3/13 [00:13<00:37,  3.75s/it]Train:  31%|███       | 4/13 [00:15<00:27,  3.09s/it]Train:  38%|███▊      | 5/13 [00:17<00:21,  2.73s/it]Train:  46%|████▌     | 6/13 [00:19<00:17,  2.51s/it]Train:  54%|█████▍    | 7/13 [00:22<00:14,  2.37s/it]Train:  62%|██████▏   | 8/13 [00:24<00:11,  2.27s/it]Train:  69%|██████▉   | 9/13 [00:26<00:08,  2.21s/it]Train:  77%|███████▋  | 10/13 [00:28<00:06,  2.17s/it]Train:  85%|████████▍ | 11/13 [00:30<00:04,  2.14s/it]Train:  92%|█████████▏| 12/13 [00:32<00:02,  2.12s/it]Train: 100%|██████████| 13/13 [00:33<00:00,  1.75s/it]                                                      Eval:   0%|          | 0/2 [00:00<?, ?it/s]Eval:  50%|█████     | 1/2 [00:09<00:09,  9.29s/it]Eval: 100%|██████████| 2/2 [00:10<00:00,  4.48s/it]                                                   Train Loss: 1.5200 | Val Loss: 6.6349
+  concept_accuracy: 0.0000
   country_accuracy: 1.0000
-  coord_mse: 0.0194
-  coord_mae: 0.1189
-  median_km: 2520.5750
+  coord_mse: 0.0050
+  coord_mae: 0.0602
+  median_km: 1201.3193
   acc@1km: 0.0000
   acc@10km: 0.0000
   acc@100km: 0.0000
-  acc@1000km: 0.1319
-INFO:__main__:Saved 4 visualization(s) to results/checkpoints/sequential/16-11-25-11-03-41-train-cbm-Australia/visualizations/concept for epoch 5
-WARNING:root:Images sizes do not match. This will causes images to be display incorrectly in the UI.
+  acc@1000km: 0.2188
+INFO:__main__:Saved 4 visualization(s) to results/dinov3-australia-spherical-loss/sequential/dinov3/Australia/2025-11-16_16-22-58/visualizations/concept for epoch 5
 Starting stage: prediction for 5 epochs
 Epoch 1/5 (Stage: prediction)
-Train:   0%|          | 0/12 [00:00<?, ?it/s]Train:   8%|▊         | 1/12 [00:09<01:47,  9.79s/it]Train:  17%|█▋        | 2/12 [00:09<00:41,  4.13s/it]Train:  25%|██▌       | 3/12 [00:10<00:20,  2.33s/it]Train:  33%|███▎      | 4/12 [00:10<00:11,  1.48s/it]Train:  42%|████▏     | 5/12 [00:19<00:30,  4.32s/it]Train:  50%|█████     | 6/12 [00:19<00:17,  2.91s/it]Train:  58%|█████▊    | 7/12 [00:20<00:10,  2.01s/it]Train:  67%|██████▋   | 8/12 [00:20<00:05,  1.44s/it]Train:  75%|███████▌  | 9/12 [00:29<00:11,  3.90s/it]Train:  83%|████████▎ | 10/12 [00:29<00:05,  2.75s/it]Train:  92%|█████████▏| 11/12 [00:29<00:01,  1.96s/it]                                                      Eval:   0%|          | 0/3 [00:00<?, ?it/s]Eval:  33%|███▎      | 1/3 [00:09<00:19,  9.58s/it]Eval:  67%|██████▋   | 2/3 [00:09<00:04,  4.05s/it]Eval: 100%|██████████| 3/3 [00:09<00:00,  2.26s/it]                                                   wandb: WARNING Step only supports monotonically increasing values, use define_metric to set a custom x axis. For details see: https://wandb.me/define-metric
-wandb: WARNING (User provided step: 1 is less than current step: 5. Dropping entry: {'prediction/train_loss': 2.009043941895167, 'prediction/val_loss': 2.689216216405233, 'prediction/val_concept_accuracy': 0.1875, 'prediction/val_country_accuracy': 1.0, 'prediction/val_coord_mse': 0.006986663521577914, 'prediction/val_coord_mae': 0.06492600962519646, 'prediction/val_median_km': 996.1238606770834, 'prediction/val_acc@1km': 0.0, 'prediction/val_acc@10km': 0.0, 'prediction/val_acc@100km': 0.0, 'prediction/val_acc@1000km': 0.4722222288449605, '_timestamp': 1763287708.0925512}).
-Train Loss: 2.0090 | Val Loss: 2.6892
-  concept_accuracy: 0.1875
+Train:   0%|          | 0/13 [00:00<?, ?it/s]Train:   8%|▊         | 1/13 [00:09<01:52,  9.41s/it]Train:  15%|█▌        | 2/13 [00:11<00:56,  5.10s/it]Train:  23%|██▎       | 3/13 [00:13<00:37,  3.72s/it]Train:  31%|███       | 4/13 [00:15<00:27,  3.07s/it]Train:  38%|███▊      | 5/13 [00:17<00:21,  2.71s/it]Train:  46%|████▌     | 6/13 [00:19<00:17,  2.50s/it]Train:  54%|█████▍    | 7/13 [00:21<00:14,  2.36s/it]Train:  62%|██████▏   | 8/13 [00:23<00:11,  2.27s/it]Train:  69%|██████▉   | 9/13 [00:26<00:08,  2.21s/it]Train:  77%|███████▋  | 10/13 [00:28<00:06,  2.17s/it]Train:  85%|████████▍ | 11/13 [00:30<00:04,  2.14s/it]Train:  92%|█████████▏| 12/13 [00:32<00:02,  2.12s/it]Train: 100%|██████████| 13/13 [00:33<00:00,  1.75s/it]                                                      Eval:   0%|          | 0/2 [00:00<?, ?it/s]Eval:  50%|█████     | 1/2 [00:09<00:09,  9.64s/it]Eval: 100%|██████████| 2/2 [00:10<00:00,  4.62s/it]                                                   Train Loss: 0.0155 | Val Loss: 0.0132
+  concept_accuracy: 0.0000
   country_accuracy: 1.0000
-  coord_mse: 0.0070
-  coord_mae: 0.0649
-  median_km: 996.1239
+  coord_mse: 0.0032
+  coord_mae: 0.0472
+  median_km: 958.9643
   acc@1km: 0.0000
   acc@10km: 0.0000
-  acc@100km: 0.0000
-  acc@1000km: 0.4722
+  acc@100km: 0.0312
+  acc@1000km: 0.5312
 Epoch 2/5 (Stage: prediction)
-Train:   0%|          | 0/12 [00:00<?, ?it/s]Train:   8%|▊         | 1/12 [00:10<01:50, 10.03s/it]Train:  17%|█▋        | 2/12 [00:10<00:42,  4.23s/it]Train:  25%|██▌       | 3/12 [00:10<00:21,  2.38s/it]Train:  33%|███▎      | 4/12 [00:10<00:12,  1.51s/it]Train:  42%|████▏     | 5/12 [00:18<00:28,  4.01s/it]Train:  50%|█████     | 6/12 [00:19<00:16,  2.70s/it]Train:  58%|█████▊    | 7/12 [00:19<00:09,  1.88s/it]Train:  67%|██████▋   | 8/12 [00:19<00:05,  1.33s/it]Train:  75%|███████▌  | 9/12 [00:28<00:10,  3.61s/it]Train:  83%|████████▎ | 10/12 [00:28<00:05,  2.55s/it]Train:  92%|█████████▏| 11/12 [00:28<00:01,  1.82s/it]                                                      Eval:   0%|          | 0/3 [00:00<?, ?it/s]Eval:  33%|███▎      | 1/3 [00:09<00:19,  9.77s/it]Eval:  67%|██████▋   | 2/3 [00:09<00:04,  4.12s/it]Eval: 100%|██████████| 3/3 [00:10<00:00,  2.30s/it]                                                   Train Loss: 2.0627 | Val Loss: 2.6886
-  concept_accuracy: 0.1875
+Train:   0%|          | 0/13 [00:00<?, ?it/s]Train:   8%|▊         | 1/13 [00:09<01:52,  9.41s/it]Train:  15%|█▌        | 2/13 [00:11<00:56,  5.13s/it]Train:  23%|██▎       | 3/13 [00:13<00:37,  3.74s/it]Train:  31%|███       | 4/13 [00:15<00:27,  3.08s/it]Train:  38%|███▊      | 5/13 [00:17<00:21,  2.72s/it]Train:  46%|████▌     | 6/13 [00:19<00:17,  2.50s/it]Train:  54%|█████▍    | 7/13 [00:21<00:14,  2.36s/it]Train:  62%|██████▏   | 8/13 [00:24<00:11,  2.27s/it]Train:  69%|██████▉   | 9/13 [00:26<00:08,  2.21s/it]Train:  77%|███████▋  | 10/13 [00:28<00:06,  2.17s/it]Train:  85%|████████▍ | 11/13 [00:30<00:04,  2.14s/it]Train:  92%|█████████▏| 12/13 [00:32<00:02,  2.12s/it]Train: 100%|██████████| 13/13 [00:33<00:00,  1.75s/it]                                                      Eval:   0%|          | 0/2 [00:00<?, ?it/s]Eval:  50%|█████     | 1/2 [00:09<00:09,  9.66s/it]Eval: 100%|██████████| 2/2 [00:10<00:00,  4.63s/it]                                                   Train Loss: 0.0116 | Val Loss: 0.0133
+  concept_accuracy: 0.0000
   country_accuracy: 1.0000
-  coord_mse: 0.0064
-  coord_mae: 0.0590
-  median_km: 964.3827
+  coord_mse: 0.0030
+  coord_mae: 0.0482
+  median_km: 931.9676
   acc@1km: 0.0000
   acc@10km: 0.0000
-  acc@100km: 0.0417
-  acc@1000km: 0.5417
+  acc@100km: 0.0312
+  acc@1000km: 0.5000
 Epoch 3/5 (Stage: prediction)
-Train:   0%|          | 0/12 [00:00<?, ?it/s]wandb: WARNING (User provided step: 2 is less than current step: 5. Dropping entry: {'prediction/train_loss': 2.0626705288887024, 'prediction/val_loss': 2.688612381617228, 'prediction/val_concept_accuracy': 0.1875, 'prediction/val_country_accuracy': 1.0, 'prediction/val_coord_mse': 0.006382788997143507, 'prediction/val_coord_mae': 0.05902877946694692, 'prediction/val_median_km': 964.3826700846354, 'prediction/val_acc@1km': 0.0, 'prediction/val_acc@10km': 0.0, 'prediction/val_acc@100km': 0.041666666666666664, 'prediction/val_acc@1000km': 0.5416666666666666, '_timestamp': 1763287748.3914084}).
-Train:   8%|▊         | 1/12 [00:09<01:42,  9.35s/it]Train:  17%|█▋        | 2/12 [00:09<00:39,  3.96s/it]Train:  25%|██▌       | 3/12 [00:09<00:20,  2.23s/it]Train:  33%|███▎      | 4/12 [00:09<00:11,  1.42s/it]Train:  42%|████▏     | 5/12 [00:18<00:28,  4.05s/it]Train:  50%|█████     | 6/12 [00:18<00:16,  2.73s/it]Train:  58%|█████▊    | 7/12 [00:18<00:09,  1.90s/it]Train:  67%|██████▋   | 8/12 [00:19<00:05,  1.35s/it]Train:  75%|███████▌  | 9/12 [00:27<00:10,  3.65s/it]Train:  83%|████████▎ | 10/12 [00:28<00:05,  2.58s/it]Train:  92%|█████████▏| 11/12 [00:28<00:01,  1.84s/it]                                                      Eval:   0%|          | 0/3 [00:00<?, ?it/s]Eval:  33%|███▎      | 1/3 [00:10<00:20, 10.24s/it]Eval:  67%|██████▋   | 2/3 [00:10<00:04,  4.32s/it]Eval: 100%|██████████| 3/3 [00:10<00:00,  2.40s/it]                                                   Train Loss: 2.0348 | Val Loss: 2.6874
-  concept_accuracy: 0.1875
+Train:   0%|          | 0/13 [00:00<?, ?it/s]Train:   8%|▊         | 1/13 [00:09<01:55,  9.61s/it]Train:  15%|█▌        | 2/13 [00:11<00:56,  5.18s/it]Train:  23%|██▎       | 3/13 [00:13<00:37,  3.76s/it]Train:  31%|███       | 4/13 [00:15<00:27,  3.10s/it]Train:  38%|███▊      | 5/13 [00:17<00:21,  2.73s/it]Train:  46%|████▌     | 6/13 [00:20<00:17,  2.51s/it]Train:  54%|█████▍    | 7/13 [00:22<00:14,  2.37s/it]Train:  62%|██████▏   | 8/13 [00:24<00:11,  2.28s/it]Train:  69%|██████▉   | 9/13 [00:26<00:08,  2.22s/it]Train:  77%|███████▋  | 10/13 [00:28<00:06,  2.18s/it]Train:  85%|████████▍ | 11/13 [00:30<00:04,  2.15s/it]Train:  92%|█████████▏| 12/13 [00:32<00:02,  2.13s/it]Train: 100%|██████████| 13/13 [00:33<00:00,  1.75s/it]                                                      Eval:   0%|          | 0/2 [00:00<?, ?it/s]Eval:  50%|█████     | 1/2 [00:09<00:09,  9.17s/it]Eval: 100%|██████████| 2/2 [00:10<00:00,  4.43s/it]                                                   Train Loss: 0.0113 | Val Loss: 0.0121
+  concept_accuracy: 0.0000
   country_accuracy: 1.0000
-  coord_mse: 0.0052
-  coord_mae: 0.0544
-  median_km: 919.4085
+  coord_mse: 0.0028
+  coord_mae: 0.0441
+  median_km: 933.8977
   acc@1km: 0.0000
   acc@10km: 0.0000
   acc@100km: 0.0000
   acc@1000km: 0.5000
 Epoch 4/5 (Stage: prediction)
-Train:   0%|          | 0/12 [00:00<?, ?it/s]wandb: WARNING (User provided step: 3 is less than current step: 5. Dropping entry: {'prediction/train_loss': 2.0347728431224823, 'prediction/val_loss': 2.6874152024586997, 'prediction/val_concept_accuracy': 0.1875, 'prediction/val_country_accuracy': 1.0, 'prediction/val_coord_mse': 0.005185657801727454, 'prediction/val_coord_mae': 0.05437123030424118, 'prediction/val_median_km': 919.4085286458334, 'prediction/val_acc@1km': 0.0, 'prediction/val_acc@10km': 0.0, 'prediction/val_acc@100km': 0.0, 'prediction/val_acc@1000km': 0.5, '_timestamp': 1763287788.488237}).
-Train:   8%|▊         | 1/12 [00:09<01:47,  9.77s/it]Train:  17%|█▋        | 2/12 [00:09<00:41,  4.12s/it]Train:  25%|██▌       | 3/12 [00:10<00:20,  2.32s/it]Train:  33%|███▎      | 4/12 [00:10<00:11,  1.47s/it]Train:  42%|████▏     | 5/12 [00:18<00:28,  4.01s/it]Train:  50%|█████     | 6/12 [00:19<00:16,  2.76s/it]Train:  58%|█████▊    | 7/12 [00:19<00:09,  1.91s/it]Train:  67%|██████▋   | 8/12 [00:19<00:05,  1.38s/it]Train:  75%|███████▌  | 9/12 [00:28<00:10,  3.64s/it]Train:  83%|████████▎ | 10/12 [00:28<00:05,  2.59s/it]Train:  92%|█████████▏| 11/12 [00:28<00:01,  1.85s/it]                                                      Eval:   0%|          | 0/3 [00:00<?, ?it/s]Eval:  33%|███▎      | 1/3 [00:09<00:19,  9.65s/it]Eval:  67%|██████▋   | 2/3 [00:09<00:04,  4.08s/it]Eval: 100%|██████████| 3/3 [00:09<00:00,  2.27s/it]                                                   wandb: WARNING (User provided step: 4 is less than current step: 5. Dropping entry: {'prediction/train_loss': 2.0461701452732086, 'prediction/val_loss': 2.687316576639811, 'prediction/val_concept_accuracy': 0.1875, 'prediction/val_country_accuracy': 1.0, 'prediction/val_coord_mse': 0.005086992867290974, 'prediction/val_coord_mae': 0.05580520381530126, 'prediction/val_median_km': 1020.1060384114584, 'prediction/val_acc@1km': 0.0, 'prediction/val_acc@10km': 0.0, 'prediction/val_acc@100km': 0.0, 'prediction/val_acc@1000km': 0.4444444477558136, '_timestamp': 1763287828.112559}).
-Train Loss: 2.0462 | Val Loss: 2.6873
-  concept_accuracy: 0.1875
+Train:   0%|          | 0/13 [00:00<?, ?it/s]Train:   8%|▊         | 1/13 [00:09<01:48,  9.08s/it]Train:  15%|█▌        | 2/13 [00:11<00:54,  4.96s/it]Train:  23%|██▎       | 3/13 [00:13<00:36,  3.64s/it]Train:  31%|███       | 4/13 [00:15<00:27,  3.02s/it]Train:  38%|███▊      | 5/13 [00:17<00:21,  2.68s/it]Train:  46%|████▌     | 6/13 [00:19<00:17,  2.48s/it]Train:  54%|█████▍    | 7/13 [00:21<00:14,  2.35s/it]Train:  62%|██████▏   | 8/13 [00:23<00:11,  2.26s/it]Train:  69%|██████▉   | 9/13 [00:25<00:08,  2.21s/it]Train:  77%|███████▋  | 10/13 [00:27<00:06,  2.17s/it]Train:  85%|████████▍ | 11/13 [00:29<00:04,  2.14s/it]Train:  92%|█████████▏| 12/13 [00:31<00:02,  2.12s/it]Train: 100%|██████████| 13/13 [00:32<00:00,  1.74s/it]                                                      Eval:   0%|          | 0/2 [00:00<?, ?it/s]Eval:  50%|█████     | 1/2 [00:09<00:09,  9.46s/it]Eval: 100%|██████████| 2/2 [00:10<00:00,  4.55s/it]                                                   Train Loss: 0.0102 | Val Loss: 0.0118
+  concept_accuracy: 0.0000
   country_accuracy: 1.0000
-  coord_mse: 0.0051
-  coord_mae: 0.0558
-  median_km: 1020.1060
+  coord_mse: 0.0029
+  coord_mae: 0.0457
+  median_km: 906.6597
   acc@1km: 0.0000
   acc@10km: 0.0000
   acc@100km: 0.0000
-  acc@1000km: 0.4444
+  acc@1000km: 0.5938
 Epoch 5/5 (Stage: prediction)
-Train:   0%|          | 0/12 [00:00<?, ?it/s]Train:   8%|▊         | 1/12 [00:09<01:45,  9.59s/it]Train:  17%|█▋        | 2/12 [00:09<00:41,  4.11s/it]Train:  25%|██▌       | 3/12 [00:10<00:20,  2.31s/it]Train:  33%|███▎      | 4/12 [00:10<00:11,  1.47s/it]
+Train:   0%|          | 0/13 [00:00<?, ?it/s]Train:   8%|▊         | 1/13 [00:09<01:51,  9.31s/it]Train:  15%|█▌        | 2/13 [00:11<00:55,  5.05s/it]Train:  23%|██▎       | 3/13 [00:13<00:36,  3.69s/it]Train:  31%|███       | 4/13 [00:15<00:27,  3.06s/it]Train:  38%|███▊      | 5/13 [00:17<00:21,  2.70s/it]Train:  46%|████▌     | 6/13 [00:19<00:17,  2.49s/it]Train:  54%|█████▍    | 7/13 [00:21<00:14,  2.36s/it]Train:  62%|██████▏   | 8/13 [00:23<00:11,  2.27s/it]Train:  69%|██████▉   | 9/13 [00:25<00:08,  2.21s/it]Train:  77%|███████▋  | 10/13 [00:28<00:06,  2.17s/it]Train:  85%|████████▍ | 11/13 [00:30<00:04,  2.14s/it]Train:  92%|█████████▏| 12/13 [00:32<00:02,  2.12s/it]Train: 100%|██████████| 13/13 [00:33<00:00,  1.74s/it]                                                      Eval:   0%|          | 0/2 [00:00<?, ?it/s]Eval:  50%|█████     | 1/2 [00:09<00:09,  9.25s/it]Eval: 100%|██████████| 2/2 [00:10<00:00,  4.46s/it]                                                   Train Loss: 0.0100 | Val Loss: 0.0113
+  concept_accuracy: 0.0000
+  country_accuracy: 1.0000
+  coord_mse: 0.0026
+  coord_mae: 0.0422
+  median_km: 881.6696
+  acc@1km: 0.0000
+  acc@10km: 0.0000
+  acc@100km: 0.0000
+  acc@1000km: 0.6250
+INFO:__main__:Saved 4 visualization(s) to results/dinov3-australia-spherical-loss/sequential/dinov3/Australia/2025-11-16_16-22-58/visualizations/prediction for epoch 5
+Evaluating on test split...
+Eval:   0%|          | 0/2 [00:00<?, ?it/s]Eval:  50%|█████     | 1/2 [00:09<00:09,  9.41s/it]Eval: 100%|██████████| 2/2 [00:11<00:00,  4.94s/it]                                                   wandb: updating run metadata
+wandb: uploading output.log; uploading wandb-summary.json
+wandb: uploading config.yaml
+wandb: 
+wandb: Run history:
+wandb:           concept/train_loss █▅▃▂▁
+wandb:       concept/val_acc@1000km ▄█▂▅▁
+wandb:        concept/val_acc@100km ▁▁▁▁▁
+wandb:         concept/val_acc@10km ▁▁▁▁▁
+wandb:          concept/val_acc@1km ▁▁▁▁▁
+wandb: concept/val_concept_accuracy ▁▁▁▁▁
+wandb:        concept/val_coord_mae ▃▁█▅▂
+wandb:        concept/val_coord_mse ▂▁█▇▁
+wandb: concept/val_country_accuracy ▁▁▁▁▁
+wandb:             concept/val_loss ▁▆▇██
+wandb:                          +22 ...
+wandb: 
+wandb: Run summary:
+wandb:           concept/train_loss 1.51996
+wandb:       concept/val_acc@1000km 0.21875
+wandb:        concept/val_acc@100km 0
+wandb:         concept/val_acc@10km 0
+wandb:          concept/val_acc@1km 0
+wandb: concept/val_concept_accuracy 0
+wandb:        concept/val_coord_mae 0.06017
+wandb:        concept/val_coord_mse 0.00502
+wandb: concept/val_country_accuracy 1
+wandb:             concept/val_loss 6.63489
+wandb:                          +22 ...
+wandb: 
+wandb: 🚀 View run train-cbm-Australia-20251116-162258 at: https://wandb.ai/project-ai-geoguessr/streetclip-cbm-geolocation/runs/wahkfjv5
+wandb: ⭐️ View project at: https://wandb.ai/project-ai-geoguessr/streetclip-cbm-geolocation
+wandb: Synced 6 W&B file(s), 8 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: results/dinov3-australia-spherical-loss/sequential/dinov3/Australia/2025-11-16_16-22-58/wandb/run-20251116_162300-wahkfjv5/logs
+Test Loss: 0.0174
+  concept_accuracy: 0.0000
+  country_accuracy: 1.0000
+  coord_mse: 0.0044
+  coord_mae: 0.0475
+  median_km: 887.8368
+  acc@1km: 0.0000
+  acc@10km: 0.0000
+  acc@100km: 0.0000
+  acc@1000km: 0.6058

@@ -13,7 +13,9 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
 from torchvision.transforms import InterpolationMode
+from transformers import AutoImageProcessor
 
+import random
 from tqdm import tqdm
 
 CLIP_IMAGE_MEAN = (0.48145466, 0.4578275, 0.40821073)
@@ -24,6 +26,76 @@ data_root = Path("data")
 folder = data_root / geoguessrId
 meta_folder = folder / "metas"
 image_folder = folder / "panorama_processed"
+
+def get_transforms_from_processor(processor: AutoImageProcessor, image_size: Optional[Tuple[int, int]] = None):
+    """
+    Create torchvision transforms from HuggingFace image processor.
+    
+    Args:
+        processor: HuggingFace AutoImageProcessor instance
+        image_size: Optional override for image size (width, height)
+    
+    Returns:
+        torchvision.Compose transform pipeline
+    """
+    # Get size from processor or use provided
+    if image_size is None:
+        if hasattr(processor, 'size') and processor.size is not None:
+            if isinstance(processor.size, dict):
+                # Handle dict format like {'shortest_edge': 224} or {'height': 224, 'width': 224}
+                size = processor.size.get('shortest_edge') or processor.size.get('height') or processor.size.get('width', 224)
+            elif isinstance(processor.size, (tuple, list)):
+                size = processor.size[0] if len(processor.size) > 0 else 224
+            else:
+                size = int(processor.size)
+        elif hasattr(processor, 'crop_size') and processor.crop_size is not None:
+            # Some processors use crop_size instead
+            if isinstance(processor.crop_size, dict):
+                size = processor.crop_size.get('height') or processor.crop_size.get('width', 224)
+            elif isinstance(processor.crop_size, (tuple, list)):
+                size = processor.crop_size[0] if len(processor.crop_size) > 0 else 224
+            else:
+                size = int(processor.crop_size)
+        else:
+            size = 224  # Default fallback
+    else:
+        size = image_size[0] if isinstance(image_size, tuple) else image_size
+    
+    # Get normalization values from processor
+    if hasattr(processor, 'image_mean') and processor.image_mean is not None:
+        mean = processor.image_mean
+        if isinstance(mean, list):
+            mean = tuple(mean)
+        elif not isinstance(mean, tuple):
+            mean = tuple([mean] * 3)  # Convert scalar to tuple
+    else:
+        mean = CLIP_IMAGE_MEAN  # Fallback to CLIP defaults
+    
+    if hasattr(processor, 'image_std') and processor.image_std is not None:
+        std = processor.image_std
+        if isinstance(std, list):
+            std = tuple(std)
+        elif not isinstance(std, tuple):
+            std = tuple([std] * 3)  # Convert scalar to tuple
+    else:
+        std = CLIP_IMAGE_STD  # Fallback to CLIP defaults
+    
+    # Ensure mean and std are tuples of length 3
+    if len(mean) != 3:
+        mean = tuple(mean[:3]) if len(mean) > 3 else tuple(list(mean) + [mean[-1]] * (3 - len(mean)))
+    if len(std) != 3:
+        std = tuple(std[:3]) if len(std) > 3 else tuple(list(std) + [std[-1]] * (3 - len(std)))
+    
+    # Create transform pipeline
+    transform_list = [
+        transforms.Resize(size, interpolation=InterpolationMode.BICUBIC),
+        transforms.CenterCrop(size),
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std),
+    ]
+    
+    return transforms.Compose(transform_list)
+
 
 class PanoramaCBMDataset(Dataset):
     """
@@ -38,31 +110,89 @@ class PanoramaCBMDataset(Dataset):
 
     def __init__(self,
                  transform=None,
-                 image_size: Tuple[int, int] = (336, 336),
+                 image_size: Optional[Tuple[int, int]] = None,
                  max_samples: Optional[int] = None,
                  country: Optional[str] = None,
-                 require_coordinates: bool = False):
+                 require_coordinates: bool = False,
+                 encoder_model: Optional[str] = None):
         """
         Args:
-            transform: Optional torchvision transforms
-            image_size: Target size for images (width, height)
+            transform: Optional torchvision transforms (overrides encoder_model preprocessing)
+            image_size: Target size for images (width, height) - used if encoder_model not provided
             max_samples: Limit number of samples for debugging
             country: Optional country name to filter samples by
             require_coordinates: Drop samples missing lat/lng
+            encoder_model: HuggingFace model identifier (e.g., 'facebook/dinov2-base')
+                          If provided, will use AutoImageProcessor to get correct preprocessing
         """
         self.transform = transform
-        self.image_size = image_size
         self.max_samples = max_samples
         self.country = country
         self.require_coordinates = require_coordinates
+        self.encoder_model = encoder_model
 
+        # Set up transforms based on encoder model or defaults
         if self.transform is None:
-            self.transform = transforms.Compose([
-                transforms.Resize(self.image_size, interpolation=InterpolationMode.BICUBIC),
-                transforms.CenterCrop(self.image_size),
-                transforms.ToTensor(),
-                transforms.Normalize(CLIP_IMAGE_MEAN, CLIP_IMAGE_STD),
-            ])
+            if encoder_model is not None:
+                # Load processor and create transforms
+                try:
+                    processor = AutoImageProcessor.from_pretrained(encoder_model)
+                    self.transform = get_transforms_from_processor(processor, image_size)
+                    # Extract image size from processor for logging
+                    if image_size is not None:
+                        self.image_size = image_size if isinstance(image_size, tuple) else (image_size, image_size)
+                    elif hasattr(processor, 'size') and processor.size is not None:
+                        if isinstance(processor.size, dict):
+                            h = processor.size.get('height', processor.size.get('shortest_edge', 224))
+                            w = processor.size.get('width', processor.size.get('shortest_edge', 224))
+                            self.image_size = (h, w)
+                        elif isinstance(processor.size, (tuple, list)):
+                            self.image_size = tuple(processor.size[:2]) if len(processor.size) >= 2 else (processor.size[0], processor.size[0])
+                        else:
+                            size_val = int(processor.size)
+                            self.image_size = (size_val, size_val)
+                    elif hasattr(processor, 'crop_size') and processor.crop_size is not None:
+                        if isinstance(processor.crop_size, dict):
+                            h = processor.crop_size.get('height', 224)
+                            w = processor.crop_size.get('width', 224)
+                            self.image_size = (h, w)
+                        elif isinstance(processor.crop_size, (tuple, list)):
+                            self.image_size = tuple(processor.crop_size[:2]) if len(processor.crop_size) >= 2 else (processor.crop_size[0], processor.crop_size[0])
+                        else:
+                            size_val = int(processor.crop_size)
+                            self.image_size = (size_val, size_val)
+                    else:
+                        self.image_size = (336, 336)  # Default fallback
+                    
+                    # Log preprocessing info
+                    mean = processor.image_mean if hasattr(processor, 'image_mean') and processor.image_mean is not None else CLIP_IMAGE_MEAN
+                    std = processor.image_std if hasattr(processor, 'image_std') and processor.image_std is not None else CLIP_IMAGE_STD
+                    print(f"Loaded processor for {encoder_model}")
+                    print(f"  Image size: {self.image_size}")
+                    print(f"  Normalization mean: {mean}")
+                    print(f"  Normalization std: {std}")
+                except Exception as e:
+                    print(f"Warning: Could not load processor for {encoder_model}: {e}")
+                    print("Falling back to default CLIP preprocessing")
+                    self.image_size = image_size or (336, 336)
+                    self.transform = transforms.Compose([
+                        transforms.Resize(self.image_size, interpolation=InterpolationMode.BICUBIC),
+                        transforms.CenterCrop(self.image_size),
+                        transforms.ToTensor(),
+                        transforms.Normalize(CLIP_IMAGE_MEAN, CLIP_IMAGE_STD),
+                    ])
+            else:
+                # Use default CLIP preprocessing
+                self.image_size = image_size or (336, 336)
+                self.transform = transforms.Compose([
+                    transforms.Resize(self.image_size, interpolation=InterpolationMode.BICUBIC),
+                    transforms.CenterCrop(self.image_size),
+                    transforms.ToTensor(),
+                    transforms.Normalize(CLIP_IMAGE_MEAN, CLIP_IMAGE_STD),
+                ])
+        else:
+            # Transform provided explicitly, use provided image_size or default
+            self.image_size = image_size or (336, 336)
 
         # Load and filter samples
         self.samples = self._load_samples()
@@ -191,7 +321,7 @@ def get_country_to_idx(samples: List[Dict]) -> Tuple[Dict[str, int], Dict[int, s
     idx_to_country = {i: country for country, i in country_to_idx.items()}
     return country_to_idx, idx_to_country
 
-def create_splits(samples: List[Dict],
+def create_splits_stratified(samples: List[Dict],
                   train_ratio: float = 0.7,
                   val_ratio: float = 0.15,
                   test_ratio: float = 0.15,
@@ -261,6 +391,74 @@ def create_splits(samples: List[Dict],
         test_samples.extend(shuffled[n_train + n_val:n_train + n_val + n_test])
 
     return train_samples, val_samples, test_samples
+
+def create_splits(samples: List[Dict], train_ratio: float = 0.8, val_ratio: float = 0.1, test_ratio: float = 0.1, seed: int = 42) -> Tuple[List[Dict], List[Dict], List[Dict]]:
+    """
+    Splits the list of samples into train, validation, and test sets 
+    by partitioning the set of unique concepts (meta_name) across the splits.
+    This ensures NO CONCEPT LEAKAGE between the sets, which is CRITICAL for CBM evaluation.
+    
+    Args:
+        samples: List of sample dictionaries
+        train_ratio: Proportion for training set
+        val_ratio: Proportion for validation set
+        test_ratio: Proportion for test set
+        seed: Random seed for reproducibility
+    """
+    assert abs(train_ratio + val_ratio + test_ratio - 1.0) < 1e-6, "Ratios must sum to 1.0"
+    
+    # Set random seed for reproducibility
+    random.seed(seed)
+    
+    # 1. Get all unique concepts (meta_name)
+    unique_concepts = list(set(sample["meta_name"] for sample in samples))
+    random.shuffle(unique_concepts)
+    
+    # 2. Split the *concepts* themselves into train/val/test groups
+    n_concepts = len(unique_concepts)
+    
+    # Calculate split sizes for the concepts
+    # Ensure at least one concept is in each set for robustness
+    n_test_concepts = max(1, int(test_ratio * n_concepts))
+    n_val_concepts = max(1, int(val_ratio * n_concepts))
+    n_train_concepts = n_concepts - n_test_concepts - n_val_concepts
+    
+    # Ensure at least one concept in training set
+    if n_train_concepts < 1:
+        if n_val_concepts > 1:
+            n_val_concepts -= 1
+            n_train_concepts += 1
+        elif n_test_concepts > 1:
+            n_test_concepts -= 1
+            n_train_concepts += 1
+        else:
+            n_train_concepts = 1
+    
+    test_concepts = set(unique_concepts[:n_test_concepts])
+    val_concepts = set(unique_concepts[n_test_concepts:n_test_concepts + n_val_concepts])
+    train_concepts = set(unique_concepts[n_test_concepts + n_val_concepts:])
+    
+    # 3. Filter samples based on their concept group
+    all_train_samples = []
+    all_val_samples = []
+    all_test_samples = []
+    
+    for sample in samples:
+        concept_name = sample["meta_name"]
+        
+        if concept_name in test_concepts:
+            all_test_samples.append(sample)
+        elif concept_name in val_concepts:
+            all_val_samples.append(sample)
+        elif concept_name in train_concepts:
+            all_train_samples.append(sample)
+            
+    # 4. Final shuffle (important for dataloaders)
+    random.shuffle(all_train_samples)
+    random.shuffle(all_val_samples)
+    random.shuffle(all_test_samples)
+    
+    return all_train_samples, all_val_samples, all_test_samples
 
 def get_statistics(samples: List[Dict]) -> Dict:
     """

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
 import sys
 from pathlib import Path
 from typing import Dict, Tuple
@@ -29,12 +30,12 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from src.config import DEFAULT_CONFIG, FEATURE_DIM_BY_MODEL
+from src.config import DEFAULT_CONFIG
 from src.dataset import PanoramaCBMDataset, SubsetDataset, create_splits
-from src.evaluation import compute_geolocation_metrics
+from src.evaluation import compute_geolocation_metrics, sphere_to_normalized_latlng
 from src.losses import LossWeights, combined_loss
 from src.models.cbm_geolocation import CBMGeolocationModel
-from src.models.streetclip_encoder import StreetCLIPConfig, StreetCLIPEncoder
+from src.models.encoder_factory import create_encoder
 
 
 def parse_args() -> argparse.Namespace:
@@ -47,7 +48,18 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--batch_size", type=int, default=cfg.batch_size)
     parser.add_argument("--num_workers", type=int, default=4)
-    parser.add_argument("--streetclip_model", type=str, default=cfg.streetclip_model)
+    parser.add_argument(
+        "--encoder_model",
+        type=str,
+        default=cfg.encoder_model,
+        help="Encoder model name (e.g., 'geolocal/StreetCLIP', 'facebook/dinov2-base')",
+    )
+    parser.add_argument(
+        "--streetclip_model",
+        type=str,
+        default=None,
+        help="Deprecated: use --encoder_model instead",
+    )
     parser.add_argument("--finetune_encoder", action="store_true")
     parser.add_argument("--encoder_lr", type=float, default=cfg.encoder_lr)
     parser.add_argument("--cbm_lr", type=float, default=cfg.cbm_lr)
@@ -66,6 +78,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--country_filter", type=str, default=cfg.country_filter)
     parser.add_argument(
         "--require_coordinates", action="store_true", default=cfg.require_coordinates
+    )
+    parser.add_argument(
+        "--coordinate_loss_type",
+        type=str,
+        default=cfg.coordinate_loss_type,
+        choices=("mse", "sphere"),
+        help="Coordinate loss/head type: 'mse' for lat/lng MSE, 'sphere' for 3D unit vectors.",
     )
     parser.add_argument(
         "--checkpoint_dir",
@@ -98,6 +117,12 @@ def parse_args() -> argparse.Namespace:
         "--wandb_entity", type=str, default=None, help="W&B entity/team name"
     )
     parser.add_argument("--no_wandb", action="store_true", help="Disable wandb logging")
+    parser.add_argument(
+        "--experiment_name",
+        type=str,
+        default="geo_cbm_v2",
+        help="Experiment name for organizing results",
+    )
     return parser.parse_args()
 
 
@@ -109,6 +134,13 @@ def collate_batch(batch):
     coords = torch.stack(coords)
     metadata = list(metadata)
     return images, concept_idx, country_idx, coords, metadata
+
+
+def worker_init_fn(worker_id: int):
+    """Initialize worker with seed for reproducibility."""
+    worker_seed = torch.initial_seed() % 2**32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
 
 
 def build_dataloaders(
@@ -133,6 +165,8 @@ def build_dataloaders(
     test_ds = SubsetDataset(dataset, test_samples)
 
     def loader(split_ds, shuffle):
+        generator = torch.Generator()
+        generator.manual_seed(seed)
         return DataLoader(
             split_ds,
             batch_size=batch_size,
@@ -140,6 +174,8 @@ def build_dataloaders(
             num_workers=num_workers,
             pin_memory=True,
             collate_fn=collate_batch,
+            worker_init_fn=worker_init_fn if num_workers > 0 else None,
+            generator=generator if shuffle else None,
         )
 
     return loader(train_ds, True), loader(val_ds, False), loader(test_ds, False)
@@ -156,7 +192,15 @@ def move_batch_to_device(batch, device):
     )
 
 
-def train_one_epoch(model, dataloader, optimizer, device, loss_weights: LossWeights):
+def train_one_epoch(
+    model,
+    dataloader,
+    optimizer,
+    device,
+    loss_weights: LossWeights,
+    stage: str,
+    coordinate_loss_type: str,
+):
     model.train()
     running_loss = 0.0
     num_batches = 0
@@ -167,15 +211,51 @@ def train_one_epoch(model, dataloader, optimizer, device, loss_weights: LossWeig
             batch, device
         )
         concept_logits, country_logits, coord_preds = model(images)
-        loss, _ = combined_loss(
-            concept_logits,
-            country_logits,
-            coord_preds,
-            concept_idx,
-            country_idx,
-            coords,
-            loss_weights,
-        )
+
+        # Stage-aware loss computation
+        if stage == "concept":
+            # Stage 1: Train concept predictor
+            loss, _ = combined_loss(
+                concept_logits,
+                country_logits,
+                coord_preds,
+                concept_idx,
+                country_idx,
+                coords,
+                loss_weights,
+                coordinate_loss_type=coordinate_loss_type,
+            )
+        elif stage == "prediction":
+            # Stage 2: Only train prediction heads, use predicted concepts
+            # Set concept_weight to 0 since concept layer is frozen
+            stage_weights = LossWeights(
+                concept=0.0,  # Don't compute concept loss
+                distance=loss_weights.distance,
+                country=loss_weights.country,
+            )
+            loss, _ = combined_loss(
+                concept_logits,
+                country_logits,
+                coord_preds,
+                concept_idx,
+                country_idx,
+                coords,
+                stage_weights,
+                coordinate_loss_type=coordinate_loss_type,
+            )
+        elif stage == "finetune":
+            # Stage 3: End-to-end training
+            loss, _ = combined_loss(
+                concept_logits,
+                country_logits,
+                coord_preds,
+                concept_idx,
+                country_idx,
+                coords,
+                loss_weights,
+                coordinate_loss_type=coordinate_loss_type,
+            )
+
         loss.backward()
         optimizer.step()
         running_loss += loss.item()
@@ -185,12 +265,31 @@ def train_one_epoch(model, dataloader, optimizer, device, loss_weights: LossWeig
 
 
 @torch.no_grad()
-def evaluate(model, dataloader, device, loss_weights: LossWeights):
+def evaluate(
+    model,
+    dataloader,
+    device,
+    loss_weights: LossWeights,
+    stage: str,
+    coordinate_loss_type: str,
+):
     model.eval()
     running_loss = 0.0
     num_batches = 0
     aggregated_metrics: Dict[str, float] = {}
     metric_counts: Dict[str, int] = {}
+
+    # Stage-aware loss weights (same logic as training)
+    if stage == "prediction":
+        # Stage 2: Only evaluate prediction heads, don't include concept loss
+        stage_weights = LossWeights(
+            concept=0.0,  # Don't compute concept loss
+            distance=loss_weights.distance,
+            country=loss_weights.country,
+        )
+    else:
+        # Stage 1 (concept) and Stage 3 (finetune): Use full loss weights
+        stage_weights = loss_weights
 
     for batch in tqdm(dataloader, desc="Eval", leave=False):
         images, concept_idx, country_idx, coords, _ = move_batch_to_device(
@@ -204,7 +303,8 @@ def evaluate(model, dataloader, device, loss_weights: LossWeights):
             concept_idx,
             country_idx,
             coords,
-            loss_weights,
+            stage_weights,
+            coordinate_loss_type=coordinate_loss_type,
         )
         running_loss += loss.item()
         num_batches += 1
@@ -216,6 +316,7 @@ def evaluate(model, dataloader, device, loss_weights: LossWeights):
             concept_idx,
             country_idx,
             coords,
+            coordinate_loss_type=coordinate_loss_type,
         )
         for key, value in metrics.items():
             if isinstance(value, float) and (value != value):
@@ -289,20 +390,60 @@ def save_checkpoint(model, optimizer, epoch, stage, path: Path):
     )
 
 
-def create_checkpoint_dir(country_filter: str = None, sequential: bool = True) -> Path:
-    """Create checkpoint directory with format: results/checkpoints/sequential/<dd-mm-yy-TIME-train-cbm-<country_filter>/"""
+def create_checkpoint_dir(
+    experiment_name: str = "geo_cbm_v2",
+    country_filter: str = None,
+    sequential: bool = True,
+    encoder_model: str = None,
+) -> Path:
+    """Create checkpoint directory with format:
+    results/<experiment_name>/<training_type>/<encoder_name>/<country>/<timestamp>/
+    where:
+    - experiment_name: experiment identifier (default: "geo_cbm_v2")
+    - training_type: "sequential" for sequential training, "joint" for joint training
+    - encoder_name: sanitized encoder model name (replace "/" with "-")
+    - country: country name or "global" if no country filter
+    - timestamp: formatted date and time (YYYY-MM-DD_HH-MM-SS)
+
+    Creates subdirectories: checkpoints/, logs/
+    """
     now = datetime.now()
-    date_str = now.strftime("%d-%m-%y")
-    time_str = now.strftime("%H-%M-%S")
-    timestamp = f"{date_str}-{time_str}"
+    timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
 
-    country_suffix = f"-{country_filter}" if country_filter else ""
-    mode = "sequential" if sequential else "joint"
+    # Training type: "sequential" or "joint"
+    training_type = "sequential" if sequential else "joint"
 
-    dir_name = f"{timestamp}-train-cbm{country_suffix}"
-    checkpoint_dir = Path("results") / "checkpoints" / mode / dir_name
-    checkpoint_dir.mkdir(parents=True, exist_ok=True)
-    return checkpoint_dir
+    # Encoder name: sanitize model name (replace "/" with "-")
+    if encoder_model:
+        ENCODER_MODEL_TO_NAME = {
+            "geolocal/StreetCLIP": "streetclip",
+            "facebook/dinov3-vit7b16-pretrain-lvd1689m": "dinov3",
+            "facebook/dinov2-base": "dinov2",
+        }
+        encoder_name = ENCODER_MODEL_TO_NAME.get(encoder_model, encoder_model)
+        encoder_name = encoder_name.replace("/", "-")
+    else:
+        encoder_name = "unknown"
+
+    # Country: use filter or "global" if None
+    country = country_filter if country_filter else "global"
+
+    # Create full directory structure
+    timestamp_dir = (
+        Path("results")
+        / experiment_name
+        / training_type
+        / encoder_name
+        / country
+        / timestamp
+    )
+    timestamp_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create subdirectories
+    (timestamp_dir / "checkpoints").mkdir(exist_ok=True)
+    (timestamp_dir / "logs").mkdir(exist_ok=True)
+
+    return timestamp_dir
 
 
 @torch.no_grad()
@@ -316,6 +457,8 @@ def visualize_predictions(
     epoch: int,
     num_samples: int = 4,
     log_to_wandb: bool = True,
+    wandb_step: int = None,
+    coordinate_loss_type: str = "mse",
 ):
     """Visualize predictions with top 5 concepts as bar plots."""
     model.eval()
@@ -331,6 +474,10 @@ def visualize_predictions(
     concept_logits, country_logits, coord_preds = model(images)
     concept_probs = torch.softmax(concept_logits, dim=1)
     country_probs = torch.softmax(country_logits, dim=1)
+    if coordinate_loss_type.lower() == "sphere":
+        coord_preds_for_display = sphere_to_normalized_latlng(coord_preds)
+    else:
+        coord_preds_for_display = coord_preds
 
     # Process up to num_samples
     n_samples = min(num_samples, len(images))
@@ -357,7 +504,7 @@ def visualize_predictions(
         pred_country_idx = country_probs[i].argmax().item()
         pred_country = idx_to_country[pred_country_idx]
         true_country = idx_to_country[country_idx[i].item()]
-        pred_coords = coord_preds[i].cpu().numpy()
+        pred_coords = coord_preds_for_display[i].cpu().numpy()
         true_coords = coords[i].cpu().numpy()
 
         title = f"Epoch {epoch} | Pred: {pred_country} | True: {true_country}\n"
@@ -370,15 +517,23 @@ def visualize_predictions(
         top5_concepts = [idx_to_concept[idx.item()] for idx in top5_indices]
         top5_probs_np = top5_probs.cpu().numpy()
 
-        bars = ax_bar.barh(range(len(top5_concepts)), top5_probs_np, color="steelblue")
-        ax_bar.set_yticks(range(len(top5_concepts)))
-        ax_bar.set_yticklabels(top5_concepts)
+        # Reverse arrays to show highest probability at top (descending order)
+        top5_concepts_reversed = list(reversed(top5_concepts))
+        top5_probs_np_reversed = top5_probs_np[::-1]
+
+        bars = ax_bar.barh(
+            range(len(top5_concepts_reversed)),
+            top5_probs_np_reversed,
+            color="steelblue",
+        )
+        ax_bar.set_yticks(range(len(top5_concepts_reversed)))
+        ax_bar.set_yticklabels(top5_concepts_reversed)
         ax_bar.set_xlabel("Probability", fontsize=10)
         ax_bar.set_title("Top 5 Predicted Concepts", fontsize=10)
         ax_bar.set_xlim(0, 1)
 
         # Add value labels on bars
-        for j, (bar, prob) in enumerate(zip(bars, top5_probs_np)):
+        for j, (bar, prob) in enumerate(zip(bars, top5_probs_np_reversed)):
             ax_bar.text(prob + 0.01, j, f"{prob:.3f}", va="center", fontsize=9)
 
         plt.tight_layout()
@@ -393,27 +548,63 @@ def visualize_predictions(
     logger.info(f"Saved {n_samples} visualization(s) to {output_dir} for epoch {epoch}")
 
     if log_to_wandb and wandb_images:
-        wandb.log({f"predictions/epoch_{epoch}": wandb_images}, step=epoch)
+        step = wandb_step if wandb_step is not None else epoch
+        wandb.log({f"predictions/epoch_{epoch}": wandb_images}, step=step)
 
 
 def main():
     args = parse_args()
     device = torch.device(args.device)
 
+    # Set seeds for reproducibility
+    seed = args.seed
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+    logger.info(f"Set random seed to {seed} for reproducibility")
+
+    # Handle backward compatibility
+    encoder_model = args.encoder_model
+    if args.streetclip_model is not None:
+        encoder_model = args.streetclip_model
+        logger.warning("--streetclip_model is deprecated. Use --encoder_model instead.")
+
     # Create checkpoint directory
     if args.checkpoint_dir is None:
-        checkpoint_dir = create_checkpoint_dir(args.country_filter, args.sequential)
+        checkpoint_dir = create_checkpoint_dir(
+            args.experiment_name, args.country_filter, args.sequential, encoder_model
+        )
     else:
         checkpoint_dir = Path(args.checkpoint_dir)
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        # Ensure subdirectories exist
+        (checkpoint_dir / "checkpoints").mkdir(exist_ok=True)
+        (checkpoint_dir / "logs").mkdir(exist_ok=True)
 
     logger.info(f"Checkpoint directory: {checkpoint_dir}")
+
+    # Set up file logging to logs/ subdirectory
+    log_file = checkpoint_dir / "logs" / "training.log"
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setLevel(logging.INFO)
+    file_formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    file_handler.setFormatter(file_formatter)
+    logger.addHandler(file_handler)
+    logger.info(f"Logging to {log_file}")
 
     # Initialize wandb
     if not args.no_wandb:
         wandb_config = {
+            "experiment_name": args.experiment_name,
             "batch_size": args.batch_size,
-            "streetclip_model": args.streetclip_model,
+            "encoder_model": encoder_model,
             "finetune_encoder": args.finetune_encoder,
             "encoder_lr": args.encoder_lr,
             "cbm_lr": args.cbm_lr,
@@ -421,6 +612,7 @@ def main():
             "concept_weight": args.concept_weight,
             "distance_weight": args.distance_weight,
             "country_weight": args.country_weight,
+            "coordinate_loss_type": args.coordinate_loss_type,
             "concept_epochs": args.concept_epochs,
             "prediction_epochs": args.prediction_epochs,
             "finetune_epochs": args.finetune_epochs,
@@ -432,18 +624,36 @@ def main():
             "checkpoint_dir": str(checkpoint_dir),
         }
 
+        # Get clean encoder name for run name and tags
+        ENCODER_MODEL_TO_NAME = {
+            "geolocal/StreetCLIP": "streetclip",
+            "facebook/dinov3-vit7b16-pretrain-lvd1689m": "dinov3",
+            "facebook/dinov2-base": "dinov2",
+        }
+        encoder_name = ENCODER_MODEL_TO_NAME.get(encoder_model, encoder_model)
+        encoder_name = encoder_name.replace("/", "-")
+        
+        # Get country name
+        country = args.country_filter if args.country_filter else "global"
+        
+        # Get loss type
+        loss_type = args.coordinate_loss_type
+        
         run_name = args.wandb_run_name
         if run_name is None:
-            country_suffix = f"-{args.country_filter}" if args.country_filter else ""
             run_name = (
-                f"train-cbm{country_suffix}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+                f"train-cbm-{country}-{encoder_name}-{loss_type}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
             )
+        
+        # Create tags list
+        tags = [country, encoder_name, loss_type]
 
         wandb.init(
             project=args.wandb_project,
             name=run_name,
             entity=args.wandb_entity,
             config=wandb_config,
+            tags=tags,
             dir=str(checkpoint_dir),
         )
         logger.info(f"Initialized wandb run: {run_name}")
@@ -454,7 +664,10 @@ def main():
         max_samples=args.max_samples,
         country=args.country_filter,
         require_coordinates=args.require_coordinates,
+        encoder_model=encoder_model,
     )
+
+    logger.info(f"Dataset image size: {dataset.image_size}")
 
     train_loader, val_loader, test_loader = build_dataloaders(
         dataset,
@@ -466,21 +679,25 @@ def main():
         seed=args.seed,
     )
 
-    encoder_config = StreetCLIPConfig(
-        model_name=args.streetclip_model,
+    # Create encoder using factory
+    encoder = create_encoder(
+        model_name=encoder_model,
         finetune=args.finetune_encoder,
         device=device,
     )
-    encoder = StreetCLIPEncoder(encoder_config)
-    feature_dim = FEATURE_DIM_BY_MODEL.get(args.streetclip_model, encoder.feature_dim)
+    feature_dim = encoder.feature_dim
 
+    logger.info(f"Using encoder: {encoder_model}")
+    logger.info(f"Encoder type: {encoder.encoder_type}")
     logger.info(f"Encoder feature dimension: {feature_dim}")
+    logger.info(f"Coordinate loss type: {args.coordinate_loss_type}")
 
     model = CBMGeolocationModel(
         encoder=encoder,
         num_concepts=len(dataset.concept_to_idx),
         num_countries=len(dataset.country_to_idx),
         feature_dim=feature_dim,
+        coordinate_loss_type=args.coordinate_loss_type,
     ).to(device)
 
     # Log model dimensions and parameter counts
@@ -545,6 +762,7 @@ def main():
             total_epochs = 1
         stages = (("finetune", total_epochs),)
 
+    global_step = 0  # Track global step across all stages for wandb
     for stage_name, epochs in stages:
         print(f"Starting stage: {stage_name} for {epochs} epochs")
         model.set_stage(
@@ -557,11 +775,25 @@ def main():
         )
 
         for epoch in range(1, epochs + 1):
+            global_step += 1  # Increment global step for wandb
             print(f"Epoch {epoch}/{epochs} (Stage: {stage_name})")
             train_loss = train_one_epoch(
-                model, train_loader, optimizer, device, loss_weights
+                model,
+                train_loader,
+                optimizer,
+                device,
+                loss_weights,
+                stage_name,
+                args.coordinate_loss_type,
             )
-            val_loss, val_metrics = evaluate(model, val_loader, device, loss_weights)
+            val_loss, val_metrics = evaluate(
+                model,
+                val_loader,
+                device,
+                loss_weights,
+                stage_name,
+                args.coordinate_loss_type,
+            )
             scheduler.step(val_loss)
 
             print(f"Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")
@@ -576,10 +808,14 @@ def main():
                 }
                 for key, value in val_metrics.items():
                     log_dict[f"{stage_name}/val_{key}"] = value
-                wandb.log(log_dict, step=epoch)
+                wandb.log(log_dict, step=global_step)
 
             if epoch % args.checkpoint_interval == 0:
-                ckpt_path = checkpoint_dir / f"stage-{stage_name}-epoch-{epoch}.pt"
+                ckpt_path = (
+                    checkpoint_dir
+                    / "checkpoints"
+                    / f"stage-{stage_name}-epoch-{epoch}.pt"
+                )
                 save_checkpoint(model, optimizer, epoch, stage_name, ckpt_path)
 
             # Visualize predictions every 5th epoch
@@ -595,10 +831,21 @@ def main():
                     epoch,
                     num_samples=4,
                     log_to_wandb=not args.no_wandb,
+                    wandb_step=global_step,
+                    coordinate_loss_type=args.coordinate_loss_type,
                 )
 
     print("Evaluating on test split...")
-    test_loss, test_metrics = evaluate(model, test_loader, device, loss_weights)
+    # Use the last stage for test evaluation (or "finetune" if available, otherwise last stage)
+    test_stage = stages[-1][0] if stages else "finetune"
+    test_loss, test_metrics = evaluate(
+        model,
+        test_loader,
+        device,
+        loss_weights,
+        test_stage,
+        args.coordinate_loss_type,
+    )
     print(f"Test Loss: {test_loss:.4f}")
     for key, value in test_metrics.items():
         print(f"  {key}: {value:.4f}")
