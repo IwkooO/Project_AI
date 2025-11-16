@@ -1,20 +1,23 @@
 #!/bin/bash
-#SBATCH --job-name=strtclip
+#SBATCH --job-name=cbm
 #SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=9
 #SBATCH --mem=32G
 #SBATCH --time=12:00:00
-#SBATCH --output=jobs/outputs/train_cbm_geolocation.log
+#SBATCH --output=jobs/outputs/train_cbm_geolocation_dinov3.log
 
 module load 2025
 module load Anaconda3/2025.06-1
 cd /scratch-shared/pnair/Project_AI/
-source activate streetview
+
+# Conda environment setup
+source activate streetview_pnair
+export PYTHONNOUSERSITE=1
 
 echo "Starting StreetCLIP CBM training"
 
-EPOCHS=5
+EPOCHS=20
 BATCH_SIZE=16
 
 python scripts/training/train_cbm_geolocation.py \
@@ -22,8 +25,11 @@ python scripts/training/train_cbm_geolocation.py \
   --concept_epochs $EPOCHS \
   --prediction_epochs $EPOCHS \
   --finetune_epochs 0 \
-  --streetclip_model geolocal/StreetCLIP \
+  --encoder_model facebook/dinov3-vit7b16-pretrain-lvd1689m \
   --country_filter Australia \
-  --sequential # This does nothing for now
+  --experiment_name dinov3-australia-spherical-loss\
+  --coordinate_loss_type sphere \
+  --sequential  # This does nothing for now 
+
   
 

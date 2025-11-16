@@ -6,6 +6,7 @@ import math
 from typing import Dict
 
 import torch
+import torch.nn.functional as F
 
 EARTH_RADIUS_KM = 6371.0
 
@@ -15,6 +16,42 @@ def denormalize_coordinates(coords: torch.Tensor) -> torch.Tensor:
     lat = coords[:, 0] * 90.0
     lng = coords[:, 1] * 180.0
     return torch.stack([lat, lng], dim=1)
+
+
+def latlng_to_sphere(lat_lng_deg: torch.Tensor) -> torch.Tensor:
+    """Convert latitude/longitude in degrees to 3D unit vectors."""
+    lat_rad = torch.deg2rad(lat_lng_deg[:, 0])
+    lng_rad = torch.deg2rad(lat_lng_deg[:, 1])
+    cos_lat = torch.cos(lat_rad)
+    x = cos_lat * torch.cos(lng_rad)
+    y = cos_lat * torch.sin(lng_rad)
+    z = torch.sin(lat_rad)
+    xyz = torch.stack([x, y, z], dim=1)
+    return F.normalize(xyz, p=2, dim=1)
+
+
+def normalized_latlng_to_sphere(coords: torch.Tensor) -> torch.Tensor:
+    """Convert normalized lat/lng in [-1, 1] to 3D unit vectors."""
+    lat_lng_deg = denormalize_coordinates(coords)
+    return latlng_to_sphere(lat_lng_deg)
+
+
+def sphere_to_latlng(sphere_vecs: torch.Tensor) -> torch.Tensor:
+    """Convert 3D unit vectors to latitude/longitude in degrees."""
+    sphere_vecs = F.normalize(sphere_vecs, p=2, dim=1)
+    x, y, z = sphere_vecs[:, 0], sphere_vecs[:, 1], sphere_vecs[:, 2]
+    z = torch.clamp(z, -1.0, 1.0)
+    lat = torch.rad2deg(torch.asin(z))
+    lng = torch.rad2deg(torch.atan2(y, x))
+    return torch.stack([lat, lng], dim=1)
+
+
+def sphere_to_normalized_latlng(sphere_vecs: torch.Tensor) -> torch.Tensor:
+    """Convert 3D unit vectors to normalized lat/lng coordinates."""
+    lat_lng_deg = sphere_to_latlng(sphere_vecs)
+    lat_norm = lat_lng_deg[:, 0] / 90.0
+    lng_norm = lat_lng_deg[:, 1] / 180.0
+    return torch.stack([lat_norm, lng_norm], dim=1)
 
 
 def haversine_distance(pred_coords: torch.Tensor, true_coords: torch.Tensor) -> torch.Tensor:
@@ -51,8 +88,17 @@ def compute_geolocation_metrics(
     concept_targets: torch.Tensor,
     country_targets: torch.Tensor,
     coordinate_targets: torch.Tensor,
+    coordinate_loss_type: str = "mse",
 ) -> Dict[str, float]:
     metrics: Dict[str, float] = {}
+    coord_type = coordinate_loss_type.lower()
+
+    if coord_type == "sphere":
+        predicted_coords_for_metrics = sphere_to_normalized_latlng(predicted_coords)
+    elif coord_type == "mse":
+        predicted_coords_for_metrics = predicted_coords
+    else:
+        raise ValueError(f"Unsupported coordinate_loss_type '{coordinate_loss_type}'")
 
     with torch.no_grad():
         metrics["concept_accuracy"] = float(
@@ -64,12 +110,18 @@ def compute_geolocation_metrics(
 
         mask = ~torch.isnan(coordinate_targets).any(dim=1)
         if mask.sum() > 0:
-            mse = torch.mean((predicted_coords[mask] - coordinate_targets[mask]) ** 2)
-            mae = torch.mean(torch.abs(predicted_coords[mask] - coordinate_targets[mask]))
+            mse = torch.mean(
+                (predicted_coords_for_metrics[mask] - coordinate_targets[mask]) ** 2
+            )
+            mae = torch.mean(
+                torch.abs(predicted_coords_for_metrics[mask] - coordinate_targets[mask])
+            )
             metrics["coord_mse"] = float(mse.item())
             metrics["coord_mae"] = float(mae.item())
 
-            distances = haversine_distance(predicted_coords, coordinate_targets)
+            distances = haversine_distance(
+                predicted_coords_for_metrics, coordinate_targets
+            )
             if distances.numel() > 0:
                 metrics["median_km"] = float(distances.median().item())
                 for threshold in [1, 10, 100, 1000]:
