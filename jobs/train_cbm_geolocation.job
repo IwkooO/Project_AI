@@ -1,0 +1,29 @@
+#!/bin/bash
+#SBATCH --job-name=strtclip
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --cpus-per-task=9
+#SBATCH --mem=32G
+#SBATCH --time=12:00:00
+#SBATCH --output=jobs/outputs/train_cbm_geolocation.log
+
+module load 2025
+module load Anaconda3/2025.06-1
+cd /scratch-shared/pnair/Project_AI/
+source activate streetview
+
+echo "Starting StreetCLIP CBM training"
+
+EPOCHS=5
+BATCH_SIZE=16
+
+python scripts/training/train_cbm_geolocation.py \
+  --batch_size $BATCH_SIZE \
+  --concept_epochs $EPOCHS \
+  --prediction_epochs $EPOCHS \
+  --finetune_epochs 0 \
+  --streetclip_model geolocal/StreetCLIP \
+  --country_filter Australia \
+  --sequential # This does nothing for now
+  
+
