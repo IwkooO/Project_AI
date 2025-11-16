@@ -3,14 +3,21 @@
 PyTorch Dataset for CBM baseline training on panorama images.
 """
 
-import torch
-from torch.utils.data import Dataset
-from pathlib import Path
 import json
-from PIL import Image
-import numpy as np
+from pathlib import Path
 from typing import Dict, List, Tuple, Optional
+
+import numpy as np
+import torch
+from PIL import Image
+from torch.utils.data import Dataset
+from torchvision import transforms
+from torchvision.transforms import InterpolationMode
+
 from tqdm import tqdm
+
+CLIP_IMAGE_MEAN = (0.48145466, 0.4578275, 0.40821073)
+CLIP_IMAGE_STD = (0.26862954, 0.26130258, 0.27577711)
 
 geoguessrId = "6906237dc7731161a37282b2"
 data_root = Path("data")
@@ -31,20 +38,31 @@ class PanoramaCBMDataset(Dataset):
 
     def __init__(self,
                  transform=None,
-                 image_size: Tuple[int, int] = (224, 224),
+                 image_size: Tuple[int, int] = (336, 336),
                  max_samples: Optional[int] = None,
-                 country: Optional[str] = None):
+                 country: Optional[str] = None,
+                 require_coordinates: bool = False):
         """
         Args:
             transform: Optional torchvision transforms
             image_size: Target size for images (width, height)
             max_samples: Limit number of samples for debugging
             country: Optional country name to filter samples by
+            require_coordinates: Drop samples missing lat/lng
         """
         self.transform = transform
         self.image_size = image_size
         self.max_samples = max_samples
         self.country = country
+        self.require_coordinates = require_coordinates
+
+        if self.transform is None:
+            self.transform = transforms.Compose([
+                transforms.Resize(self.image_size, interpolation=InterpolationMode.BICUBIC),
+                transforms.CenterCrop(self.image_size),
+                transforms.ToTensor(),
+                transforms.Normalize(CLIP_IMAGE_MEAN, CLIP_IMAGE_STD),
+            ])
 
         # Load and filter samples
         self.samples = self._load_samples()
@@ -92,6 +110,9 @@ class PanoramaCBMDataset(Dataset):
                 lat = meta.get('lat')
                 lng = meta.get('lng')
 
+                if self.require_coordinates and (lat is None or lng is None):
+                    continue
+
                 sample = {
                     'pano_id': pano_id,
                     'image_path': image_path,
@@ -115,12 +136,13 @@ class PanoramaCBMDataset(Dataset):
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int, int, Dict]:
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int, int, torch.Tensor, Dict]:
         """
         Returns:
             image_tensor: Processed image tensor
             concept_idx: Index of metaName (concept)
             target_idx: Index of country (target)
+            coordinates_tensor: Normalized (lat, lng) tensor in [-1, 1]
             metadata: Dict with sample information
         """
         sample = self.samples[idx]
@@ -140,6 +162,8 @@ class PanoramaCBMDataset(Dataset):
         concept_idx = self.concept_to_idx[sample['meta_name']]
         target_idx = self.country_to_idx[sample['country']]
 
+        coordinates = normalize_coordinates(sample['lat'], sample['lng'])
+
         # Metadata dict
         metadata = {
             'pano_id': sample['pano_id'],
@@ -151,7 +175,7 @@ class PanoramaCBMDataset(Dataset):
             'images': sample['images']
         }
 
-        return image, concept_idx, target_idx, metadata
+        return image, concept_idx, target_idx, coordinates, metadata
 
 def get_concept_to_idx(samples: List[Dict]) -> Tuple[Dict[str, int], Dict[int, str]]:
     """Create mapping from metaName strings to indices."""
@@ -173,7 +197,10 @@ def create_splits(samples: List[Dict],
                   test_ratio: float = 0.15,
                   seed: int = 42) -> Tuple[List[Dict], List[Dict], List[Dict]]:
     """
-    Split samples into train/val/test sets.
+    Split samples into train/val/test sets with per-concept stratification.
+
+    Ensures that every concept (meta_name) contributes at least one example to the
+    training set so that the concept head sees all labels during supervised training.
 
     Args:
         samples: List of sample dictionaries
@@ -187,21 +214,51 @@ def create_splits(samples: List[Dict],
     """
     assert abs(train_ratio + val_ratio + test_ratio - 1.0) < 1e-6, "Ratios must sum to 1.0"
 
-    np.random.seed(seed)
+    rng = np.random.default_rng(seed)
+    concept_to_samples: Dict[str, List[Dict]] = {}
+    for sample in samples:
+        concept_to_samples.setdefault(sample['meta_name'], []).append(sample)
 
-    # Shuffle samples
-    indices = np.random.permutation(len(samples))
+    train_samples: List[Dict] = []
+    val_samples: List[Dict] = []
+    test_samples: List[Dict] = []
 
-    n_train = int(len(samples) * train_ratio)
-    n_val = int(len(samples) * val_ratio)
+    for concept in sorted(concept_to_samples.keys()):
+        concept_samples = concept_to_samples[concept]
+        if len(concept_samples) == 1:
+            train_samples.extend(concept_samples)
+            continue
 
-    train_indices = indices[:n_train]
-    val_indices = indices[n_train:n_train + n_val]
-    test_indices = indices[n_train + n_val:]
+        shuffled_indices = rng.permutation(len(concept_samples))
+        shuffled = [concept_samples[i] for i in shuffled_indices]
 
-    train_samples = [samples[i] for i in train_indices]
-    val_samples = [samples[i] for i in val_indices]
-    test_samples = [samples[i] for i in test_indices]
+        n = len(shuffled)
+        n_train = max(1, int(round(n * train_ratio)))
+        n_val = int(round(n * val_ratio))
+        if n_train + n_val > n:
+            overflow = n_train + n_val - n
+            if n_val >= overflow:
+                n_val -= overflow
+            else:
+                n_train = max(1, n_train - (overflow - n_val))
+                n_val = 0
+        n_test = n - n_train - n_val
+
+        if n_test < 0:
+            n_val = max(0, n_val + n_test)
+            n_test = 0
+
+        if n_train == 0:
+            if n_val > 0:
+                n_train, n_val = 1, n_val - 1
+            elif n_test > 0:
+                n_train, n_test = 1, n_test - 1
+            else:
+                n_train = 1
+
+        train_samples.extend(shuffled[:n_train])
+        val_samples.extend(shuffled[n_train:n_train + n_val])
+        test_samples.extend(shuffled[n_train + n_val:n_train + n_val + n_test])
 
     return train_samples, val_samples, test_samples
 
@@ -288,6 +345,16 @@ class SubsetDataset(Dataset):
         parent_idx = self.parent_dataset.samples.index(sample)
         return self.parent_dataset[parent_idx]
 
+
+def normalize_coordinates(lat: Optional[float], lng: Optional[float]) -> torch.Tensor:
+    """Normalize coordinates to [-1, 1] range."""
+    if lat is None or lng is None:
+        return torch.tensor([float('nan'), float('nan')], dtype=torch.float32)
+
+    lat_norm = float(lat) / 90.0
+    lng_norm = float(lng) / 180.0
+    return torch.tensor([lat_norm, lng_norm], dtype=torch.float32)
+
 if __name__ == "__main__":
     # Test the dataset
     dataset = PanoramaCBMDataset(country="Australia")  
@@ -315,8 +382,9 @@ if __name__ == "__main__":
     print(f"Subset dataset sizes: Train={len(train_dataset)}, Val={len(val_dataset)}, Test={len(test_dataset)}")
 
     # Test __getitem__
-    image, concept_idx, target_idx, metadata = dataset[0]
+    image, concept_idx, target_idx, coords, metadata = dataset[0]
     print(f"Image shape: {image.shape}")
     print(f"Concept idx: {concept_idx} -> {dataset.idx_to_concept[concept_idx]}")
     print(f"Target idx: {target_idx} -> {dataset.idx_to_country[target_idx]}")
+    print(f"Coordinates: {coords}")
     print(f"Metadata keys: {list(metadata.keys())}")
