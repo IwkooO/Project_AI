@@ -152,5 +152,52 @@ def compute_geolocation_metrics(
 
     return metrics
 
+def compute_haversine_distance(pred_coords: torch.Tensor, true_coords: torch.Tensor) -> torch.Tensor:
+    """Compute Haversine distance between two points on the Earth's surface.
+    
+    Args:
+        pred_coords: Predicted coordinates, shape (2,) for single pair or (N, 2) for batch.
+        true_coords: True coordinates, shape (2,) for single pair or (N, 2) for batch.
+    
+    Returns:
+        Distance in kilometers.
+    """
+    def _to_tensor(coords):
+        if isinstance(coords, torch.Tensor):
+            tensor = coords
+        elif hasattr(coords, "__array__"):
+            tensor = torch.from_numpy(coords)
+        else:
+            tensor = torch.tensor(coords)
+        return tensor.to(torch.float32)
+
+    def _prepare_coords(coords_tensor: torch.Tensor):
+        was_1d = coords_tensor.dim() == 1
+        tensor = coords_tensor if not was_1d else coords_tensor.unsqueeze(0)
+        needs_denorm = tensor.abs().max() <= 1.0001
+        tensor = denormalize_coordinates(tensor) if needs_denorm else tensor
+        return tensor, was_1d
+
+    pred_tensor = _to_tensor(pred_coords)
+    true_tensor = _to_tensor(true_coords)
+
+    pred_deg, pred_was_1d = _prepare_coords(pred_tensor)
+    true_deg, true_was_1d = _prepare_coords(true_tensor)
+
+    lat1 = torch.deg2rad(true_deg[:, 0])
+    lon1 = torch.deg2rad(true_deg[:, 1])
+    lat2 = torch.deg2rad(pred_deg[:, 0])
+    lon2 = torch.deg2rad(pred_deg[:, 1])
+
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = torch.sin(dlat / 2) ** 2 + torch.cos(lat1) * torch.cos(lat2) * torch.sin(dlon / 2) ** 2
+    c = 2 * torch.atan2(torch.sqrt(a), torch.sqrt(1 - a))
+    distances = EARTH_RADIUS_KM * c
+
+    if pred_was_1d and true_was_1d:
+        return distances.squeeze(0)
+    return distances
+
 
 

@@ -13,44 +13,19 @@ the 'module load <package__name>' command. If you are uncertain if a package is
 already available 
 on the system, please use 'module avail' or 'module spider' to search for it.
 ============================================================================================== 
-/var/spool/slurm/slurmd/job16293460/slurm_script: line 14: cd: /home/pnair/Project_AI/: No such file or directory
-Loading samples:   0%|          | 0/5538 [00:00<?, ?it/s]Loading samples:   0%|          | 2/5538 [00:00<05:58, 15.43it/s]Loading samples:   3%|▎         | 172/5538 [00:00<00:05, 897.04it/s]Loading samples:   8%|▊         | 417/5538 [00:00<00:03, 1559.71it/s]Loading samples:  12%|█▏        | 673/5538 [00:00<00:02, 1936.63it/s]Loading samples:  17%|█▋        | 931/5538 [00:00<00:02, 2161.25it/s]Loading samples:  21%|██        | 1170/5538 [00:00<00:01, 2235.31it/s]Loading samples:  25%|██▌       | 1402/5538 [00:00<00:01, 2259.76it/s]Loading samples:  30%|██▉       | 1638/5538 [00:00<00:01, 2288.93it/s]Loading samples:  34%|███▍      | 1882/5538 [00:00<00:01, 2333.94it/s]Loading samples:  39%|███▊      | 2139/5538 [00:01<00:01, 2403.32it/s]Loading samples:  43%|████▎     | 2394/5538 [00:01<00:01, 2447.46it/s]Loading samples:  48%|████▊     | 2645/5538 [00:01<00:01, 2464.24it/s]Loading samples:  52%|█████▏    | 2893/5538 [00:01<00:01, 2467.72it/s]Loading samples:  57%|█████▋    | 3148/5538 [00:01<00:00, 2491.45it/s]Loading samples:  61%|██████▏   | 3398/5538 [00:01<00:00, 2478.77it/s]Loading samples:  66%|██████▌   | 3647/5538 [00:01<00:00, 2456.90it/s]Loading samples:  71%|███████   | 3905/5538 [00:01<00:00, 2493.42it/s]Loading samples:  75%|███████▌  | 4160/5538 [00:01<00:00, 2509.01it/s]Loading samples:  80%|███████▉  | 4412/5538 [00:01<00:00, 2508.71it/s]Loading samples:  84%|████████▍ | 4663/5538 [00:02<00:00, 2492.51it/s]Loading samples:  89%|████████▉ | 4919/5538 [00:02<00:00, 2509.84it/s]Loading samples:  93%|█████████▎| 5177/5538 [00:02<00:00, 2529.27it/s]Loading samples:  98%|█████████▊| 5435/5538 [00:02<00:00, 2541.40it/s]Loading samples: 100%|██████████| 5538/5538 [00:02<00:00, 2322.86it/s]
-Country filter 'Australia' applied:
-  - Loaded samples: 251
-  - Skipped (country mismatch): 4736
+/var/spool/slurm/slurmd/job16345943/slurm_script: line 14: cd: /home/pnair/Project_AI/: No such file or directory
+Using default CLIP preprocessing
+  Image size: (336, 336)
+  Normalization mean: (0.48145466, 0.4578275, 0.40821073)
+  Normalization std: (0.26862954, 0.26130258, 0.27577711)
+Loading samples:   0%|          | 0/5538 [00:00<?, ?it/s]Loading samples:   1%|          | 34/5538 [00:00<00:16, 338.76it/s]Loading samples:   5%|▍         | 269/5538 [00:00<00:03, 1517.99it/s]Loading samples:   9%|▉         | 514/5538 [00:00<00:02, 1939.36it/s]Loading samples:  14%|█▍        | 763/5538 [00:00<00:02, 2152.63it/s]Loading samples:  18%|█▊        | 1015/5538 [00:00<00:01, 2282.44it/s]Loading samples:  23%|██▎       | 1248/5538 [00:00<00:01, 2297.68it/s]Loading samples:  27%|██▋       | 1495/5538 [00:00<00:01, 2353.53it/s]Loading samples:  31%|███▏      | 1731/5538 [00:00<00:01, 2330.55it/s]Loading samples:  35%|███▌      | 1965/5538 [00:00<00:01, 2324.64it/s]Loading samples:  40%|███▉      | 2212/5538 [00:01<00:01, 2367.01it/s]Loading samples:  44%|████▍     | 2453/5538 [00:01<00:01, 2377.65it/s]Loading samples:  49%|████▊     | 2694/5538 [00:01<00:01, 2386.34it/s]Loading samples:  53%|█████▎    | 2933/5538 [00:01<00:01, 2377.57it/s]Loading samples:  57%|█████▋    | 3171/5538 [00:01<00:00, 2378.14it/s]Loading samples:  62%|██████▏   | 3409/5538 [00:01<00:00, 2332.04it/s]Loading samples:  66%|██████▌   | 3643/5538 [00:01<00:00, 2314.16it/s]Loading samples:  70%|███████   | 3884/5538 [00:01<00:00, 2339.83it/s]Loading samples:  74%|███████▍  | 4119/5538 [00:01<00:00, 2342.60it/s]Loading samples:  79%|███████▊  | 4361/5538 [00:01<00:00, 2362.94it/s]Loading samples:  83%|████████▎ | 4599/5538 [00:02<00:00, 2364.90it/s]Loading samples:  87%|████████▋ | 4844/5538 [00:02<00:00, 2389.68it/s]Loading samples:  92%|█████████▏| 5084/5538 [00:02<00:00, 2374.74it/s]Loading samples:  96%|█████████▌| 5322/5538 [00:02<00:00, 2314.74it/s]Loading samples: 100%|██████████| 5538/5538 [00:02<00:00, 2283.14it/s]
+Country filter 'India' applied:
+  - Loaded samples: 468
+  - Skipped (country mismatch): 4519
   - Skipped (no image): 551
-Loaded 251 samples
-Concepts: 32
+  - Skipped (no coordinates): 0
+Loaded 468 samples
+Concepts: 62
 Countries: 1
-Dataset Statistics:
-  Total samples: 251
-  Number of countries: 1
-  Number of concepts: 32
-  Coordinate coverage: 251/251 (100.0%)
-
-Top 10 countries:
-  1. Australia: 251
-
-Top 10 concepts:
-  1. Victoria hydrant bollard: 10
-  2. WA yellow sign posts: 10
-  3. NSW red no stopping sign: 10
-  4. NSW guardrail ending: 10
-  5. WA property marker: 10
-  6. WA bollard: 10
-  7. Bollard: 10
-  8. WA stripy bollard: 10
-  9. NT pole: 10
-  10. Melbourne white blue sticker: 10
-{'pano_id': 'CUjS2mS-Uvvb-5rW-hkHBQ', 'image_path': PosixPath('data/6906237dc7731161a37282b2/panorama_processed/image_CUjS2mS-Uvvb-5rW-hkHBQ.jpg'), 'meta_path': PosixPath('data/6906237dc7731161a37282b2/metas/CUjS2mS-Uvvb-5rW-hkHBQ.json'), 'meta_name': 'Victoria hydrant bollard', 'country': 'Australia', 'lat': -37.82407, 'lng': 147.62221, 'note': '<p>You can find these white hydrant poles that feature a blue circle and a red section on top of it in Victoria.(they have couple different designs but they all follow same color/shape +/- pattern)</p>', 'images': ['https://learnablemeta.com/images/NTX92TdJmFQ2WeGG5zGbGucJOb0l7fFJ4Vm8.avif']}
-Image shape: data/6906237dc7731161a37282b2/panorama_processed/image_CUjS2mS-Uvvb-5rW-hkHBQ.jpg
-Concept idx: Victoria hydrant bollard
-Target idx: Australia
-Metadata keys: ['pano_id', 'image_path', 'meta_path', 'meta_name', 'country', 'lat', 'lng', 'note', 'images']
-Split sizes: Train=205, Val=23, Test=23
-Subset dataset sizes: Train=205, Val=23, Test=23
-Image shape: torch.Size([3, 336, 336])
-Concept idx: 15 -> Victoria hydrant bollard
-Target idx: 0 -> Australia
-Coordinates: tensor([-0.4203,  0.8201])
-Metadata keys: ['pano_id', 'meta_name', 'country', 'lat', 'lng', 'note', 'images']
+Exporting 468 samples to CSV...
+Successfully exported 468 rows to dataset_export_india.csv

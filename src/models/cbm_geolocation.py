@@ -36,14 +36,21 @@ class CBMGeolocationModel(nn.Module):
         self.country_head = nn.Linear(num_concepts, num_countries)
 
         coord_out_dim = 3 if self.coordinate_loss_type == "sphere" else 2
-        self.coordinate_head = nn.Linear(num_concepts, coord_out_dim)
+        self.coordinate_head = nn.Sequential(
+            nn.Linear(num_concepts, 128),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, coord_out_dim)
+        )
 
     def forward(self, images: torch.Tensor):
         features = self.encoder(images)
         concept_logits = self.concept_layer(features)
         concept_probs = F.softmax(concept_logits, dim=1)
-        country_logits = self.country_head(concept_probs)
-        coord_logits = self.coordinate_head(concept_probs)
+        country_logits = self.country_head(concept_logits)
+        coord_logits = self.coordinate_head(concept_logits)
         if self.coordinate_loss_type == "sphere":
             coordinates = F.normalize(coord_logits, p=2, dim=1)
         else:
