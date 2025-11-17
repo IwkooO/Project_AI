@@ -10,7 +10,7 @@ from typing import Optional
 import torch
 import torch.nn.functional as F
 
-from src.evaluation import normalized_latlng_to_sphere
+from src.evaluation import normalized_latlng_to_sphere, haversine_distance
 
 
 @dataclass
@@ -46,6 +46,14 @@ def coordinate_loss(
 
     if loss_type == "mse":
         return F.mse_loss(pred_coords[mask], target_coords[mask])
+
+    if loss_type == "haversine":
+        distances = haversine_distance(pred_coords[mask], target_coords[mask])
+        if distances.numel() == 0:
+            return torch.zeros(
+                1, device=pred_coords.device, dtype=pred_coords.dtype
+            ).squeeze()
+        return distances.mean()
 
     raise ValueError(f"Unsupported coordinate loss type '{loss_type}'")
 

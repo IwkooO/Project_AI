@@ -12,7 +12,26 @@ EARTH_RADIUS_KM = 6371.0
 
 
 def denormalize_coordinates(coords: torch.Tensor) -> torch.Tensor:
-    """Convert normalized coordinates back to degrees."""
+    """Convert normalized coordinates back to degrees.
+    
+    Args:
+        coords: Normalized coordinates, shape (2,) for single pair or (N, 2) for batch.
+                Can be torch.Tensor or numpy array.
+    
+    Returns:
+        Denormalized coordinates in degrees, shape (2,) or (N, 2).
+    """
+    # Convert numpy to torch if needed
+    if not isinstance(coords, torch.Tensor):
+        coords = torch.from_numpy(coords) if hasattr(coords, '__array__') else torch.tensor(coords)
+    
+    # Handle 1D input (single coordinate pair)
+    if coords.dim() == 1:
+        lat = coords[0] * 90.0
+        lng = coords[1] * 180.0
+        return torch.stack([lat, lng])
+    
+    # Handle 2D input (batch)
     lat = coords[:, 0] * 90.0
     lng = coords[:, 1] * 180.0
     return torch.stack([lat, lng], dim=1)
@@ -95,7 +114,7 @@ def compute_geolocation_metrics(
 
     if coord_type == "sphere":
         predicted_coords_for_metrics = sphere_to_normalized_latlng(predicted_coords)
-    elif coord_type == "mse":
+    elif coord_type in {"mse", "haversine"}:
         predicted_coords_for_metrics = predicted_coords
     else:
         raise ValueError(f"Unsupported coordinate_loss_type '{coordinate_loss_type}'")

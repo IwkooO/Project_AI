@@ -31,8 +31,13 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from src.config import DEFAULT_CONFIG
-from src.dataset import PanoramaCBMDataset, SubsetDataset, create_splits
-from src.evaluation import compute_geolocation_metrics, sphere_to_normalized_latlng
+from src.dataset import (
+    PanoramaCBMDataset,
+    SubsetDataset,
+    create_splits,
+    create_splits_stratified,
+)
+from src.evaluation import compute_geolocation_metrics, sphere_to_normalized_latlng, denormalize_coordinates
 from src.losses import LossWeights, combined_loss
 from src.models.cbm_geolocation import CBMGeolocationModel
 from src.models.encoder_factory import create_encoder
@@ -83,8 +88,8 @@ def parse_args() -> argparse.Namespace:
         "--coordinate_loss_type",
         type=str,
         default=cfg.coordinate_loss_type,
-        choices=("mse", "sphere"),
-        help="Coordinate loss/head type: 'mse' for lat/lng MSE, 'sphere' for 3D unit vectors.",
+        choices=("mse", "sphere", "haversine"),
+        help="Coordinate loss/head type: 'mse' for lat/lng MSE, 'sphere' for 3D unit vectors, 'haversine' for great-circle distance.",
     )
     parser.add_argument(
         "--checkpoint_dir",
@@ -123,6 +128,11 @@ def parse_args() -> argparse.Namespace:
         default="geo_cbm_v2",
         help="Experiment name for organizing results",
     )
+    parser.add_argument(
+        "--stratified_concept_sampling",
+        action="store_true",
+        help="Use concept-level stratified splits instead of disjoint concept splits",
+    )
     return parser.parse_args()
 
 
@@ -151,8 +161,10 @@ def build_dataloaders(
     val_ratio: float,
     test_ratio: float,
     seed: int,
+    stratify_concepts: bool = False,
 ):
-    train_samples, val_samples, test_samples = create_splits(
+    split_fn = create_splits_stratified if stratify_concepts else create_splits
+    train_samples, val_samples, test_samples = split_fn(
         dataset.samples,
         train_ratio=train_ratio,
         val_ratio=val_ratio,
@@ -214,7 +226,14 @@ def train_one_epoch(
 
         # Stage-aware loss computation
         if stage == "concept":
-            # Stage 1: Train concept predictor
+            # Stage 1: Train concept predictor ONLY
+            # Don't include country/distance losses since those heads are frozen and random
+            # This prevents conflicting gradients from frozen random heads
+            stage_weights = LossWeights(
+                concept=loss_weights.concept,
+                distance=0.0,  # Don't compute distance loss
+                country=0.0,   # Don't compute country loss
+            )
             loss, _ = combined_loss(
                 concept_logits,
                 country_logits,
@@ -222,7 +241,7 @@ def train_one_epoch(
                 concept_idx,
                 country_idx,
                 coords,
-                loss_weights,
+                stage_weights,
                 coordinate_loss_type=coordinate_loss_type,
             )
         elif stage == "prediction":
@@ -280,7 +299,15 @@ def evaluate(
     metric_counts: Dict[str, int] = {}
 
     # Stage-aware loss weights (same logic as training)
-    if stage == "prediction":
+    if stage == "concept":
+        # Stage 1: Only evaluate concept prediction
+        # Don't include country/distance losses since those heads are frozen and random
+        stage_weights = LossWeights(
+            concept=loss_weights.concept,
+            distance=0.0,  # Don't compute distance loss
+            country=0.0,   # Don't compute country loss
+        )
+    elif stage == "prediction":
         # Stage 2: Only evaluate prediction heads, don't include concept loss
         stage_weights = LossWeights(
             concept=0.0,  # Don't compute concept loss
@@ -288,7 +315,7 @@ def evaluate(
             country=loss_weights.country,
         )
     else:
-        # Stage 1 (concept) and Stage 3 (finetune): Use full loss weights
+        # Stage 3 (finetune): Use full loss weights
         stage_weights = loss_weights
 
     for batch in tqdm(dataloader, desc="Eval", leave=False):
@@ -507,8 +534,23 @@ def visualize_predictions(
         pred_coords = coord_preds_for_display[i].cpu().numpy()
         true_coords = coords[i].cpu().numpy()
 
-        title = f"Epoch {epoch} | Pred: {pred_country} | True: {true_country}\n"
-        title += f"Coords: Pred({pred_coords[0]:.3f}, {pred_coords[1]:.3f}) | True({true_coords[0]:.3f}, {true_coords[1]:.3f})"
+        # Unnormalize the predicted and true coordinates
+        pred_coords = denormalize_coordinates(pred_coords)
+        true_coords = denormalize_coordinates(true_coords)
+
+        # Get ground truth concept
+        true_concept_idx = concept_idx[i].item()
+        true_concept = idx_to_concept[true_concept_idx]
+        true_concept_prob = concept_probs[i][true_concept_idx].item()
+
+        # Get image ID from metadata
+        pano_id = metadata[i]['pano_id']
+        image_id = f"image_{pano_id}.jpg"
+
+        title = f"Epoch {epoch} | Image ID: {image_id}\n"
+        title += f"Pred: {pred_country} | True: {true_country}\n"
+        title += f"Coords: Pred({pred_coords[0]:.3f}, {pred_coords[1]:.3f}) | True({true_coords[0]:.3f}, {true_coords[1]:.3f})\n"
+        title += f"GT Concept: {true_concept} ({true_concept_prob:.3f})"
         ax_img.set_title(title, fontsize=10)
 
         # Bottom: Top 5 concepts bar plot
@@ -517,19 +559,41 @@ def visualize_predictions(
         top5_concepts = [idx_to_concept[idx.item()] for idx in top5_indices]
         top5_probs_np = top5_probs.cpu().numpy()
 
+        # Check if ground truth is in top 5
+        true_in_top5 = true_concept_idx in top5_indices.cpu().numpy()
+        
         # Reverse arrays to show highest probability at top (descending order)
         top5_concepts_reversed = list(reversed(top5_concepts))
         top5_probs_np_reversed = top5_probs_np[::-1]
+        top5_indices_reversed = list(reversed(top5_indices.cpu().numpy()))
+
+        # Color bars: highlight ground truth if in top 5, otherwise use default color
+        bar_colors = [
+            "orange" if idx == true_concept_idx else "steelblue"
+            for idx in top5_indices_reversed
+        ]
 
         bars = ax_bar.barh(
             range(len(top5_concepts_reversed)),
             top5_probs_np_reversed,
-            color="steelblue",
+            color=bar_colors,
         )
         ax_bar.set_yticks(range(len(top5_concepts_reversed)))
-        ax_bar.set_yticklabels(top5_concepts_reversed)
+        
+        # Add (GT) label to ground truth concept in y-axis labels
+        yticklabels = []
+        for concept, idx in zip(top5_concepts_reversed, top5_indices_reversed):
+            if idx == true_concept_idx:
+                yticklabels.append(f"{concept} (GT)")
+            else:
+                yticklabels.append(concept)
+        ax_bar.set_yticklabels(yticklabels)
+        
         ax_bar.set_xlabel("Probability", fontsize=10)
-        ax_bar.set_title("Top 5 Predicted Concepts", fontsize=10)
+        title = "Top 5 Predicted Concepts"
+        if not true_in_top5:
+            title += f" | GT: {true_concept} ({true_concept_prob:.3f})"
+        ax_bar.set_title(title, fontsize=10)
         ax_bar.set_xlim(0, 1)
 
         # Add value labels on bars
@@ -644,9 +708,22 @@ def main():
             run_name = (
                 f"train-cbm-{country}-{encoder_name}-{loss_type}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
             )
+        if args.stratified_concept_sampling:
+            run_name += "-stratified"
+            strat_tag = "stratified"
+        else:
+            strat_tag = "disjoint"
+            run_name += "-disjoint"
         
+        if args.sequential:
+            run_name += "-sequential"
+            seq_tag = "sequential"
+        else:
+            seq_tag = "non-sequential"
+            run_name += "-non-sequential"
+
         # Create tags list
-        tags = [country, encoder_name, loss_type]
+        tags = [country, encoder_name, loss_type, strat_tag, seq_tag]
 
         wandb.init(
             project=args.wandb_project,
@@ -677,6 +754,7 @@ def main():
         val_ratio=args.val_ratio,
         test_ratio=args.test_ratio,
         seed=args.seed,
+        stratify_concepts=args.stratified_concept_sampling,
     )
 
     # Create encoder using factory
@@ -820,7 +898,7 @@ def main():
 
             # Visualize predictions every 5th epoch
             if epoch % 5 == 0:
-                viz_dir = checkpoint_dir / "visualizations" / stage_name
+                viz_dir = checkpoint_dir / "visualizations" / stage_name 
                 visualize_predictions(
                     model,
                     val_loader,

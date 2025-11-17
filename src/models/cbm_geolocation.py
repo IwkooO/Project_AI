@@ -26,10 +26,10 @@ class CBMGeolocationModel(nn.Module):
         self.encoder = encoder
         self.feature_dim = feature_dim
         self.coordinate_loss_type = coordinate_loss_type.lower()
-        if self.coordinate_loss_type not in {"mse", "sphere"}:
+        if self.coordinate_loss_type not in {"mse", "sphere", "haversine"}:
             raise ValueError(
                 f"Unsupported coordinate_loss_type '{coordinate_loss_type}'. "
-                "Expected 'mse' or 'sphere'."
+                "Expected 'mse', 'sphere', or 'haversine'."
             )
 
         self.concept_layer = nn.Linear(feature_dim, num_concepts)
@@ -41,8 +41,9 @@ class CBMGeolocationModel(nn.Module):
     def forward(self, images: torch.Tensor):
         features = self.encoder(images)
         concept_logits = self.concept_layer(features)
-        country_logits = self.country_head(concept_logits)
-        coord_logits = self.coordinate_head(concept_logits)
+        concept_probs = F.softmax(concept_logits, dim=1)
+        country_logits = self.country_head(concept_probs)
+        coord_logits = self.coordinate_head(concept_probs)
         if self.coordinate_loss_type == "sphere":
             coordinates = F.normalize(coord_logits, p=2, dim=1)
         else:
