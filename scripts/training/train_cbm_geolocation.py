@@ -37,7 +37,7 @@ from src.dataset import (
     create_splits,
     create_splits_stratified,
 )
-from src.evaluation import compute_geolocation_metrics, sphere_to_normalized_latlng, denormalize_coordinates
+from src.evaluation import compute_geolocation_metrics, sphere_to_normalized_latlng, denormalize_coordinates, compute_haversine_distance
 from src.losses import LossWeights, combined_loss
 from src.models.cbm_geolocation import CBMGeolocationModel
 from src.models.encoder_factory import create_encoder
@@ -538,6 +538,10 @@ def visualize_predictions(
         pred_coords = denormalize_coordinates(pred_coords)
         true_coords = denormalize_coordinates(true_coords)
 
+        # Get Haversine distance between predicted and true coordinates
+        distance_km = compute_haversine_distance(pred_coords, true_coords)
+        distance_km = distance_km.item()
+        
         # Get ground truth concept
         true_concept_idx = concept_idx[i].item()
         true_concept = idx_to_concept[true_concept_idx]
@@ -549,7 +553,7 @@ def visualize_predictions(
 
         title = f"Epoch {epoch} | Image ID: {image_id}\n"
         title += f"Pred: {pred_country} | True: {true_country}\n"
-        title += f"Coords: Pred({pred_coords[0]:.3f}, {pred_coords[1]:.3f}) | True({true_coords[0]:.3f}, {true_coords[1]:.3f})\n"
+        title += f"Coords: Pred({pred_coords[0]:.3f}, {pred_coords[1]:.3f}) | True({true_coords[0]:.3f}, {true_coords[1]:.3f}) | Distance: {distance_km:.1f} km\n"
         title += f"GT Concept: {true_concept} ({true_concept_prob:.3f})"
         ax_img.set_title(title, fontsize=10)
 
@@ -721,9 +725,16 @@ def main():
         else:
             seq_tag = "non-sequential"
             run_name += "-non-sequential"
+        
+        if args.finetune_encoder:
+            finetune_tag = "finetuned"
+            run_name += "-finetuned"
+        else:
+            finetune_tag = "not-finetuned"
+            run_name += "-not-finetuned"
 
         # Create tags list
-        tags = [country, encoder_name, loss_type, strat_tag, seq_tag]
+        tags = [country, encoder_name, loss_type, strat_tag, seq_tag, finetune_tag]
 
         wandb.init(
             project=args.wandb_project,

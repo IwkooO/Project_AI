@@ -5,33 +5,54 @@
 #SBATCH --cpus-per-task=9
 #SBATCH --mem=32G
 #SBATCH --time=12:00:00
-#SBATCH --output=jobs/outputs/train_cbm_geolocation_streetclip.log
+
+# ===== Model config block =====
+
+MODEL_NAME="StreetCLIP"
+#MODEL_NAME="DINOv3"
+# Change above variable to select different models/configs.
+
+if [ "$MODEL_NAME" = "StreetCLIP" ]; then
+  ENCODER_MODEL="geolocal/StreetCLIP"
+  EXPERIMENT_SUFFIX="streetclip"
+elif [ "$MODEL_NAME" = "DINOv3" ]; then
+  ENCODER_MODEL="facebook/dinov3-vit7b16-pretrain-lvd1689m"
+  EXPERIMENT_SUFFIX="dinov3"
+else
+  echo "Unknown MODEL_NAME=$MODEL_NAME"
+  exit 1
+fi
+
+COORDINATE_LOSS_TYPE="mse"
+COUNTRY_FILTER="Australia"
+EPOCHS=5
+BATCH_SIZE=16
+EXPERIMENT_NAME="${EXPERIMENT_SUFFIX}-${COORDINATE_LOSS_TYPE}-loss"
+OUT_LOG="jobs/outputs/train_cbm_geolocation_${EXPERIMENT_SUFFIX}.log"
+
+#SBATCH --output=${OUT_LOG}
+
+# ===== Loaded modules and environment setup =====
 
 module load 2025
 module load Anaconda3/2025.06-1
 cd /scratch-shared/pnair/Project_AI/
 module load CUDA/12.8.0
 
-# Conda environment setup
 source activate streetview_pnair
 export PYTHONNOUSERSITE=1
 
-echo "Starting StreetCLIP CBM training"
-
-EPOCHS=5
-BATCH_SIZE=16
+echo "Starting $MODEL_NAME CBM training (Experiment: $EXPERIMENT_NAME, Encoder: $ENCODER_MODEL, Log: $OUT_LOG)"
 
 python scripts/training/train_cbm_geolocation.py \
   --batch_size $BATCH_SIZE \
   --concept_epochs $EPOCHS \
   --prediction_epochs $EPOCHS \
   --finetune_epochs 0 \
-  --encoder_model geolocal/StreetCLIP \
-  --country_filter Australia \
-  --experiment_name streetclip-haversine-loss\
-  --coordinate_loss_type haversine \
+  --encoder_model "$ENCODER_MODEL" \
+  --country_filter "$COUNTRY_FILTER" \
+  --experiment_name "$EXPERIMENT_NAME" \
+  --coordinate_loss_type "$COORDINATE_LOSS_TYPE" \
   --stratified_concept_sampling \
   --sequential  # This does nothing for now 
-
-  
 

@@ -28,12 +28,27 @@ def export_dataset_to_csv(
     Export dataset metadata to CSV.
     
     Args:
-        output_path: Path to output CSV file
+        output_path: Path to output CSV file (will be placed in data/exports/)
         encoder_model: Optional encoder model name (not needed for export)
         max_samples: Optional limit on number of samples
         country: Optional country filter
         require_coordinates: Only include samples with coordinates
     """
+    # Ensure output is in data/exports/ directory
+    project_root = Path(__file__).parent.parent.parent
+    exports_dir = project_root / "data" / "exports"
+    
+    # If output_path is absolute, use it as-is but ensure it's in exports
+    # If relative, place it in data/exports/
+    if output_path.is_absolute():
+        # If it's already in data/exports, use it; otherwise, take just the filename
+        if str(exports_dir) in str(output_path):
+            final_path = output_path
+        else:
+            final_path = exports_dir / output_path.name
+    else:
+        # Relative path - place in data/exports/
+        final_path = exports_dir / output_path
     # Create dataset (without loading images - we'll access samples directly)
     dataset = PanoramaCBMDataset(
         transform=None,  # We don't need transforms since we're not loading images
@@ -93,14 +108,14 @@ def export_dataset_to_csv(
             'image_path',
         ]
         
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        final_path.parent.mkdir(parents=True, exist_ok=True)
         
-        with open(output_path, 'w', newline='', encoding='utf-8') as f:
+        with open(final_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(rows)
         
-        print(f"Successfully exported {len(rows)} rows to {output_path}")
+        print(f"Successfully exported {len(rows)} rows to {final_path}")
     else:
         print("No samples to export")
 
@@ -113,7 +128,7 @@ def parse_args():
         '--output',
         type=Path,
         default=Path('dataset_export.csv'),
-        help='Output CSV file path (default: dataset_export.csv)'
+        help='Output CSV file name or path (will be placed in data/exports/, default: dataset_export.csv)'
     )
     parser.add_argument(
         '--encoder-model',

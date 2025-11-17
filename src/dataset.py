@@ -122,6 +122,7 @@ def get_transforms_from_processor(processor: Optional[AutoImageProcessor] = None
     # Create transform pipeline - resize directly to target size without cropping
     transform_list = [
         transforms.Resize(target_size, interpolation=InterpolationMode.BICUBIC),
+        transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize(mean, std),
     ]
