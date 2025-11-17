@@ -27,42 +27,75 @@ folder = data_root / geoguessrId
 meta_folder = folder / "metas"
 image_folder = folder / "panorama_processed"
 
-def get_transforms_from_processor(processor: AutoImageProcessor, image_size: Optional[Tuple[int, int]] = None):
+def extract_image_size(processor: Optional[AutoImageProcessor] = None, image_size: Optional[Tuple[int, int]] = None) -> Tuple[int, int]:
+    """
+    Extract image size from processor or use provided size.
+    
+    Args:
+        processor: Optional HuggingFace AutoImageProcessor instance
+        image_size: Optional override for image size (width, height)
+    
+    Returns:
+        Tuple of (width, height)
+    """
+    if image_size is not None:
+        if isinstance(image_size, tuple):
+            return image_size
+        return (image_size, image_size)
+    
+    if processor is None:
+        return (336, 336)  # Default fallback
+    
+    # Extract from processor.size
+    if hasattr(processor, 'size') and processor.size is not None:
+        if isinstance(processor.size, dict):
+            w = processor.size.get('width') or processor.size.get('shortest_edge') or processor.size.get('height', 224)
+            h = processor.size.get('height') or processor.size.get('shortest_edge') or processor.size.get('width', 224)
+            return (w, h)
+        elif isinstance(processor.size, (tuple, list)):
+            if len(processor.size) >= 2:
+                return tuple(processor.size[:2])  # (width, height)
+            size_val = processor.size[0] if len(processor.size) > 0 else 224
+            return (size_val, size_val)
+        else:
+            size_val = int(processor.size)
+            return (size_val, size_val)
+    
+    # Extract from processor.crop_size
+    if hasattr(processor, 'crop_size') and processor.crop_size is not None:
+        if isinstance(processor.crop_size, dict):
+            w = processor.crop_size.get('width') or processor.crop_size.get('height', 224)
+            h = processor.crop_size.get('height') or processor.crop_size.get('width', 224)
+            return (w, h)
+        elif isinstance(processor.crop_size, (tuple, list)):
+            if len(processor.crop_size) >= 2:
+                return tuple(processor.crop_size[:2])
+            size_val = processor.crop_size[0] if len(processor.crop_size) > 0 else 224
+            return (size_val, size_val)
+        else:
+            size_val = int(processor.crop_size)
+            return (size_val, size_val)
+    
+    return (224, 224)  # Default fallback
+
+
+def get_transforms_from_processor(processor: Optional[AutoImageProcessor] = None, image_size: Optional[Tuple[int, int]] = None):
     """
     Create torchvision transforms from HuggingFace image processor.
     
     Args:
-        processor: HuggingFace AutoImageProcessor instance
-        image_size: Optional override for image size (width, height)
+        processor: Optional HuggingFace AutoImageProcessor instance. If None, uses CLIP defaults.
+        image_size: Optional override for image size (width, height). Defaults to (336, 336) if processor is None.
     
     Returns:
         torchvision.Compose transform pipeline
     """
-    # Get size from processor or use provided
-    if image_size is None:
-        if hasattr(processor, 'size') and processor.size is not None:
-            if isinstance(processor.size, dict):
-                # Handle dict format like {'shortest_edge': 224} or {'height': 224, 'width': 224}
-                size = processor.size.get('shortest_edge') or processor.size.get('height') or processor.size.get('width', 224)
-            elif isinstance(processor.size, (tuple, list)):
-                size = processor.size[0] if len(processor.size) > 0 else 224
-            else:
-                size = int(processor.size)
-        elif hasattr(processor, 'crop_size') and processor.crop_size is not None:
-            # Some processors use crop_size instead
-            if isinstance(processor.crop_size, dict):
-                size = processor.crop_size.get('height') or processor.crop_size.get('width', 224)
-            elif isinstance(processor.crop_size, (tuple, list)):
-                size = processor.crop_size[0] if len(processor.crop_size) > 0 else 224
-            else:
-                size = int(processor.crop_size)
-        else:
-            size = 224  # Default fallback
-    else:
-        size = image_size[0] if isinstance(image_size, tuple) else image_size
+    # Get size from processor or use provided (width, height) -> convert to (height, width) for torchvision
+    width, height = extract_image_size(processor, image_size)
+    target_size = (height, width)
     
     # Get normalization values from processor
-    if hasattr(processor, 'image_mean') and processor.image_mean is not None:
+    if processor is not None and hasattr(processor, 'image_mean') and processor.image_mean is not None:
         mean = processor.image_mean
         if isinstance(mean, list):
             mean = tuple(mean)
@@ -71,7 +104,7 @@ def get_transforms_from_processor(processor: AutoImageProcessor, image_size: Opt
     else:
         mean = CLIP_IMAGE_MEAN  # Fallback to CLIP defaults
     
-    if hasattr(processor, 'image_std') and processor.image_std is not None:
+    if processor is not None and hasattr(processor, 'image_std') and processor.image_std is not None:
         std = processor.image_std
         if isinstance(std, list):
             std = tuple(std)
@@ -86,10 +119,9 @@ def get_transforms_from_processor(processor: AutoImageProcessor, image_size: Opt
     if len(std) != 3:
         std = tuple(std[:3]) if len(std) > 3 else tuple(list(std) + [std[-1]] * (3 - len(std)))
     
-    # Create transform pipeline
+    # Create transform pipeline - resize directly to target size without cropping
     transform_list = [
-        transforms.Resize(size, interpolation=InterpolationMode.BICUBIC),
-        transforms.CenterCrop(size),
+        transforms.Resize(target_size, interpolation=InterpolationMode.BICUBIC),
         transforms.ToTensor(),
         transforms.Normalize(mean, std),
     ]
@@ -133,66 +165,38 @@ class PanoramaCBMDataset(Dataset):
 
         # Set up transforms based on encoder model or defaults
         if self.transform is None:
+            processor = None
             if encoder_model is not None:
-                # Load processor and create transforms
                 try:
                     processor = AutoImageProcessor.from_pretrained(encoder_model)
-                    self.transform = get_transforms_from_processor(processor, image_size)
-                    # Extract image size from processor for logging
-                    if image_size is not None:
-                        self.image_size = image_size if isinstance(image_size, tuple) else (image_size, image_size)
-                    elif hasattr(processor, 'size') and processor.size is not None:
-                        if isinstance(processor.size, dict):
-                            h = processor.size.get('height', processor.size.get('shortest_edge', 224))
-                            w = processor.size.get('width', processor.size.get('shortest_edge', 224))
-                            self.image_size = (h, w)
-                        elif isinstance(processor.size, (tuple, list)):
-                            self.image_size = tuple(processor.size[:2]) if len(processor.size) >= 2 else (processor.size[0], processor.size[0])
-                        else:
-                            size_val = int(processor.size)
-                            self.image_size = (size_val, size_val)
-                    elif hasattr(processor, 'crop_size') and processor.crop_size is not None:
-                        if isinstance(processor.crop_size, dict):
-                            h = processor.crop_size.get('height', 224)
-                            w = processor.crop_size.get('width', 224)
-                            self.image_size = (h, w)
-                        elif isinstance(processor.crop_size, (tuple, list)):
-                            self.image_size = tuple(processor.crop_size[:2]) if len(processor.crop_size) >= 2 else (processor.crop_size[0], processor.crop_size[0])
-                        else:
-                            size_val = int(processor.crop_size)
-                            self.image_size = (size_val, size_val)
-                    else:
-                        self.image_size = (336, 336)  # Default fallback
-                    
-                    # Log preprocessing info
-                    mean = processor.image_mean if hasattr(processor, 'image_mean') and processor.image_mean is not None else CLIP_IMAGE_MEAN
-                    std = processor.image_std if hasattr(processor, 'image_std') and processor.image_std is not None else CLIP_IMAGE_STD
-                    print(f"Loaded processor for {encoder_model}")
-                    print(f"  Image size: {self.image_size}")
-                    print(f"  Normalization mean: {mean}")
-                    print(f"  Normalization std: {std}")
                 except Exception as e:
                     print(f"Warning: Could not load processor for {encoder_model}: {e}")
                     print("Falling back to default CLIP preprocessing")
-                    self.image_size = image_size or (336, 336)
-                    self.transform = transforms.Compose([
-                        transforms.Resize(self.image_size, interpolation=InterpolationMode.BICUBIC),
-                        transforms.CenterCrop(self.image_size),
-                        transforms.ToTensor(),
-                        transforms.Normalize(CLIP_IMAGE_MEAN, CLIP_IMAGE_STD),
-                    ])
+            
+            # Use get_transforms_from_processor for all cases (handles None processor)
+            self.transform = get_transforms_from_processor(processor, image_size)
+            self.image_size = extract_image_size(processor, image_size)
+            
+            # Log preprocessing info
+            if processor is not None:
+                mean = processor.image_mean if hasattr(processor, 'image_mean') and processor.image_mean is not None else CLIP_IMAGE_MEAN
+                std = processor.image_std if hasattr(processor, 'image_std') and processor.image_std is not None else CLIP_IMAGE_STD
+                # Convert to tuples for consistent display
+                if isinstance(mean, list):
+                    mean = tuple(mean)
+                if isinstance(std, list):
+                    std = tuple(std)
+                print(f"Loaded processor for {encoder_model}")
             else:
-                # Use default CLIP preprocessing
-                self.image_size = image_size or (336, 336)
-                self.transform = transforms.Compose([
-                    transforms.Resize(self.image_size, interpolation=InterpolationMode.BICUBIC),
-                    transforms.CenterCrop(self.image_size),
-                    transforms.ToTensor(),
-                    transforms.Normalize(CLIP_IMAGE_MEAN, CLIP_IMAGE_STD),
-                ])
+                mean = CLIP_IMAGE_MEAN
+                std = CLIP_IMAGE_STD
+                print("Using default CLIP preprocessing")
+            print(f"  Image size: {self.image_size}")
+            print(f"  Normalization mean: {mean}")
+            print(f"  Normalization std: {std}")
         else:
             # Transform provided explicitly, use provided image_size or default
-            self.image_size = image_size or (336, 336)
+            self.image_size = extract_image_size(None, image_size)
 
         # Load and filter samples
         self.samples = self._load_samples()
@@ -208,19 +212,24 @@ class PanoramaCBMDataset(Dataset):
     def _load_samples(self) -> List[Dict]:
         """Load meta files and filter to samples with existing images."""
         samples = []
+        skipped_no_country_match = 0
+        skipped_no_image = 0
+        skipped_no_coords = 0
 
         # Get all meta files
         meta_files = list(meta_folder.glob("*.json"))
 
-        if self.max_samples:
-            meta_files = meta_files[:self.max_samples]
-
         for meta_path in tqdm(meta_files, desc="Loading samples"):
+            # Stop if we've reached max_samples (applied after filtering)
+            if self.max_samples and len(samples) >= self.max_samples:
+                break
+                
             pano_id = meta_path.stem
 
             # Check if image exists
             image_path = image_folder / f"image_{pano_id}.jpg"
             if not image_path.exists():
+                skipped_no_image += 1
                 continue
 
             # Load meta data
@@ -232,15 +241,20 @@ class PanoramaCBMDataset(Dataset):
                 if 'metaName' not in meta or 'country' not in meta:
                     continue
 
-                # Filter by country if specified
-                if self.country is not None and meta['country'] != self.country:
-                    continue
+                # Filter by country if specified (case-insensitive, strip whitespace)
+                if self.country is not None:
+                    meta_country = str(meta['country']).strip()
+                    filter_country = str(self.country).strip()
+                    if meta_country.lower() != filter_country.lower():
+                        skipped_no_country_match += 1
+                        continue
 
                 # Extract coordinates if available
                 lat = meta.get('lat')
                 lng = meta.get('lng')
 
                 if self.require_coordinates and (lat is None or lng is None):
+                    skipped_no_coords += 1
                     continue
 
                 sample = {
@@ -260,6 +274,15 @@ class PanoramaCBMDataset(Dataset):
             except (json.JSONDecodeError, KeyError) as e:
                 print(f"Error loading {meta_path}: {e}")
                 continue
+
+        # Debug output if country filter is active
+        if self.country is not None:
+            print(f"Country filter '{self.country}' applied:")
+            print(f"  - Loaded samples: {len(samples)}")
+            print(f"  - Skipped (country mismatch): {skipped_no_country_match}")
+            print(f"  - Skipped (no image): {skipped_no_image}")
+            if self.require_coordinates:
+                print(f"  - Skipped (no coordinates): {skipped_no_coords}")
 
         return samples
 
