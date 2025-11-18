@@ -35,7 +35,7 @@ def export_dataset_to_csv(
         require_coordinates: Only include samples with coordinates
     """
     # Ensure output is in data/exports/ directory
-    project_root = Path(__file__).parent.parent.parent
+    project_root = '/scratch-shared/pnair/Project_AI'
     exports_dir = project_root / "data" / "exports"
     
     # If output_path is absolute, use it as-is but ensure it's in exports

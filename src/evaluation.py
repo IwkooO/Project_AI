@@ -143,8 +143,28 @@ def compute_geolocation_metrics(
             )
             if distances.numel() > 0:
                 metrics["median_km"] = float(distances.median().item())
+                metrics["mean_km"] = float(distances.mean().item())
+                metrics["p90_km"] = float(torch.quantile(distances, 0.9).item())
                 for threshold in [1, 10, 100, 1000]:
                     metrics[f"acc@{threshold}km"] = accuracy_within_threshold(distances, threshold)
+
+            pred_deg = denormalize_coordinates(predicted_coords_for_metrics[mask])
+            true_deg = denormalize_coordinates(coordinate_targets[mask])
+            lat_bias = pred_deg[:, 0] - true_deg[:, 0]
+            lng_bias = pred_deg[:, 1] - true_deg[:, 1]
+            metrics["lat_bias_deg"] = float(lat_bias.mean().item())
+            metrics["lng_bias_deg"] = float(lng_bias.mean().item())
+            metrics["lat_std_deg"] = float(pred_deg[:, 0].std(unbiased=False).item())
+            metrics["lng_std_deg"] = float(pred_deg[:, 1].std(unbiased=False).item())
+
+            centroid = coordinate_targets[mask].mean(dim=0, keepdim=True)
+            centroid_preds = centroid.expand_as(coordinate_targets[mask])
+            centroid_distances = haversine_distance(
+                centroid_preds, coordinate_targets[mask]
+            )
+            if centroid_distances.numel() > 0:
+                metrics["centroid_median_km"] = float(centroid_distances.median().item())
+                metrics["centroid_mean_km"] = float(centroid_distances.mean().item())
         else:
             metrics["coord_mse"] = math.nan
             metrics["coord_mae"] = math.nan

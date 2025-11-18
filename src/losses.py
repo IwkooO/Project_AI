@@ -17,7 +17,7 @@ from src.evaluation import normalized_latlng_to_sphere, haversine_distance
 class LossWeights:
     concept: float = 1.0
     distance: float = 1.0
-    country: float = 0.5
+    country: float = 1.0
 
 
 def concept_loss(logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:

@@ -5,6 +5,7 @@
 #SBATCH --cpus-per-task=9
 #SBATCH --mem=32G
 #SBATCH --time=12:00:00
+#SBATCH --output=jobs/outputs/train_cbm_geolocation.log
 
 # ===== Model config block =====
 
@@ -24,13 +25,11 @@ else
 fi
 
 COORDINATE_LOSS_TYPE="mse"
-COUNTRY_FILTER="Australia"
-EPOCHS=5
+#COUNTRY_FILTER="India"
+EPOCHS=20
 BATCH_SIZE=16
 EXPERIMENT_NAME="${EXPERIMENT_SUFFIX}-${COORDINATE_LOSS_TYPE}-loss"
 OUT_LOG="jobs/outputs/train_cbm_geolocation_${EXPERIMENT_SUFFIX}.log"
-
-#SBATCH --output=${OUT_LOG}
 
 # ===== Loaded modules and environment setup =====
 
@@ -50,9 +49,15 @@ python scripts/training/train_cbm_geolocation.py \
   --prediction_epochs $EPOCHS \
   --finetune_epochs 0 \
   --encoder_model "$ENCODER_MODEL" \
-  --country_filter "$COUNTRY_FILTER" \
   --experiment_name "$EXPERIMENT_NAME" \
   --coordinate_loss_type "$COORDINATE_LOSS_TYPE" \
   --stratified_concept_sampling \
-  --sequential  # This does nothing for now 
+  --concept_stage_distance_weight 0.2 \
+  --coordinate_head_lr 5e-4 \
+  --country_head_lr 5e-4 \
+  --grad_clip_norm 1.0 \
+  --use_coordinate_residuals \
+  --diagnostics_interval 2 \
+  --diagnostics_samples 128 \
+  --sequential  # This does nothing for now --country_filter "$COUNTRY_FILTER" \
 
