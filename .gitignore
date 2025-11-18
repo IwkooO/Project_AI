@@ -4,3 +4,4 @@ checkpoints/
 .cache/
 results/
 *.env
+.cursor/
