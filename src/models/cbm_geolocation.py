@@ -131,7 +131,7 @@ class CBMGeolocationModel(nn.Module):
 
     def coordinate_parameters(self) -> Iterable[nn.Parameter]:
         params = list(self.coordinate_head.parameters())
-        if self.feature_skip is not None:
+        if self.feature_skip:
             params += list(self.feature_skip.parameters())
         return params
 

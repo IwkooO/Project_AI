@@ -25,11 +25,10 @@ else
 fi
 
 COORDINATE_LOSS_TYPE="mse"
-#COUNTRY_FILTER="India"
-EPOCHS=20
+COUNTRY_FILTER="Australia"
+EPOCHS=5
 BATCH_SIZE=16
-EXPERIMENT_NAME="${EXPERIMENT_SUFFIX}-${COORDINATE_LOSS_TYPE}-loss"
-OUT_LOG="jobs/outputs/train_cbm_geolocation_${EXPERIMENT_SUFFIX}.log"
+EXPERIMENT_NAME="${EXPERIMENT_SUFFIX}-${COORDINATE_LOSS_TYPE}-loss-fix-residuals"
 
 # ===== Loaded modules and environment setup =====
 
@@ -51,13 +50,15 @@ python scripts/training/train_cbm_geolocation.py \
   --encoder_model "$ENCODER_MODEL" \
   --experiment_name "$EXPERIMENT_NAME" \
   --coordinate_loss_type "$COORDINATE_LOSS_TYPE" \
+  --country_filter "$COUNTRY_FILTER" \
   --stratified_concept_sampling \
   --concept_stage_distance_weight 0.2 \
   --coordinate_head_lr 5e-4 \
   --country_head_lr 5e-4 \
   --grad_clip_norm 1.0 \
   --use_coordinate_residuals \
+  --residual_stats_source "train" \
   --diagnostics_interval 2 \
   --diagnostics_samples 128 \
-  --sequential  # This does nothing for now --country_filter "$COUNTRY_FILTER" \
+  --sequential  # This does nothing for now 
 
