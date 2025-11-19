@@ -4,7 +4,7 @@ Concept Bottleneck Model for StreetCLIP-based geolocation.
 
 from __future__ import annotations
 
-from typing import Dict, Iterable, Optional
+from typing import Dict, Iterable, Optional, Tuple
 
 import torch
 from torch import nn
@@ -26,10 +26,14 @@ class CBMGeolocationModel(nn.Module):
         detach_concepts_for_prediction: bool = True,
         coordinate_residual_center: Optional[torch.Tensor] = None,
         coordinate_residual_bounds: Optional[torch.Tensor] = None,
+        # New arguments for alignment
+        location_encoder: Optional[nn.Module] = None,
+        concept_text_features: Optional[torch.Tensor] = None,
     ):
         super().__init__()
         self.encoder = encoder
         self.feature_dim = feature_dim
+        self.location_encoder = location_encoder
         self.coordinate_loss_type = coordinate_loss_type.lower()
         if self.coordinate_loss_type not in {"mse", "sphere", "haversine"}:
             raise ValueError(
@@ -57,14 +61,54 @@ class CBMGeolocationModel(nn.Module):
             else None,
         )
 
-        # Define concept, country, and coordinate heads
-        self.concept_layer = nn.Sequential(
-            nn.Linear(feature_dim, 256),
-            nn.LayerNorm(256),
-            nn.GELU(),
-            nn.Dropout(0.1),
-            nn.Linear(256, num_concepts),
-        )
+        # --- Concept Layer ---
+        # If concept_text_features provided, use Concept-Aware Alignment architecture
+        if concept_text_features is not None:
+            # Get text feature dimension from concept bank
+            text_feature_dim = concept_text_features.shape[1]
+            
+            # Register concept bank as a parameter (can be frozen or finetuned)
+            self.register_parameter(
+                "concept_bank", 
+                nn.Parameter(concept_text_features.clone(), requires_grad=True)
+            )
+            
+            # Adapter to project image features to text feature space
+            # Image encoder outputs feature_dim (e.g., 1024), text encoder outputs text_feature_dim (e.g., 768)
+            self.concept_adapter = nn.Sequential(
+                nn.Linear(feature_dim, feature_dim),
+                nn.LayerNorm(feature_dim),
+                nn.GELU(),
+                nn.Linear(feature_dim, text_feature_dim)  # Project to concept bank space (text_dim)
+            )
+            self.text_feature_dim = text_feature_dim
+            self.use_concept_bank = True
+        else:
+            # Legacy MLP concept layer
+            self.concept_layer = nn.Sequential(
+                nn.Linear(feature_dim, 256),
+                nn.LayerNorm(256),
+                nn.GELU(),
+                nn.Dropout(0.1),
+                nn.Linear(256, num_concepts),
+            )
+            self.use_concept_bank = False
+            self.text_feature_dim = None
+
+        # --- Location Adapter (if location encoder present) ---
+        if self.location_encoder is not None:
+            # Adapter to project location features to concept space
+            # Location encoder outputs feature_dim (e.g., 1024)
+            # If using concept bank, project to text_feature_dim (e.g., 768), otherwise keep feature_dim
+            target_dim = self.text_feature_dim if self.use_concept_bank else feature_dim
+            self.location_adapter = nn.Sequential(
+                nn.Linear(feature_dim, feature_dim),
+                nn.LayerNorm(feature_dim),
+                nn.GELU(),
+                nn.Linear(feature_dim, target_dim)  # Project to concept bank space or keep feature_dim
+            )
+
+        # --- Prediction Heads ---
         self.country_head = nn.Sequential(
                 nn.Linear(num_concepts, 128),
                 nn.LayerNorm(128),
@@ -95,10 +139,59 @@ class CBMGeolocationModel(nn.Module):
             nn.Linear(128, coord_out_dim),
         )
 
-    def forward(self, images: torch.Tensor):
-        features = self.encoder(images)
-        concept_logits = self.concept_layer(features)
+    def forward(
+        self, 
+        images: torch.Tensor, 
+        target_coords: Optional[torch.Tensor] = None
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, Optional[torch.Tensor], Optional[torch.Tensor], Optional[torch.Tensor]]:
+        """
+        Returns:
+            concept_logits, country_logits, coordinates, 
+            image_features (adapted), location_features (adapted), location_concept_logits
+        """
+        # 1. Image Encoding
+        raw_features = self.encoder(images)
+        
+        # 2. Concept Prediction
+        if self.use_concept_bank:
+            # Adapt image features
+            image_features = self.concept_adapter(raw_features)
+            # Compute logits via dot product with concept bank
+            # image_features: [B, D], concept_bank: [C, D] -> [B, C]
+            concept_logits = image_features @ self.concept_bank.T
+            # Scale? CLIP uses scaling, but here we might rely on adapter
+            # Adding a learnable scale or fixed scale is common. 
+            # For now, let linear layers handle magnitude.
+        else:
+            image_features = raw_features
+            concept_logits = self.concept_layer(raw_features)
+            
         concept_probs = F.softmax(concept_logits, dim=1)
+        
+        # 3. Location Processing (Training only)
+        location_features = None
+        location_concept_logits = None
+        
+        if self.location_encoder is not None and target_coords is not None:
+            # Encode locations
+            # Check for NaNs in coords
+            mask = ~torch.isnan(target_coords).any(dim=1)
+            if mask.any():
+                # We only compute for valid coords, but to keep shapes consistent
+                # we might need to handle full batch.
+                # If we have NaNs, we can just zero them out or skip loss later.
+                # For simplicity, pass all, assume loss function handles masking.
+                # Replace NaNs with 0 for forward pass (gradient will be masked in loss)
+                safe_coords = torch.nan_to_num(target_coords, nan=0.0)
+                
+                raw_loc_features = self.location_encoder(safe_coords)
+                location_features = self.location_adapter(raw_loc_features)
+                
+                # Location -> Concept logits
+                if self.use_concept_bank:
+                    location_concept_logits = location_features @ self.concept_bank.T
+        
+        # 4. Downstream Predictions (Country, Coords)
         country_input = concept_probs
         coord_input = concept_probs if self.coordinate_input == "probs" else concept_logits
 
@@ -106,11 +199,12 @@ class CBMGeolocationModel(nn.Module):
             coord_input = coord_input.detach()
 
         if self.feature_skip is not None:
-            projected_features = self.feature_skip(features)
+            projected_features = self.feature_skip(raw_features)
             coord_input = torch.cat([coord_input, projected_features], dim=1)
 
         country_logits = self.country_head(country_input)
         coord_logits = self.coordinate_head(coord_input)
+        
         if self.coordinate_loss_type == "sphere":
             coordinates = F.normalize(coord_logits, p=2, dim=1)
         else:
@@ -127,7 +221,15 @@ class CBMGeolocationModel(nn.Module):
                 )
             else:
                 coordinates = coordinate_delta
-        return concept_logits, country_logits, coordinates
+                
+        return (
+            concept_logits, 
+            country_logits, 
+            coordinates, 
+            image_features if self.use_concept_bank else None,
+            location_features,
+            location_concept_logits
+        )
 
     def coordinate_parameters(self) -> Iterable[nn.Parameter]:
         params = list(self.coordinate_head.parameters())
@@ -144,14 +246,26 @@ class CBMGeolocationModel(nn.Module):
         """Return parameters to optimize for the given stage."""
         stage = stage.lower()
         if stage == "concept":
-            params = list(self.concept_layer.parameters()) + list(
-                p for p in self.encoder.parameters() if p.requires_grad
-            )
+            # Concept stage now involves alignment
+            params = []
+            if self.use_concept_bank:
+                params += list(self.concept_adapter.parameters())
+                params += [self.concept_bank]
+            else:
+                params += list(self.concept_layer.parameters())
+            
+            params += list(p for p in self.encoder.parameters() if p.requires_grad)
+            
+            if self.location_encoder is not None:
+                params += list(self.location_encoder.parameters())
+                params += list(self.location_adapter.parameters())
+
             if train_country_head:
                 params += list(self.country_head.parameters())
             if train_prediction_head:
                 params += self.coordinate_parameters()
             return params
+            
         if stage == "prediction":
             return list(self.country_head.parameters()) + self.coordinate_parameters()
         if stage == "finetune":
@@ -177,20 +291,42 @@ class CBMGeolocationModel(nn.Module):
             if isinstance(modules, (list, tuple)):
                 for module in modules:
                     _set_requires_grad(module, value)
+            elif isinstance(modules, nn.Parameter):
+                modules.requires_grad = value
             else:
                 for param in modules.parameters():
                     param.requires_grad = value
 
         if stage == "concept":
-            _set_requires_grad(self.concept_layer, True)
+            if self.use_concept_bank:
+                _set_requires_grad(self.concept_adapter, True)
+                _set_requires_grad(self.concept_bank, True) # Allow fine-tuning concepts
+            else:
+                _set_requires_grad(self.concept_layer, True)
+                
             _set_requires_grad(self.country_head, train_country_head)
             _set_requires_grad(self.coordinate_head, train_prediction_head)
             if self.feature_skip is not None:
                 _set_requires_grad(self.feature_skip, train_prediction_head)
+                
+            # Enable location branch
+            if self.location_encoder is not None:
+                _set_requires_grad(self.location_encoder, True)
+                _set_requires_grad(self.location_adapter, True)
             return
 
         if stage == "prediction":
-            _set_requires_grad(self.concept_layer, False)
+            if self.use_concept_bank:
+                _set_requires_grad(self.concept_adapter, False)
+                _set_requires_grad(self.concept_bank, False)
+            else:
+                _set_requires_grad(self.concept_layer, False)
+                
+            # Disable location branch for prediction stage (only needed for concept/alignment training)
+            if self.location_encoder is not None:
+                _set_requires_grad(self.location_encoder, False)
+                _set_requires_grad(self.location_adapter, False)
+
             _set_requires_grad(self.country_head, True)
             _set_requires_grad(self.coordinate_head, True)
             if self.feature_skip is not None:
@@ -210,7 +346,3 @@ class CBMGeolocationModel(nn.Module):
     def unfreeze_all(self):
         for param in self.parameters():
             param.requires_grad = True
-
-
-
-

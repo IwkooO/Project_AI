@@ -31,6 +31,7 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from torch.nn.utils import clip_grad_norm_
+from transformers import CLIPModel, CLIPTokenizer
 
 from src.config import DEFAULT_CONFIG
 from src.dataset import (
@@ -48,7 +49,8 @@ from src.evaluation import (
 )
 from src.losses import LossWeights, combined_loss
 from src.models.cbm_geolocation import CBMGeolocationModel
-from src.models.encoder_factory import create_encoder
+from src.models.encoder_factory import create_encoder, VisionEncoder
+from src.models.location_encoder import GeoCLIPLocationEncoder
 
 # ============================================================================
 # Constants
@@ -184,6 +186,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--concept_weight", type=float, default=cfg.concept_weight)
     parser.add_argument("--distance_weight", type=float, default=cfg.distance_weight)
     parser.add_argument("--country_weight", type=float, default=cfg.country_weight)
+    parser.add_argument("--contrastive_weight", type=float, default=cfg.contrastive_weight)
+    parser.add_argument("--divergence_weight", type=float, default=cfg.divergence_weight)
     parser.add_argument(
         "--concept_stage_distance_weight",
         type=float,
@@ -312,16 +316,25 @@ def resolve_stage_loss_weights(
     concept_stage_country_weight: float,
 ) -> LossWeights:
     if stage == "concept":
+        # In concept stage (now Concept-Aware Alignment), we use full alignment losses
+        # We might want to enable distance/country losses if specified
         return LossWeights(
             concept=base_weights.concept,
             distance=concept_stage_distance_weight,
             country=concept_stage_country_weight,
+            contrastive=base_weights.contrastive,
+            divergence=base_weights.divergence,
         )
     if stage == "prediction":
+        # In prediction stage, we usually freeze encoder/concepts and train heads
+        # Alignment losses are usually off, or we can keep them.
+        # Standard CBM: freeze concepts, train prediction.
         return LossWeights(
             concept=0.0,
             distance=base_weights.distance,
             country=base_weights.country,
+            contrastive=0.0, # Disable alignment training in prediction stage
+            divergence=0.0,
         )
     return base_weights
 
@@ -408,7 +421,17 @@ def train_one_epoch(
         images, concept_idx, country_idx, coords, _ = move_batch_to_device(
             batch, device
         )
-        concept_logits, country_logits, coord_preds = model(images)
+        
+        # Pass coords to forward for location encoding (only used if location_encoder is active)
+        (
+            concept_logits, 
+            country_logits, 
+            coord_preds, 
+            image_features, 
+            location_features, 
+            location_concept_logits
+        ) = model(images, target_coords=coords)
+        
         loss, _ = combined_loss(
             concept_logits,
             country_logits,
@@ -416,7 +439,11 @@ def train_one_epoch(
             concept_idx,
             country_idx,
             coords,
-            stage_weights,
+            # New args
+            image_features=image_features,
+            location_features=location_features,
+            location_concept_logits=location_concept_logits,
+            weights=stage_weights,
             coordinate_loss_type=coordinate_loss_type,
         )
 
@@ -455,7 +482,15 @@ def evaluate(
         images, concept_idx, country_idx, coords, _ = move_batch_to_device(
             batch, device
         )
-        concept_logits, country_logits, coord_preds = model(images)
+        (
+            concept_logits, 
+            country_logits, 
+            coord_preds, 
+            image_features, 
+            location_features, 
+            location_concept_logits
+        ) = model(images, target_coords=coords)
+        
         loss, _ = combined_loss(
             concept_logits,
             country_logits,
@@ -463,7 +498,10 @@ def evaluate(
             concept_idx,
             country_idx,
             coords,
-            stage_weights,
+            image_features=image_features,
+            location_features=location_features,
+            location_concept_logits=location_concept_logits,
+            weights=stage_weights,
             coordinate_loss_type=coordinate_loss_type,
         )
         running_loss += loss.item()
@@ -504,14 +542,34 @@ def optimizer_for_stage(
     coordinate_lr = args.coordinate_head_lr or args.cbm_lr
     country_lr = args.country_head_lr or args.cbm_lr
 
+    # Model.parameters_for_stage returns list of parameters
+    # But we want per-group LR control.
+
     if stage == "concept":
+        # Encoder
         if args.finetune_encoder:
             encoder_params = [p for p in model.encoder.parameters() if p.requires_grad]
             if encoder_params:
                 param_groups.append({"params": encoder_params, "lr": args.encoder_lr})
+        
+        # CBM / Alignment params
+        # Concept adapter, bank, location encoder/adapter are all part of "concept_layer" equivalent
+        cbm_params = []
+        if model.use_concept_bank:
+            cbm_params += list(model.concept_adapter.parameters())
+            if isinstance(model.concept_bank, torch.nn.Parameter):
+                cbm_params.append(model.concept_bank)
+        elif hasattr(model, 'concept_layer'):
+             cbm_params += list(model.concept_layer.parameters())
+        
+        if model.location_encoder is not None:
+            cbm_params += list(model.location_encoder.parameters())
+            cbm_params += list(model.location_adapter.parameters())
+            
         param_groups.append(
-            {"params": model.concept_layer.parameters(), "lr": args.cbm_lr}
+            {"params": cbm_params, "lr": args.cbm_lr}
         )
+        
         if train_country_head:
             param_groups.append(
                 {"params": model.country_head.parameters(), "lr": country_lr}
@@ -534,15 +592,38 @@ def optimizer_for_stage(
             encoder_params = [p for p in model.encoder.parameters() if p.requires_grad]
             if encoder_params:
                 param_groups.append({"params": encoder_params, "lr": args.finetune_lr})
-        param_groups.append(
-            {"params": model.concept_layer.parameters(), "lr": args.cbm_lr}
-        )
-        param_groups.append(
-            {"params": model.country_head.parameters(), "lr": country_lr}
-        )
-        param_groups.append(
-            {"params": model.coordinate_parameters(), "lr": coordinate_lr}
-        )
+        
+        # All other params
+        rest_params = []
+        # Filter out encoder params to avoid duplication
+        encoder_param_ids = set(id(p) for p in model.encoder.parameters())
+        
+        for name, param in model.named_parameters():
+            if param.requires_grad and id(param) not in encoder_param_ids:
+                # Check if head params to give different LR
+                # For simplicity, just use cbm_lr/coord_lr based on name
+                if "coordinate" in name:
+                     # Handled separately? No, let's simplify:
+                     # Just grouping by module is easier
+                     pass
+        
+        # Re-build groups manually for finetune:
+        cbm_params = []
+        if model.use_concept_bank:
+            cbm_params += list(model.concept_adapter.parameters())
+            if isinstance(model.concept_bank, torch.nn.Parameter):
+                cbm_params.append(model.concept_bank)
+        elif hasattr(model, 'concept_layer'):
+             cbm_params += list(model.concept_layer.parameters())
+        
+        if model.location_encoder is not None:
+            cbm_params += list(model.location_encoder.parameters())
+            cbm_params += list(model.location_adapter.parameters())
+            
+        param_groups.append({"params": cbm_params, "lr": args.cbm_lr})
+        param_groups.append({"params": model.country_head.parameters(), "lr": country_lr})
+        param_groups.append({"params": model.coordinate_parameters(), "lr": coordinate_lr})
+
     else:
         raise ValueError(f"Unknown stage {stage}")
 
@@ -571,17 +652,7 @@ def create_checkpoint_dir(
     sequential: bool = True,
     encoder_model: str = None,
 ) -> Path:
-    """Create checkpoint directory with format:
-    results/<experiment_name>/<training_type>/<encoder_name>/<country>/<timestamp>/
-    where:
-    - experiment_name: experiment identifier (default: "geo_cbm_v2")
-    - training_type: "sequential" for sequential training, "joint" for joint training
-    - encoder_name: sanitized encoder model name (replace "/" with "-")
-    - country: country name or "global" if no country filter
-    - timestamp: formatted date and time (YYYY-MM-DD_HH-MM-SS)
-
-    Creates subdirectories: checkpoints/, logs/
-    """
+    """Create checkpoint directory."""
     now = datetime.now()
     timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
 
@@ -645,7 +716,14 @@ def visualize_predictions(
     )
 
     # Get predictions
-    concept_logits, country_logits, coord_preds = model(images)
+    # Forward pass returns 6 values now
+    (
+        concept_logits, 
+        country_logits, 
+        coord_preds, 
+        _, _, _ 
+    ) = model(images)
+    
     concept_probs = torch.softmax(concept_logits, dim=1)
     country_probs = torch.softmax(country_logits, dim=1)
     if coordinate_loss_type.lower() == "sphere":
@@ -790,7 +868,13 @@ def dump_coordinate_diagnostics(
         images, concept_idx, country_idx, coords, metadata = move_batch_to_device(
             batch, device
         )
-        concept_logits, country_logits, coord_preds = model(images)
+        (
+            concept_logits, 
+            country_logits, 
+            coord_preds, 
+            _, _, _ 
+        ) = model(images)
+        
         if coord_type == "sphere":
             coord_preds_norm = sphere_to_normalized_latlng(coord_preds)
         else:
@@ -930,6 +1014,8 @@ def main():
             "concept_weight": args.concept_weight,
             "distance_weight": args.distance_weight,
             "country_weight": args.country_weight,
+            "contrastive_weight": args.contrastive_weight,
+            "divergence_weight": args.divergence_weight,
             "coordinate_loss_type": args.coordinate_loss_type,
             "concept_epochs": args.concept_epochs,
             "prediction_epochs": args.prediction_epochs,
@@ -1057,6 +1143,44 @@ def main():
     logger.info(f"Encoder feature dimension: {feature_dim}")
     logger.info(f"Coordinate loss type: {args.coordinate_loss_type}")
 
+    # --- Concept Text Features (Concept Bank) ---
+    concept_text_features = None
+    concept_list = [dataset.idx_to_concept[i] for i in range(len(dataset.idx_to_concept))]
+    
+    # Try to encode concept text
+    try:
+        if hasattr(encoder, "model") and hasattr(encoder.model, "get_text_features"):
+             # It's likely a CLIP model or StreetCLIPEncoder
+             # We need a tokenizer
+             logger.info("Generating concept bank from text descriptions...")
+             
+             # If we can access encode_text directly (StreetCLIPEncoder)
+             if hasattr(encoder, "encode_text"):
+                 concept_text_features = encoder.encode_text(concept_list, device=device)
+             else:
+                 # Fallback: try to load tokenizer manually
+                 try:
+                     tokenizer = CLIPTokenizer.from_pretrained(encoder_model)
+                     inputs = tokenizer(concept_list, padding=True, truncation=True, return_tensors="pt").to(device)
+                     with torch.no_grad():
+                         text_features = encoder.model.get_text_features(**inputs)
+                         concept_text_features = text_features / text_features.norm(p=2, dim=-1, keepdim=True)
+                 except Exception as e:
+                     logger.warning(f"Could not generate text features: {e}")
+                     
+    except Exception as e:
+        logger.warning(f"Failed to initialize concept bank: {e}")
+
+    if concept_text_features is not None:
+        logger.info(f"Generated concept bank with shape: {concept_text_features.shape}")
+    else:
+        logger.warning("Proceeding without concept bank (using standard MLP concept layer).")
+
+    # --- Location Encoder ---
+    # Initialize GeoCLIP location encoder
+    location_encoder = GeoCLIPLocationEncoder(feature_dim=feature_dim)
+    logger.info("Initialized GeoCLIP Location Encoder")
+
     model = CBMGeolocationModel(
         encoder=encoder,
         num_concepts=len(dataset.concept_to_idx),
@@ -1076,6 +1200,8 @@ def main():
             if residual_bounds is None
             else residual_bounds.to(torch.float32)
         ),
+        location_encoder=location_encoder,
+        concept_text_features=concept_text_features,
     ).to(device)
 
     # --- Model Information Logging ---
@@ -1085,7 +1211,16 @@ def main():
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     encoder_params = count_parameters(model.encoder)
-    concept_params = count_parameters(model.concept_layer)
+    
+    concept_params = 0
+    if model.use_concept_bank:
+         concept_params += count_parameters(model.concept_adapter)
+         # Bank might be param
+         if isinstance(model.concept_bank, torch.nn.Parameter):
+             concept_params += model.concept_bank.numel()
+    else:
+         concept_params += count_parameters(model.concept_layer)
+         
     country_params = count_parameters(model.country_head)
     coord_params = count_parameters(model.coordinate_head)
 
@@ -1096,7 +1231,7 @@ def main():
         f"Parameter counts - Total: {total_params:,}, Trainable: {trainable_params:,}"
     )
     logger.info(
-        f"  Encoder: {encoder_params:,}, Concept layer: {concept_params:,}, Country head: {country_params:,}, Coordinate head: {coord_params:,}"
+        f"  Encoder: {encoder_params:,}, Concept layer/adapter: {concept_params:,}, Country head: {country_params:,}, Coordinate head: {coord_params:,}"
     )
 
     # Log model info to wandb
@@ -1120,6 +1255,8 @@ def main():
         concept=args.concept_weight,
         distance=args.distance_weight,
         country=args.country_weight,
+        contrastive=args.contrastive_weight,
+        divergence=args.divergence_weight,
     )
 
     stages: Tuple[Tuple[str, int], ...]
@@ -1288,6 +1425,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
-
     main()

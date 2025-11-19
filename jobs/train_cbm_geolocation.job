@@ -28,7 +28,7 @@ COORDINATE_LOSS_TYPE="mse"
 COUNTRY_FILTER="Australia"
 EPOCHS=5
 BATCH_SIZE=16
-EXPERIMENT_NAME="${EXPERIMENT_SUFFIX}-${COORDINATE_LOSS_TYPE}-loss-fix-residuals"
+EXPERIMENT_NAME="${EXPERIMENT_SUFFIX}-${COORDINATE_LOSS_TYPE}-cbm-gps-alignment"
 
 # ===== Loaded modules and environment setup =====
 

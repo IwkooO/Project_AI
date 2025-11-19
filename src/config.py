@@ -25,6 +25,8 @@ class StreetCLIPCBMConfig:
     concept_weight: float = 1.0
     distance_weight: float = 1.0
     country_weight: float = 0.5
+    contrastive_weight: float = 0.1
+    divergence_weight: float = 0.1
     coordinate_loss_type: str = "mse"
     sequential: bool = True
     country_filter: Optional[str] = None
@@ -50,5 +52,3 @@ FEATURE_DIM_BY_MODEL: Dict[str, int] = {
 }
 
 DEFAULT_CONFIG = StreetCLIPCBMConfig()
-
-
