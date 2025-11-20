@@ -43,6 +43,12 @@ class StreetCLIPEncoder(nn.Module):
 
         self.feature_dim = self.model.vision_model.config.hidden_size
 
+        # --- GeoCLIP Distillation Support ---
+        # If configured for distillation, we assume we can load a teacher model
+        # or that teacher features are provided externally.
+        # No extra components needed here unless we want to embed the teacher inside.
+        # To keep it lightweight, we'll handle teacher loading in the training script.
+
     def freeze_encoder(self):
         for param in self.model.parameters():
             param.requires_grad = False

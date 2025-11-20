@@ -114,10 +114,18 @@ def compute_geolocation_metrics(
 
     if coord_type == "sphere":
         predicted_coords_for_metrics = sphere_to_normalized_latlng(predicted_coords)
+    elif coord_type == "vmf":
+        predicted_coords_for_metrics = vmf_to_normalized_latlng(predicted_coords)
     elif coord_type in {"mse", "haversine"}:
         predicted_coords_for_metrics = predicted_coords
     else:
         raise ValueError(f"Unsupported coordinate_loss_type '{coordinate_loss_type}'")
+
+    # Handle 3D targets (vMF mode)
+    if coordinate_targets.shape[-1] == 3:
+        target_norm_latlng = sphere_to_normalized_latlng(coordinate_targets)
+    else:
+        target_norm_latlng = coordinate_targets
 
     with torch.no_grad():
         metrics["concept_accuracy"] = float(
@@ -127,19 +135,19 @@ def compute_geolocation_metrics(
             (country_logits.argmax(dim=1) == country_targets).float().mean().item()
         )
 
-        mask = ~torch.isnan(coordinate_targets).any(dim=1)
+        mask = ~torch.isnan(target_norm_latlng).any(dim=1)
         if mask.sum() > 0:
             mse = torch.mean(
-                (predicted_coords_for_metrics[mask] - coordinate_targets[mask]) ** 2
+                (predicted_coords_for_metrics[mask] - target_norm_latlng[mask]) ** 2
             )
             mae = torch.mean(
-                torch.abs(predicted_coords_for_metrics[mask] - coordinate_targets[mask])
+                torch.abs(predicted_coords_for_metrics[mask] - target_norm_latlng[mask])
             )
             metrics["coord_mse"] = float(mse.item())
             metrics["coord_mae"] = float(mae.item())
 
             distances = haversine_distance(
-                predicted_coords_for_metrics, coordinate_targets
+                predicted_coords_for_metrics, target_norm_latlng
             )
             if distances.numel() > 0:
                 metrics["median_km"] = float(distances.median().item())
@@ -149,7 +157,7 @@ def compute_geolocation_metrics(
                     metrics[f"acc@{threshold}km"] = accuracy_within_threshold(distances, threshold)
 
             pred_deg = denormalize_coordinates(predicted_coords_for_metrics[mask])
-            true_deg = denormalize_coordinates(coordinate_targets[mask])
+            true_deg = denormalize_coordinates(target_norm_latlng[mask])
             lat_bias = pred_deg[:, 0] - true_deg[:, 0]
             lng_bias = pred_deg[:, 1] - true_deg[:, 1]
             metrics["lat_bias_deg"] = float(lat_bias.mean().item())
@@ -157,10 +165,10 @@ def compute_geolocation_metrics(
             metrics["lat_std_deg"] = float(pred_deg[:, 0].std(unbiased=False).item())
             metrics["lng_std_deg"] = float(pred_deg[:, 1].std(unbiased=False).item())
 
-            centroid = coordinate_targets[mask].mean(dim=0, keepdim=True)
-            centroid_preds = centroid.expand_as(coordinate_targets[mask])
+            centroid = target_norm_latlng[mask].mean(dim=0, keepdim=True)
+            centroid_preds = centroid.expand_as(target_norm_latlng[mask])
             centroid_distances = haversine_distance(
-                centroid_preds, coordinate_targets[mask]
+                centroid_preds, target_norm_latlng[mask]
             )
             if centroid_distances.numel() > 0:
                 metrics["centroid_median_km"] = float(centroid_distances.median().item())
@@ -171,6 +179,48 @@ def compute_geolocation_metrics(
             metrics["median_km"] = math.nan
 
     return metrics
+
+
+def vmf_to_normalized_latlng(pred_params: torch.Tensor) -> torch.Tensor:
+    """
+    Convert vMF mixture parameters to normalized lat/lng point estimate.
+    
+    pred_params: (B, 5*K)
+    Returns: (B, 2) normalized lat/lng
+    """
+    B = pred_params.shape[0]
+    K = pred_params.shape[1] // 5
+    
+    params = pred_params.view(B, K, 5)
+    mu_raw = params[:, :, :3]
+    kappa_raw = params[:, :, 3:4]
+    pi_logits = params[:, :, 4]
+    
+    mu = F.normalize(mu_raw, p=2, dim=2) # (B, K, 3)
+    kappa = F.softplus(kappa_raw) + 1e-6 # (B, K, 1)
+    pi = F.softmax(pi_logits, dim=1).unsqueeze(2) # (B, K, 1)
+    
+    # A_3(k) = coth(k) - 1/k
+    k = kappa
+    # Use approximation or stable impl
+    # For numerical stability:
+    # A3(k) approx 1 - 1/k for large k
+    # A3(k) approx k/3 for small k
+    
+    A3 = torch.zeros_like(k)
+    large = k > 10.0
+    small = k < 1e-3
+    medium = ~(large | small)
+    
+    A3[large] = 1.0 / torch.tanh(k[large]) - 1.0 / k[large]
+    A3[medium] = 1.0 / torch.tanh(k[medium]) - 1.0 / k[medium]
+    A3[small] = k[small] / 3.0
+    
+    expected_mu = mu * A3
+    expected_x = torch.sum(pi * expected_mu, dim=1) # (B, 3)
+    
+    # Normalize to project to sphere
+    return sphere_to_normalized_latlng(F.normalize(expected_x, p=2, dim=1))
 
 def compute_haversine_distance(pred_coords: torch.Tensor, true_coords: torch.Tensor) -> torch.Tensor:
     """Compute Haversine distance between two points on the Earth's surface.

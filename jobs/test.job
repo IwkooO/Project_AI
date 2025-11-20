@@ -15,3 +15,77 @@ source activate streetview_pnair
 export PYTHONNOUSERSITE=1
 python scripts/tests/export_dataset_to_csv.py --output dataset_export_thailand.csv --country "Thailand" --require-coordinates 
 #python src/dataset.py
+python_args=(
+  # Number of samples processed per training step. Larger = faster but more memory
+  --batch_size "$BATCH_SIZE"
+
+  # Number of epochs for concept stage: trains concept bottleneck (image -> concepts)
+  --concept_epochs "$EPOCHS"
+
+  # Number of epochs for prediction stage: trains heads (concepts -> country/coordinates)
+  --prediction_epochs "$EPOCHS"
+
+  # Number of epochs for finetune stage: trains everything together (0 = disabled)
+  --finetune_epochs 0
+
+  # Vision encoder model name (e.g., "geolocal/StreetCLIP" or "facebook/dinov3-...")
+  --encoder_model "$ENCODER_MODEL"
+
+  # Name for organizing results/checkpoints in results/ directory
+  --experiment_name "$EXPERIMENT_NAME"
+
+  # How to predict coordinates: "mse" (lat/lng MSE), "sphere" (3D unit vectors), 
+  # "haversine" (great-circle distance), "vmf" (probabilistic von Mises-Fisher mixture)
+  --coordinate_loss_type "$COORDINATE_LOSS_TYPE"
+
+  # Filter dataset to only samples from this country (e.g., "Australia")
+  --country_filter "$COUNTRY_FILTER"
+
+  # Split train/val/test ensuring each concept appears in training (vs. disjoint concept splits)
+  --stratified_concept_sampling
+
+  # Weight for coordinate loss during concept stage (0.0 = disable, allows joint training)
+  --concept_stage_distance_weight 0.2
+
+  # Learning rate for coordinate prediction head (defaults to cbm_lr if not set)
+  --coordinate_head_lr 1e-4
+
+  # Learning rate for country classification head (defaults to cbm_lr if not set)
+  --country_head_lr 1e-4
+
+  # Clip gradients to this max norm to prevent exploding gradients (0 = disabled)
+  --grad_clip_norm 1.0
+
+  # Predict coordinate offsets around dataset centroid instead of absolute coordinates
+  --use_coordinate_residuals
+
+  # Compute residual center/bounds from "train" split or "dataset" (all samples)
+  --residual_stats_source "train"
+
+  # Dump coordinate prediction diagnostics every N epochs (0 = disabled)
+  --diagnostics_interval 2
+
+  # Maximum number of samples to include in diagnostics CSV per dump
+  --diagnostics_samples 128
+
+  # Weight for GeoCLIP teacher distillation loss (0.0 = disabled, try 0.1-0.5)
+  --distillation_weight "$DISTILLATION_WEIGHT"
+
+  # Use sequential training: concept stage -> prediction stage -> finetune stage
+  # (vs. joint training where everything trains together)
+  --sequential
+
+  # Enable coarse-to-fine routing: first predict coarse region, then fine-grained coordinates
+  # Uses mixture-of-experts style with per-region coordinate heads
+  --use_hierarchical_routing
+
+  # Number of coarse regions for hierarchical routing (e.g., 64 = 64 different region heads)
+  # More cells = more specialized but more parameters and slower
+  --num_coarse_cells "$NUM_COARSE_CELLS"
+
+  # Number of mixture components for vMF loss (only used if coordinate_loss_type="vmf")
+  # More mixtures = more flexible but more parameters (default: 5)
+  --num_mixtures "$NUM_MIXTURES"
+)
+
+python scripts/training/train_cbm_geolocation.py "${python_args[@]}"

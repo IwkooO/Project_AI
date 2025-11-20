@@ -11,6 +11,8 @@ from torch import nn
 import torch.nn.functional as F
 
 
+from src.models.encoder_factory import HierarchicalRouter, CoarseRouterConfig
+
 class CBMGeolocationModel(nn.Module):
     """Concept bottleneck model with StreetCLIP encoder."""
 
@@ -29,16 +31,22 @@ class CBMGeolocationModel(nn.Module):
         # New arguments for alignment
         location_encoder: Optional[nn.Module] = None,
         concept_text_features: Optional[torch.Tensor] = None,
+        num_mixtures: int = 5,
+        # Hierarchical routing config
+        use_hierarchical_routing: bool = False,
+        num_coarse_cells: int = 64,
     ):
         super().__init__()
         self.encoder = encoder
         self.feature_dim = feature_dim
         self.location_encoder = location_encoder
         self.coordinate_loss_type = coordinate_loss_type.lower()
-        if self.coordinate_loss_type not in {"mse", "sphere", "haversine"}:
+        self.num_mixtures = num_mixtures
+        self.use_hierarchical_routing = use_hierarchical_routing
+        if self.coordinate_loss_type not in {"mse", "sphere", "haversine", "vmf"}:
             raise ValueError(
                 f"Unsupported coordinate_loss_type '{coordinate_loss_type}'. "
-                "Expected 'mse', 'sphere', or 'haversine'."
+                "Expected 'mse', 'sphere', 'haversine', or 'vmf'."
             )
 
         if coordinate_input not in {"probs", "logits"}:
@@ -108,15 +116,7 @@ class CBMGeolocationModel(nn.Module):
                 nn.Linear(feature_dim, target_dim)  # Project to concept bank space or keep feature_dim
             )
 
-        # --- Prediction Heads ---
-        self.country_head = nn.Sequential(
-                nn.Linear(num_concepts, 128),
-                nn.LayerNorm(128),
-                nn.GELU(),
-                nn.Dropout(0.1),
-                nn.Linear(128, num_countries),
-        )
-
+        # --- Prediction Heads Setup (needed for hierarchical routing) ---
         coord_in_dim = num_concepts
         self.feature_skip = None
         if coordinate_feature_skip_dim is not None and coordinate_feature_skip_dim > 0:
@@ -127,7 +127,55 @@ class CBMGeolocationModel(nn.Module):
             )
             coord_in_dim += coordinate_feature_skip_dim
 
-        coord_out_dim = 3 if self.coordinate_loss_type == "sphere" else 2
+        if self.coordinate_loss_type == "sphere":
+            coord_out_dim = 3
+        elif self.coordinate_loss_type == "vmf":
+            # 5 params per mixture: mu(3), kappa(1), pi(1)
+            coord_out_dim = self.num_mixtures * 5
+        else:
+            coord_out_dim = 2
+
+        # --- Hierarchical Routing (Optional) ---
+        self.hierarchical_router = None
+        self.fine_grained_heads = None
+
+        if self.use_hierarchical_routing:
+            # Router config
+            router_config = CoarseRouterConfig(
+                num_coarse_cells=num_coarse_cells,
+                hidden_dim=512,
+            )
+
+            # Router takes concept features
+            # If using concept bank, input dim is text_feature_dim. Otherwise num_concepts
+            router_input_dim = self.text_feature_dim if self.use_concept_bank else num_concepts
+
+            self.hierarchical_router = HierarchicalRouter(router_config, router_input_dim)
+
+            # Fine-grained heads: One per coarse cell
+            # Reuse coordinate head architecture but one per cell
+            self.fine_grained_heads = nn.ModuleList([
+                nn.Sequential(
+                    nn.Linear(coord_in_dim, 256),
+                    nn.LayerNorm(256),
+                    nn.GELU(),
+                    nn.Dropout(0.1),
+                    nn.Linear(256, 128),
+                    nn.GELU(),
+                    nn.Dropout(0.1),
+                    nn.Linear(128, coord_out_dim),
+                ) for _ in range(num_coarse_cells)
+            ])
+
+        # --- Prediction Heads ---
+        self.country_head = nn.Sequential(
+                nn.Linear(num_concepts, 128),
+                nn.LayerNorm(128),
+                nn.GELU(),
+                nn.Dropout(0.1),
+                nn.Linear(128, num_countries),
+        )
+
         self.coordinate_head = nn.Sequential(
             nn.Linear(coord_in_dim, 256),
             nn.LayerNorm(256),
@@ -203,10 +251,62 @@ class CBMGeolocationModel(nn.Module):
             coord_input = torch.cat([coord_input, projected_features], dim=1)
 
         country_logits = self.country_head(country_input)
-        coord_logits = self.coordinate_head(coord_input)
+        
+        # Coordinate prediction
+        if self.use_hierarchical_routing:
+             # 1. Predict coarse cell logits
+             # Input to router: we can use concept features or logits.
+             # Using concept_logits or adapt features if available
+             router_input = image_features if self.use_concept_bank else concept_logits
+             coarse_logits = self.hierarchical_router(router_input) # [B, num_cells]
+             
+             # 2. Select best cell (hard routing for inference, soft for training?)
+             # For simplicity: Soft routing (mixture of experts style) or just top-1
+             # Let's do weighted sum of heads based on router probabilities (MoE style)
+             router_probs = F.softmax(coarse_logits, dim=1) # [B, num_cells]
+             
+             # Run all heads? Expensive if num_cells is large (e.g. 64).
+             # Optimization: Run only top-k heads or batched matrix mult.
+             # Since heads are small MLPs, we can stack weights?
+             # For 64 cells, running loop is slow.
+             # Let's use top-1 for now for simplicity, or weighted avg of all.
+             
+             # Better approach for efficiency: 
+             # Compute output for ALL heads in parallel using grouped conv or batched linear?
+             # For this MVP, let's iterate. 64 is small enough.
+             
+             # But we need gradients for router.
+             # Weighted sum:
+             # coord_out = sum(prob_i * head_i(input))
+             
+             # To make it efficient:
+             # Batch process? 
+             # [B, D] -> [B, 1, D]
+             # heads weights: [num_cells, D, H]
+             # This suggests implementing fine heads as a single BatchedLinear layer.
+             # But we used nn.Sequential.
+             
+             # Fallback: Loop (slow but correct)
+             head_outputs = []
+             for head in self.fine_grained_heads:
+                 head_outputs.append(head(coord_input))
+             
+             # Stack: [B, num_cells, out_dim]
+             head_outputs = torch.stack(head_outputs, dim=1)
+             
+             # Weight by router probs: [B, num_cells, 1]
+             weighted_out = head_outputs * router_probs.unsqueeze(-1)
+             
+             # Sum: [B, out_dim]
+             coord_logits = weighted_out.sum(dim=1)
+             
+        else:
+            coord_logits = self.coordinate_head(coord_input)
         
         if self.coordinate_loss_type == "sphere":
             coordinates = F.normalize(coord_logits, p=2, dim=1)
+        elif self.coordinate_loss_type == "vmf":
+            coordinates = coord_logits
         else:
             coordinate_delta = torch.tanh(coord_logits)
             if (

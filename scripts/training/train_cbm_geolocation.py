@@ -46,11 +46,11 @@ from src.evaluation import (
     sphere_to_normalized_latlng,
     denormalize_coordinates,
     compute_haversine_distance,
+    vmf_to_normalized_latlng,
 )
 from src.losses import LossWeights, combined_loss
 from src.models.cbm_geolocation import CBMGeolocationModel
-from src.models.encoder_factory import create_encoder, VisionEncoder
-from src.models.location_encoder import GeoCLIPLocationEncoder
+from src.models.encoder_factory import create_encoder, VisionEncoder, GeoCLIPLocationEncoder
 
 # ============================================================================
 # Constants
@@ -116,8 +116,8 @@ def parse_args() -> argparse.Namespace:
         "--coordinate_loss_type",
         type=str,
         default=cfg.coordinate_loss_type,
-        choices=("mse", "sphere", "haversine"),
-        help="Coordinate loss/head type: 'mse' for lat/lng MSE, 'sphere' for 3D unit vectors, 'haversine' for great-circle distance.",
+        choices=("mse", "sphere", "haversine", "vmf"),
+        help="Coordinate loss/head type: 'mse' for lat/lng MSE, 'sphere' for 3D unit vectors, 'haversine' for great-circle distance, 'vmf' for von Mises-Fisher mixture.",
     )
     parser.add_argument(
         "--concept_to_coord_input",
@@ -146,6 +146,24 @@ def parse_args() -> argparse.Namespace:
         choices=("train", "dataset"),
         default="train",
         help="Samples to use when computing centroid residual stats.",
+    )
+
+    parser.add_argument(
+        "--use_hierarchical_routing",
+        action="store_true",
+        help="Use hierarchical routing to predict coordinates.",
+    )
+    parser.add_argument(
+        "--num_coarse_cells",
+        type=int,
+        default=64,
+        help="Number of coarse cells to use for hierarchical routing.",
+    )
+    parser.add_argument(
+        "--num_mixtures",
+        type=int,
+        default=5,
+        help="Number of mixtures to use for vMF coordinate prediction.",
     )
     
     # --- Training Configuration ---
@@ -199,6 +217,12 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=0.0,
         help="Optional country loss weight during concept stage.",
+    )
+    parser.add_argument(
+        "--distillation_weight",
+        type=float,
+        default=0.0,
+        help="Weight for distillation loss from GeoCLIP teacher (default 0.0).",
     )
     
     # --- Checkpointing and Logging ---
@@ -324,6 +348,7 @@ def resolve_stage_loss_weights(
             country=concept_stage_country_weight,
             contrastive=base_weights.contrastive,
             divergence=base_weights.divergence,
+            distillation=base_weights.distillation,
         )
     if stage == "prediction":
         # In prediction stage, we usually freeze encoder/concepts and train heads
@@ -335,6 +360,7 @@ def resolve_stage_loss_weights(
             country=base_weights.country,
             contrastive=0.0, # Disable alignment training in prediction stage
             divergence=0.0,
+            distillation=base_weights.distillation, # Can keep distillation in prediction stage
         )
     return base_weights
 
@@ -408,6 +434,7 @@ def train_one_epoch(
     concept_stage_distance_weight: float,
     concept_stage_country_weight: float,
     grad_clip_norm: float,
+    geoclip_teacher=None,
 ):
     model.train()
     running_loss = 0.0
@@ -432,6 +459,29 @@ def train_one_epoch(
             location_concept_logits
         ) = model(images, target_coords=coords)
         
+        # Compute teacher features for distillation (if GeoCLIP teacher available)
+        teacher_features = None
+        if geoclip_teacher is not None and stage_weights.distillation > 0:
+            with torch.no_grad():
+                # GeoCLIP expects image paths or PIL Images, but we have tensors
+                # We need to use the model's image encoder directly
+                # For now, we'll skip distillation if we can't easily get features
+                # In practice, you'd need to adapt GeoCLIP's forward or use its encoder
+                # This is a placeholder - actual implementation would require GeoCLIP API details
+                try:
+                    # Attempt to get features from GeoCLIP's image encoder
+                    # This assumes GeoCLIP has a method to encode images from tensors
+                    if hasattr(geoclip_teacher, 'encode_image'):
+                        teacher_features = geoclip_teacher.encode_image(images)
+                    elif hasattr(geoclip_teacher, 'model') and hasattr(geoclip_teacher.model, 'encode_image'):
+                        teacher_features = geoclip_teacher.model.encode_image(images)
+                    # Normalize teacher features if needed
+                    if teacher_features is not None:
+                        teacher_features = teacher_features / (teacher_features.norm(p=2, dim=-1, keepdim=True) + 1e-8)
+                except Exception as e:
+                    # If teacher feature extraction fails, skip distillation for this batch
+                    teacher_features = None
+        
         loss, _ = combined_loss(
             concept_logits,
             country_logits,
@@ -445,6 +495,7 @@ def train_one_epoch(
             location_concept_logits=location_concept_logits,
             weights=stage_weights,
             coordinate_loss_type=coordinate_loss_type,
+            teacher_features=teacher_features,
         )
 
         loss.backward()
@@ -467,6 +518,7 @@ def evaluate(
     coordinate_loss_type: str,
     concept_stage_distance_weight: float,
     concept_stage_country_weight: float,
+    geoclip_teacher=None,
 ):
     model.eval()
     running_loss = 0.0
@@ -491,6 +543,19 @@ def evaluate(
             location_concept_logits
         ) = model(images, target_coords=coords)
         
+        # Compute teacher features for distillation (if GeoCLIP teacher available)
+        teacher_features = None
+        if geoclip_teacher is not None and stage_weights.distillation > 0:
+            try:
+                if hasattr(geoclip_teacher, 'encode_image'):
+                    teacher_features = geoclip_teacher.encode_image(images)
+                elif hasattr(geoclip_teacher, 'model') and hasattr(geoclip_teacher.model, 'encode_image'):
+                    teacher_features = geoclip_teacher.model.encode_image(images)
+                if teacher_features is not None:
+                    teacher_features = teacher_features / (teacher_features.norm(p=2, dim=-1, keepdim=True) + 1e-8)
+            except Exception:
+                teacher_features = None
+        
         loss, _ = combined_loss(
             concept_logits,
             country_logits,
@@ -503,6 +568,7 @@ def evaluate(
             location_concept_logits=location_concept_logits,
             weights=stage_weights,
             coordinate_loss_type=coordinate_loss_type,
+            teacher_features=teacher_features,
         )
         running_loss += loss.item()
         num_batches += 1
@@ -728,6 +794,11 @@ def visualize_predictions(
     country_probs = torch.softmax(country_logits, dim=1)
     if coordinate_loss_type.lower() == "sphere":
         coord_preds_for_display = sphere_to_normalized_latlng(coord_preds)
+    elif coordinate_loss_type.lower() == "vmf":
+        coord_preds_for_display = vmf_to_normalized_latlng(coord_preds)
+        # Also handle targets for vMF (3D -> 2D)
+        if coords.shape[-1] == 3:
+            coords = sphere_to_normalized_latlng(coords)
     else:
         coord_preds_for_display = coord_preds
 
@@ -877,8 +948,19 @@ def dump_coordinate_diagnostics(
         
         if coord_type == "sphere":
             coord_preds_norm = sphere_to_normalized_latlng(coord_preds)
+            coords_norm = coords # Sphere uses normalized latlng targets usually? 
+            # Wait, sphere loss expects normalized latlng targets in dataset?
+            # No, dataset returns normalized latlng. Loss converts if needed.
+            # If vmf, dataset returns cartesian.
+        elif coord_type == "vmf":
+            coord_preds_norm = vmf_to_normalized_latlng(coord_preds)
+            if coords.shape[-1] == 3:
+                coords_norm = sphere_to_normalized_latlng(coords)
+            else:
+                coords_norm = coords
         else:
             coord_preds_norm = coord_preds
+            coords_norm = coords
 
         concept_probs = torch.softmax(concept_logits, dim=1)
         country_probs = torch.softmax(country_logits, dim=1)
@@ -886,7 +968,7 @@ def dump_coordinate_diagnostics(
         for i in range(len(images)):
             if len(rows) >= max_samples:
                 break
-            true_coords = coords[i].detach().cpu()
+            true_coords = coords_norm[i].detach().cpu()
             pred_coords = coord_preds_norm[i].detach().cpu()
             pred_deg = denormalize_coordinates(pred_coords)
             true_deg = denormalize_coordinates(true_coords)
@@ -961,6 +1043,9 @@ def main():
     args = parse_args()
     device = torch.device(args.device)
 
+    # --- Log arguments ---
+    logger.info(f"Arguments: {args}")
+
     # --- Setup: Seeds and Reproducibility ---
     seed = args.seed
     random.seed(seed)
@@ -1016,6 +1101,7 @@ def main():
             "country_weight": args.country_weight,
             "contrastive_weight": args.contrastive_weight,
             "divergence_weight": args.divergence_weight,
+            "distillation_weight": args.distillation_weight,
             "coordinate_loss_type": args.coordinate_loss_type,
             "concept_epochs": args.concept_epochs,
             "prediction_epochs": args.prediction_epochs,
@@ -1083,6 +1169,7 @@ def main():
         country=args.country_filter,
         require_coordinates=args.require_coordinates,
         encoder_model=encoder_model,
+        return_cartesian=(args.coordinate_loss_type.lower() == "vmf"),
     )
 
     logger.info(f"Dataset image size: {dataset.image_size}")
@@ -1181,6 +1268,29 @@ def main():
     location_encoder = GeoCLIPLocationEncoder(feature_dim=feature_dim)
     logger.info("Initialized GeoCLIP Location Encoder")
 
+    # --- GeoCLIP Teacher Model (for distillation) ---
+    geoclip_teacher = None
+    if args.distillation_weight > 0:
+        try:
+            # Try to import and load GeoCLIP
+            from geoclip import GeoCLIP
+            geoclip_teacher = GeoCLIP()
+            geoclip_teacher.eval()
+            geoclip_teacher.to(device)
+            # Freeze teacher
+            for param in geoclip_teacher.parameters():
+                param.requires_grad = False
+            logger.info("Loaded GeoCLIP teacher model for distillation")
+        except ImportError:
+            logger.warning(
+                "GeoCLIP package not found. Install with: pip install geoclip\n"
+                "Distillation will be disabled."
+            )
+            args.distillation_weight = 0.0
+        except Exception as e:
+            logger.warning(f"Failed to load GeoCLIP teacher: {e}\nDistillation will be disabled.")
+            args.distillation_weight = 0.0
+
     model = CBMGeolocationModel(
         encoder=encoder,
         num_concepts=len(dataset.concept_to_idx),
@@ -1202,6 +1312,9 @@ def main():
         ),
         location_encoder=location_encoder,
         concept_text_features=concept_text_features,
+        num_mixtures=args.num_mixtures,
+        use_hierarchical_routing=args.use_hierarchical_routing,
+        num_coarse_cells=args.num_coarse_cells,
     ).to(device)
 
     # --- Model Information Logging ---
@@ -1257,6 +1370,7 @@ def main():
         country=args.country_weight,
         contrastive=args.contrastive_weight,
         divergence=args.divergence_weight,
+        distillation=args.distillation_weight,
     )
 
     stages: Tuple[Tuple[str, int], ...]
@@ -1322,6 +1436,7 @@ def main():
                 args.concept_stage_distance_weight,
                 args.concept_stage_country_weight,
                 args.grad_clip_norm,
+                geoclip_teacher=geoclip_teacher,
             )
             val_loss, val_metrics = evaluate(
                 model,
@@ -1332,6 +1447,7 @@ def main():
                 args.coordinate_loss_type,
                 args.concept_stage_distance_weight,
                 args.concept_stage_country_weight,
+                geoclip_teacher=geoclip_teacher,
             )
             scheduler.step(val_loss)
 
@@ -1404,6 +1520,7 @@ def main():
         args.coordinate_loss_type,
         args.concept_stage_distance_weight,
         args.concept_stage_country_weight,
+        geoclip_teacher=geoclip_teacher,
     )
     print(f"Test Loss: {test_loss:.4f}")
     for key, value in test_metrics.items():

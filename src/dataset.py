@@ -147,7 +147,8 @@ class PanoramaCBMDataset(Dataset):
                  max_samples: Optional[int] = None,
                  country: Optional[str] = None,
                  require_coordinates: bool = False,
-                 encoder_model: Optional[str] = None):
+                 encoder_model: Optional[str] = None,
+                 return_cartesian: bool = False):
         """
         Args:
             transform: Optional torchvision transforms (overrides encoder_model preprocessing)
@@ -157,12 +158,14 @@ class PanoramaCBMDataset(Dataset):
             require_coordinates: Drop samples missing lat/lng
             encoder_model: HuggingFace model identifier (e.g., 'facebook/dinov2-base')
                           If provided, will use AutoImageProcessor to get correct preprocessing
+            return_cartesian: If True, returns 3D Cartesian coordinates on unit sphere instead of normalized 2D
         """
         self.transform = transform
         self.max_samples = max_samples
         self.country = country
         self.require_coordinates = require_coordinates
         self.encoder_model = encoder_model
+        self.return_cartesian = return_cartesian
 
         # Set up transforms based on encoder model or defaults
         if self.transform is None:
@@ -316,7 +319,13 @@ class PanoramaCBMDataset(Dataset):
         concept_idx = self.concept_to_idx[sample['meta_name']]
         target_idx = self.country_to_idx[sample['country']]
 
-        coordinates = normalize_coordinates(sample['lat'], sample['lng'])
+        if self.return_cartesian:
+            if sample['lat'] is not None and sample['lng'] is not None:
+                coordinates = latlon_to_cartesian(sample['lat'], sample['lng'])
+            else:
+                coordinates = torch.tensor([float('nan')] * 3, dtype=torch.float32)
+        else:
+            coordinates = normalize_coordinates(sample['lat'], sample['lng'])
 
         # Metadata dict
         metadata = {
@@ -576,6 +585,24 @@ def normalize_coordinates(lat: Optional[float], lng: Optional[float]) -> torch.T
     lat_norm = float(lat) / 90.0
     lng_norm = float(lng) / 180.0
     return torch.tensor([lat_norm, lng_norm], dtype=torch.float32)
+
+def latlon_to_cartesian(lat: float, lng: float) -> torch.Tensor:
+    """
+    Convert latitude and longitude to 3D Cartesian coordinates on the unit sphere.
+    Args:
+        lat: Latitude in degrees
+        lng: Longitude in degrees
+    Returns:
+        tensor of shape (3,) containing (x, y, z)
+    """
+    lat_rad = np.deg2rad(lat)
+    lng_rad = np.deg2rad(lng)
+    
+    x = np.cos(lat_rad) * np.cos(lng_rad)
+    y = np.cos(lat_rad) * np.sin(lng_rad)
+    z = np.sin(lat_rad)
+    
+    return torch.tensor([x, y, z], dtype=torch.float32)
 
 if __name__ == "__main__":
     # Test the dataset

@@ -24,11 +24,21 @@ else
   exit 1
 fi
 
-COORDINATE_LOSS_TYPE="mse"
+COORDINATE_LOSS_TYPE="vmf"
+# Options: "mse", "sphere", "haversine", "vmf" (von Mises-Fisher mixture)
+# "vmf" uses probabilistic coordinate prediction with mixture distributions
+
 COUNTRY_FILTER="Australia"
 EPOCHS=5
 BATCH_SIZE=16
-EXPERIMENT_NAME="${EXPERIMENT_SUFFIX}-${COORDINATE_LOSS_TYPE}-cbm-gps-alignment"
+
+# New features (set to 0/empty to disable)
+USE_HIERARCHICAL_ROUTING=1  # Set to 1 to enable coarse-to-fine routing
+NUM_COARSE_CELLS=64  # Number of coarse regions for hierarchical routing
+DISTILLATION_WEIGHT=0.1  # Weight for GeoCLIP teacher distillation (0.0 to disable)
+NUM_MIXTURES=5
+
+EXPERIMENT_NAME="${EXPERIMENT_SUFFIX}-${COORDINATE_LOSS_TYPE}-hierarchical-routing"
 
 # ===== Loaded modules and environment setup =====
 
@@ -46,7 +56,7 @@ python scripts/training/train_cbm_geolocation.py \
   --batch_size $BATCH_SIZE \
   --concept_epochs $EPOCHS \
   --prediction_epochs $EPOCHS \
-  --finetune_epochs 0 \
+  --finetune_epochs 5 \
   --encoder_model "$ENCODER_MODEL" \
   --experiment_name "$EXPERIMENT_NAME" \
   --coordinate_loss_type "$COORDINATE_LOSS_TYPE" \
@@ -60,5 +70,10 @@ python scripts/training/train_cbm_geolocation.py \
   --residual_stats_source "train" \
   --diagnostics_interval 2 \
   --diagnostics_samples 128 \
-  --sequential  # This does nothing for now 
+  --distillation_weight $DISTILLATION_WEIGHT \
+  --sequential \
+  --use_hierarchical_routing \
+  --num_coarse_cells $NUM_COARSE_CELLS \
+  --num_mixtures $NUM_MIXTURES \
+  --finetune_encoder
 

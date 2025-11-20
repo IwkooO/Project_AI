@@ -10,6 +10,7 @@ from typing import Optional
 
 import torch
 from torch import nn
+import torch.nn.functional as F
 from transformers import CLIPImageProcessor, CLIPModel, AutoImageProcessor, AutoModel
 
 
@@ -186,4 +187,127 @@ def create_encoder(model_name: str, finetune: bool = False, device: Optional[tor
         device=device,
     )
     return VisionEncoder(config)
+
+
+@dataclass
+class CoarseRouterConfig:
+    """Configuration for the coarse-to-fine routing mechanism."""
+    
+    num_coarse_cells: int = 64  # Total number of coarse regions (e.g. S2 cells or K-means clusters)
+    hidden_dim: int = 512
+    dropout: float = 0.1
+
+
+class HierarchicalRouter(nn.Module):
+    """
+    Coarse-to-Fine Router.
+    Predicts a coarse region first, then routes to a region-specific coordinate head.
+    Also supports integrating location encoding logic directly.
+    """
+    
+    def __init__(self, config: CoarseRouterConfig, input_dim: int):
+        super().__init__()
+        self.config = config
+        
+        # Coarse predictor (Router)
+        # Predicts logits for each coarse cell
+        self.router_head = nn.Sequential(
+            nn.Linear(input_dim, config.hidden_dim),
+            nn.LayerNorm(config.hidden_dim),
+            nn.GELU(),
+            nn.Dropout(config.dropout),
+            nn.Linear(config.hidden_dim, config.num_coarse_cells)
+        )
+        
+    def forward(self, features: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            features: Input features (e.g. concept probabilities or embeddings) [B, D]
+        Returns:
+            coarse_logits: [B, num_coarse_cells]
+        """
+        return self.router_head(features)
+
+
+class GeoCLIPLocationEncoder(nn.Module):
+    """
+    Location encoder based on GeoCLIP architecture.
+    Uses sinusoidal positional embeddings (Fourier features) followed by an MLP.
+    Migrated from location_encoder.py to centralize factory logic.
+    """
+
+    def __init__(
+        self,
+        feature_dim: int = 768,
+        hidden_dim: int = 512,
+        num_frequencies: int = 32,
+        sigma: float = 10.0,  # Scale for random frequencies
+    ):
+        super().__init__()
+        self.feature_dim = feature_dim
+        self.num_frequencies = num_frequencies
+        self.sigma = sigma
+
+        # Input is (sin, cos) for each frequency * 2 coordinates (lat, lng) = 4 * num_frequencies
+        # Random Fourier Features
+        self.register_buffer(
+            "frequencies", torch.randn(2, num_frequencies) * sigma
+        )
+        
+        input_dim = 2 * num_frequencies  # sin and cos for each frequency projection
+        
+        self.mlp = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, feature_dim),
+        )
+
+    def forward(self, coords: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            coords: Coordinates, shape (batch, 2) or (batch, 3)
+                    - If (batch, 2): Normalized coordinates in [-1, 1] (lat, lng)
+                    - If (batch, 3): 3D Cartesian coordinates on unit sphere (x, y, z)
+        
+        Returns:
+            Location embeddings: (batch, feature_dim)
+        """
+        # Handle 3D Cartesian coordinates (from vMF loss)
+        if coords.shape[-1] == 3:
+            # Convert 3D Cartesian to normalized lat/lng
+            # Check for zero vectors (from NaN replacement) - use default location
+            coords_norm = coords.norm(p=2, dim=-1, keepdim=True)
+            zero_mask = coords_norm.squeeze(-1) < 1e-6
+            
+            # Normalize to ensure unit sphere, handling zero vectors
+            coords_3d = coords.clone()
+            # Replace zero vectors with default (equator, prime meridian) before normalizing
+            default_vec = torch.tensor([1.0, 0.0, 0.0], device=coords.device, dtype=coords.dtype)
+            coords_3d[zero_mask] = default_vec
+            coords_3d = F.normalize(coords_3d, p=2, dim=-1)
+            
+            x, y, z = coords_3d[:, 0], coords_3d[:, 1], coords_3d[:, 2]
+            z = torch.clamp(z, -1.0, 1.0)
+            lat_rad = torch.asin(z)
+            lng_rad = torch.atan2(y, x)
+            # Convert to degrees then normalize
+            lat_deg = torch.rad2deg(lat_rad)
+            lng_deg = torch.rad2deg(lng_rad)
+            lat_norm = lat_deg / 90.0
+            lng_norm = lng_deg / 180.0
+            coords_2d = torch.stack([lat_norm, lng_norm], dim=1)
+        else:
+            # Already 2D normalized coordinates
+            coords_2d = coords
+        
+        # Project coordinates using random frequencies
+        # (batch, 2) @ (2, num_frequencies) -> (batch, num_frequencies)
+        projections = 2 * 3.14159265359 * coords_2d @ self.frequencies
+        
+        # Fourier features: [sin(proj), cos(proj)]
+        features = torch.cat([torch.sin(projections), torch.cos(projections)], dim=-1)
+        
+        return self.mlp(features)
 
