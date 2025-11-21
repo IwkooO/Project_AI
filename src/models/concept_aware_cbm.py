@@ -54,10 +54,12 @@ class ConceptAwareGeoModel(nn.Module):
         
         # Image Projector (f_img): Maps image embeddings to concept activations
         # Input: d_streetclip, Output: k (concepts)
+        # Added dropout for regularization to prevent overfitting
         self.image_projector = nn.Sequential(
             nn.Linear(streetclip_dim, 256),
             nn.LayerNorm(256),
             nn.GELU(),
+            nn.Dropout(0.3),  # Dropout for regularization
             nn.Linear(256, num_concepts)
         )
         

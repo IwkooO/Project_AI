@@ -22,13 +22,16 @@ export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
 # Run training
 python scripts/training/train_concept_aware.py \
     --encoder_model "geolocal/StreetCLIP" \
-    --batch_size 64 \
-    --epochs 10 \
-    --lr 1e-4 \
-    --lambda_divergence 0.1 \
+    --batch_size 16 \
+    --epochs 20 \
+    --lr 3e-4 \
+    --weight_decay 0.1 \
+    --lambda_divergence 0.05 \
+    --lambda_concept 1.0 \
+    --label_smoothing 0.1 \
+    --early_stopping_patience 5 \
     --output_dir "results/concept_aware" \
     --save_interval 5 \
     --use_wandb \
-    --country_filter "Australia"
 
 
