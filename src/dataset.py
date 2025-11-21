@@ -147,7 +147,8 @@ class PanoramaCBMDataset(Dataset):
                  max_samples: Optional[int] = None,
                  country: Optional[str] = None,
                  require_coordinates: bool = False,
-                 encoder_model: Optional[str] = None):
+                 encoder_model: Optional[str] = None,
+                 return_cartesian: bool = False):
         """
         Args:
             transform: Optional torchvision transforms (overrides encoder_model preprocessing)
@@ -157,12 +158,14 @@ class PanoramaCBMDataset(Dataset):
             require_coordinates: Drop samples missing lat/lng
             encoder_model: HuggingFace model identifier (e.g., 'facebook/dinov2-base')
                           If provided, will use AutoImageProcessor to get correct preprocessing
+            return_cartesian: If True, returns 3D Cartesian coordinates on unit sphere instead of normalized 2D
         """
         self.transform = transform
         self.max_samples = max_samples
         self.country = country
         self.require_coordinates = require_coordinates
         self.encoder_model = encoder_model
+        self.return_cartesian = return_cartesian
 
         # Set up transforms based on encoder model or defaults
         if self.transform is None:
@@ -217,6 +220,11 @@ class PanoramaCBMDataset(Dataset):
         skipped_no_image = 0
         skipped_no_coords = 0
 
+        # Pre-process country filter for O(1) comparison inside loop
+        target_country_norm = None
+        if self.country is not None:
+            target_country_norm = str(self.country).strip().lower()
+
         # Get all meta files
         meta_files = list(meta_folder.glob("*.json"))
 
@@ -242,11 +250,10 @@ class PanoramaCBMDataset(Dataset):
                 if 'metaName' not in meta or 'country' not in meta:
                     continue
 
-                # Filter by country if specified (case-insensitive, strip whitespace)
-                if self.country is not None:
-                    meta_country = str(meta['country']).strip()
-                    filter_country = str(self.country).strip()
-                    if meta_country.lower() != filter_country.lower():
+                # Fast Country Filter (O(1) comparison)
+                if target_country_norm is not None:
+                    meta_country = str(meta['country']).strip().lower()
+                    if meta_country != target_country_norm:
                         skipped_no_country_match += 1
                         continue
 
@@ -316,7 +323,13 @@ class PanoramaCBMDataset(Dataset):
         concept_idx = self.concept_to_idx[sample['meta_name']]
         target_idx = self.country_to_idx[sample['country']]
 
-        coordinates = normalize_coordinates(sample['lat'], sample['lng'])
+        if self.return_cartesian:
+            if sample['lat'] is not None and sample['lng'] is not None:
+                coordinates = latlon_to_cartesian(sample['lat'], sample['lng'])
+            else:
+                coordinates = torch.tensor([float('nan')] * 3, dtype=torch.float32)
+        else:
+            coordinates = normalize_coordinates(sample['lat'], sample['lng'])
 
         # Metadata dict
         metadata = {
@@ -552,19 +565,24 @@ def print_statistics(stats: Dict):
 class SubsetDataset(Dataset):
     """
     Dataset wrapper for subsets (train/val/test splits).
+    Optimized for O(1) retrieval speed.
     """
 
     def __init__(self, parent_dataset: PanoramaCBMDataset, samples: List[Dict]):
         self.parent_dataset = parent_dataset
         self.samples = samples
+        
+        # Build a fast lookup: pano_id -> parent index
+        # This avoids O(n) index() calls in __getitem__
+        parent_pano_to_idx = {sample['pano_id']: idx for idx, sample in enumerate(parent_dataset.samples)}
+        self.parent_indices = [parent_pano_to_idx[sample['pano_id']] for sample in samples]
 
     def __len__(self):
         return len(self.samples)
 
     def __getitem__(self, idx):
-        # Find the index in the parent dataset
-        sample = self.samples[idx]
-        parent_idx = self.parent_dataset.samples.index(sample)
+        # Direct index lookup - O(1) instead of O(n)
+        parent_idx = self.parent_indices[idx]
         return self.parent_dataset[parent_idx]
 
 
@@ -576,6 +594,24 @@ def normalize_coordinates(lat: Optional[float], lng: Optional[float]) -> torch.T
     lat_norm = float(lat) / 90.0
     lng_norm = float(lng) / 180.0
     return torch.tensor([lat_norm, lng_norm], dtype=torch.float32)
+
+def latlon_to_cartesian(lat: float, lng: float) -> torch.Tensor:
+    """
+    Convert latitude and longitude to 3D Cartesian coordinates on the unit sphere.
+    Args:
+        lat: Latitude in degrees
+        lng: Longitude in degrees
+    Returns:
+        tensor of shape (3,) containing (x, y, z)
+    """
+    lat_rad = np.deg2rad(lat)
+    lng_rad = np.deg2rad(lng)
+    
+    x = np.cos(lat_rad) * np.cos(lng_rad)
+    y = np.cos(lat_rad) * np.sin(lng_rad)
+    z = np.sin(lat_rad)
+    
+    return torch.tensor([x, y, z], dtype=torch.float32)
 
 if __name__ == "__main__":
     # Test the dataset

@@ -1,0 +1,77 @@
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+INFO:__main__:Using device: cuda
+INFO:__main__:Initializing Dataset...
+Loading samples:   0%|          | 0/5538 [00:00<?, ?it/s]Loading samples:   0%|          | 9/5538 [00:00<01:01, 89.97it/s]Loading samples:   4%|▍         | 244/5538 [00:00<00:03, 1415.31it/s]Loading samples:   9%|▊         | 482/5538 [00:00<00:02, 1851.54it/s]Loading samples:  13%|█▎        | 710/5538 [00:00<00:02, 2016.99it/s]Loading samples:  16%|█▋        | 912/5538 [00:06<00:49, 92.63it/s]  Loading samples:  19%|█▉        | 1043/5538 [00:10<01:11, 62.86it/s]Loading samples:  20%|██        | 1130/5538 [00:12<01:14, 59.07it/s]Loading samples:  22%|██▏       | 1191/5538 [00:13<01:12, 59.97it/s]Loading samples:  22%|██▏       | 1235/5538 [00:13<01:08, 62.67it/s]Loading samples:  23%|██▎       | 1268/5538 [00:14<01:10, 60.58it/s]Loading samples:  23%|██▎       | 1292/5538 [00:14<01:07, 62.48it/s]Loading samples:  24%|██▎       | 1312/5538 [00:14<01:03, 66.88it/s]Loading samples:  24%|██▍       | 1330/5538 [00:14<00:57, 72.62it/s]Loading samples:  24%|██▍       | 1355/5538 [00:15<00:48, 85.46it/s]Loading samples:  25%|██▍       | 1380/5538 [00:15<00:44, 94.15it/s]Loading samples:  25%|██▌       | 1398/5538 [00:15<00:40, 102.17it/s]Loading samples:  26%|██▌       | 1415/5538 [00:15<00:38, 108.47it/s]Loading samples:  26%|██▌       | 1432/5538 [00:15<00:39, 103.40it/s]Loading samples:  26%|██▌       | 1446/5538 [00:15<00:45, 90.49it/s] Loading samples:  26%|██▋       | 1458/5538 [00:15<00:43, 93.95it/s]Loading samples:  27%|██▋       | 1470/5538 [00:16<00:43, 93.65it/s]Loading samples:  27%|██▋       | 1481/5538 [00:16<00:45, 88.96it/s]Loading samples:  27%|██▋       | 1511/5538 [00:16<00:30, 132.62it/s]Loading samples:  28%|██▊       | 1527/5538 [00:16<00:29, 138.26it/s]Loading samples:  28%|██▊       | 1543/5538 [00:16<00:37, 106.20it/s]Loading samples:  28%|██▊       | 1556/5538 [00:16<00:41, 97.11it/s] Loading samples:  28%|██▊       | 1575/5538 [00:16<00:34, 115.52it/s]Loading samples:  29%|██▊       | 1589/5538 [00:17<00:40, 96.99it/s] Loading samples:  29%|██▉       | 1621/5538 [00:17<00:27, 142.64it/s]Loading samples:  30%|██▉       | 1651/5538 [00:17<00:27, 140.11it/s]Loading samples:  30%|███       | 1668/5538 [00:17<00:41, 94.24it/s] Loading samples:  31%|███       | 1705/5538 [00:17<00:29, 130.45it/s]Loading samples:  31%|███▏      | 1734/5538 [00:18<00:24, 158.11it/s]Loading samples:  32%|███▏      | 1761/5538 [00:18<00:20, 180.45it/s]Loading samples:  33%|███▎      | 1823/5538 [00:18<00:13, 278.06it/s]Loading samples:  34%|███▎      | 1858/5538 [00:18<00:22, 160.34it/s]Loading samples:  34%|███▍      | 1885/5538 [00:18<00:20, 175.23it/s]Loading samples:  35%|███▌      | 1945/5538 [00:18<00:14, 244.08it/s]Loading samples:  36%|███▌      | 1983/5538 [00:19<00:13, 271.30it/s]Loading samples:  37%|███▋      | 2025/5538 [00:19<00:11, 296.75it/s]Loading samples:  37%|███▋      | 2061/5538 [00:19<00:14, 241.35it/s]Loading samples:  38%|███▊      | 2116/5538 [00:19<00:11, 304.95it/s]Loading samples:  39%|███▉      | 2156/5538 [00:19<00:11, 293.66it/s]Loading samples:  40%|████      | 2229/5538 [00:19<00:08, 392.43it/s]Loading samples:  41%|████▏     | 2295/5538 [00:19<00:07, 457.20it/s]Loading samples:  42%|████▏     | 2353/5538 [00:19<00:07, 453.84it/s]Loading samples:  43%|████▎     | 2403/5538 [00:20<00:08, 378.60it/s]Loading samples:  45%|████▍     | 2488/5538 [00:20<00:06, 475.42it/s]Loading samples:  46%|████▌     | 2541/5538 [00:20<00:07, 405.68it/s]Loading samples:  47%|████▋     | 2604/5538 [00:20<00:06, 455.19it/s]Loading samples:  49%|████▊     | 2691/5538 [00:20<00:05, 530.35it/s]Loading samples:  50%|████▉     | 2749/5538 [00:20<00:05, 511.13it/s]Loading samples:  51%|█████     | 2827/5538 [00:20<00:04, 578.13it/s]Loading samples:  52%|█████▏    | 2889/5538 [00:21<00:04, 575.20it/s]Loading samples:  53%|█████▎    | 2956/5538 [00:21<00:05, 435.73it/s]Loading samples:  54%|█████▍    | 3007/5538 [00:21<00:05, 428.42it/s]Loading samples:  56%|█████▌    | 3096/5538 [00:21<00:04, 510.48it/s]Loading samples:  58%|█████▊    | 3216/5538 [00:21<00:03, 673.30it/s]Loading samples:  60%|█████▉    | 3322/5538 [00:21<00:03, 715.02it/s]Loading samples:  61%|██████▏   | 3399/5538 [00:21<00:03, 681.19it/s]Loading samples:  63%|██████▎   | 3482/5538 [00:21<00:02, 718.44it/s]Loading samples:  65%|██████▌   | 3622/5538 [00:22<00:02, 897.94it/s]Loading samples:  67%|██████▋   | 3717/5538 [00:22<00:02, 902.41it/s]Loading samples:  70%|██████▉   | 3850/5538 [00:22<00:01, 1021.20it/s]Loading samples:  71%|███████▏  | 3956/5538 [00:22<00:01, 815.78it/s] Loading samples:  74%|███████▍  | 4120/5538 [00:22<00:01, 1015.70it/s]Loading samples:  76%|███████▋  | 4233/5538 [00:22<00:01, 655.54it/s] Loading samples:  78%|███████▊  | 4337/5538 [00:22<00:01, 727.31it/s]Loading samples:  81%|████████  | 4468/5538 [00:23<00:01, 849.26it/s]Loading samples:  83%|████████▎ | 4573/5538 [00:23<00:01, 881.19it/s]Loading samples:  85%|████████▌ | 4715/5538 [00:23<00:00, 986.93it/s]Loading samples:  88%|████████▊ | 4884/5538 [00:23<00:00, 1164.72it/s]Loading samples:  91%|█████████ | 5012/5538 [00:23<00:00, 1111.51it/s]Loading samples:  93%|█████████▎| 5132/5538 [00:23<00:00, 944.58it/s] Loading samples:  95%|█████████▍| 5236/5538 [00:23<00:00, 787.18it/s]Loading samples:  97%|█████████▋| 5360/5538 [00:23<00:00, 884.73it/s]Loading samples:  99%|█████████▊| 5460/5538 [00:24<00:00, 850.73it/s]Loading samples: 100%|██████████| 5538/5538 [00:24<00:00, 229.06it/s]
+INFO:__main__:Extracting and encoding concepts...
+INFO:__main__:Found 32 unique concepts.
+Country filter 'Australia' applied:
+  - Loaded samples: 251
+  - Skipped (country mismatch): 4736
+  - Skipped (no image): 551
+  - Skipped (no coordinates): 0
+Loaded 251 samples
+Concepts: 32
+Countries: 1
+Traceback (most recent call last):
+  File "/gpfs/scratch1/shared/pnair/Project_AI/scripts/training/train_concept_aware.py", line 351, in <module>
+    train(args)
+  File "/gpfs/scratch1/shared/pnair/Project_AI/scripts/training/train_concept_aware.py", line 186, in train
+    feats = base_encoder.get_text_features(batch_texts)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/pnair/.conda/envs/streetview_pnair/lib/python3.11/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch-shared/pnair/Project_AI/src/models/streetclip_encoder.py", line 89, in get_text_features
+    text_features = self.model.get_text_features(**inputs)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/pnair/.conda/envs/streetview_pnair/lib/python3.11/site-packages/transformers/utils/generic.py", line 809, in wrapper
+    return func(*args, **valid_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/pnair/.conda/envs/streetview_pnair/lib/python3.11/site-packages/transformers/models/clip/modeling_clip.py", line 888, in get_text_features
+    text_outputs: BaseModelOutputWithPooling = self.text_model(
+                                               ^^^^^^^^^^^^^^^^
+  File "/home/pnair/.conda/envs/streetview_pnair/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/pnair/.conda/envs/streetview_pnair/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/pnair/.conda/envs/streetview_pnair/lib/python3.11/site-packages/transformers/models/clip/modeling_clip.py", line 603, in forward
+    hidden_states = self.embeddings(input_ids=input_ids, position_ids=position_ids)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/pnair/.conda/envs/streetview_pnair/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/pnair/.conda/envs/streetview_pnair/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/pnair/.conda/envs/streetview_pnair/lib/python3.11/site-packages/transformers/models/clip/modeling_clip.py", line 246, in forward
+    inputs_embeds = self.token_embedding(input_ids)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/pnair/.conda/envs/streetview_pnair/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/pnair/.conda/envs/streetview_pnair/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/pnair/.conda/envs/streetview_pnair/lib/python3.11/site-packages/torch/nn/modules/sparse.py", line 190, in forward
+    return F.embedding(
+           ^^^^^^^^^^^^
+  File "/home/pnair/.conda/envs/streetview_pnair/lib/python3.11/site-packages/torch/nn/functional.py", line 2551, in embedding
+    return torch.embedding(weight, input, padding_idx, scale_grad_by_freq, sparse)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Expected all tensors to be on the same device, but found at least two devices, cuda:0 and cpu! (when checking argument for argument index in method wrapper_CUDA__index_select)

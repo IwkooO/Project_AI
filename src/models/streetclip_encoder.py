@@ -5,11 +5,11 @@ StreetCLIP encoder wrapper for CBM geolocation.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List, Union
 
 import torch
 from torch import nn
-from transformers import CLIPImageProcessor, CLIPModel
+from transformers import CLIPImageProcessor, CLIPModel, CLIPTokenizer
 
 
 @dataclass
@@ -29,6 +29,7 @@ class StreetCLIPEncoder(nn.Module):
         self.config = config or StreetCLIPConfig()
         self.model = CLIPModel.from_pretrained(self.config.model_name)
         self.image_processor = CLIPImageProcessor.from_pretrained(self.config.model_name)
+        self.tokenizer = CLIPTokenizer.from_pretrained(self.config.model_name)
 
         if not self.config.finetune:
             self.freeze_encoder()
@@ -61,6 +62,30 @@ class StreetCLIPEncoder(nn.Module):
     def get_image_features(self, pixel_values: torch.Tensor) -> torch.Tensor:
         return self.forward(pixel_values)
 
-
-
-
+    @torch.no_grad()
+    def get_text_features(self, text: Union[List[str], str]) -> torch.Tensor:
+        """
+        Get text features for a list of strings or a single string.
+        
+        Args:
+            text: List of strings or single string to encode
+            
+        Returns:
+            Text features tensor [batch_size, hidden_size]
+        """
+        if isinstance(text, str):
+            text = [text]
+            
+        inputs = self.tokenizer(
+            text, 
+            padding=True, 
+            truncation=True, 
+            return_tensors="pt"
+        )
+        
+        # Move inputs to the same device as the model
+        model_device = next(self.model.parameters()).device
+        inputs = {k: v.to(model_device) for k, v in inputs.items()}
+            
+        text_features = self.model.get_text_features(**inputs)
+        return text_features
