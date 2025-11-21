@@ -21,11 +21,11 @@ from tqdm import tqdm
 CLIP_IMAGE_MEAN = (0.48145466, 0.4578275, 0.40821073)
 CLIP_IMAGE_STD = (0.26862954, 0.26130258, 0.27577711)
 
-geoguessrId = "6906237dc7731161a37282b2"
+geoguessrId = "691df1ee911f74393c53af8c"
 data_root = Path("data")
 folder = data_root / geoguessrId
 meta_folder = folder / "metas"
-image_folder = folder / "panorama_processed"
+image_folder = Path("/scratch-shared/igodzwon/Project_AI/data/691df1ee911f74393c53af8c/panorama_processed")
 
 def extract_image_size(processor: Optional[AutoImageProcessor] = None, image_size: Optional[Tuple[int, int]] = None) -> Tuple[int, int]:
     """
@@ -527,7 +527,7 @@ def get_statistics(samples: List[Dict]) -> Dict:
 
     stats['num_countries'] = len(stats['countries'])
     stats['num_concepts'] = len(stats['concepts'])
-    stats['coordinate_coverage_pct'] = stats['coordinate_coverage'] / len(samples) * 100
+    stats['coordinate_coverage_pct'] = (stats['coordinate_coverage'] / len(samples) * 100) if len(samples) > 0 else 0.0
 
     return stats
 
@@ -579,11 +579,19 @@ def normalize_coordinates(lat: Optional[float], lng: Optional[float]) -> torch.T
 
 if __name__ == "__main__":
     # Test the dataset
-    dataset = PanoramaCBMDataset(country="Australia")  
+    dataset = PanoramaCBMDataset()  
 
     # Test statistics
-    stats = get_statistics(dataset.samples)
-    print_statistics(stats)
+    if len(dataset.samples) > 0:
+        stats = get_statistics(dataset.samples)
+        print_statistics(stats)
+    else:
+        print("Warning: No samples loaded! Check that:")
+        print(f"  1. Meta folder exists: {meta_folder}")
+        print(f"  2. Image folder exists: {image_folder}")
+        print(f"  3. Meta files match image filenames")
+        import sys
+        sys.exit(1)
     
     # print an example sample
     print(dataset.samples[0])

@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from tqdm import tqdm
 
-geoguessrId = "6906237dc7731161a37282b2"
+geoguessrId = "691df1ee911f74393c53af8c"
 data_root = Path("data")
 folder = data_root / geoguessrId
 meta_folder = folder / "metas"

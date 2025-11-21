@@ -4,9 +4,10 @@
 #SBATCH --job-name=preprocess_pano
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=9
-#SBATCH --time=06:00:00
+#SBATCH --time=12:00:00
 #SBATCH --mem=32GB
 #SBATCH --output=jobs/outputs/preprocess_pano.log
+#SBATCH --dependency=afterok:16761856
 
 module purge
 module load 2025
@@ -15,6 +16,15 @@ module load Anaconda3/2025.06-1
 cd $HOME/Project_AI/
 source activate streetview
 
-python scripts/data_processing/preprocess_panorama.py --panorama-folder /scratch-shared/pnair/Project_AI/data/6906237dc7731161a37282b2/panorama
+# Define paths
+PANORAMA_FOLDER="/home/igodzwon/Project_AI/data/691df1ee911f74393c53af8c/panorama"
+OUTPUT_FOLDER="/scratch-shared/igodzwon/Project_AI/data/691df1ee911f74393c53af8c/panorama_processed"
+
+# Create output folder if it doesn't exist
+mkdir -p "$OUTPUT_FOLDER"
+
+python scripts/data_processing/preprocess_panorama.py \
+    --panorama-folder "$PANORAMA_FOLDER" \
+    --output-folder "$OUTPUT_FOLDER"
 
 

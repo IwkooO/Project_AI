@@ -1,11 +1,17 @@
 import aiohttp
 import asyncio
-import constants
 import json
 from pathlib import Path
+import sys
+# Add project root to Python path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+
+import constants
 from tqdm import tqdm
 
-geoguessrId = "6906237dc7731161a37282b2"
+geoguessrId = "691df1ee911f74393c53af8c"
 endpoint = f"https://learnablemeta.com/api/userscript/map/{geoguessrId}/"
 
 data_root = Path("data")
