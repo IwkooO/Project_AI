@@ -13,7 +13,7 @@ from PIL import Image
 project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(project_root))
 
-from src.dataset_probe import ConceptProbeDataset, create_stratified_splits, get_transforms
+from src.data.dataset_probe import ConceptProbeDataset, create_stratified_splits, get_transforms
 from src.models.probe import StreetClipProbe
 
 def visualize_predictions(model, dataset, device, num_images=10, output_dir=Path("visualizations/probe")):

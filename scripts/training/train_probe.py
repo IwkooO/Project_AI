@@ -15,10 +15,10 @@ except ImportError:
         return iterable
 
 # Add project root to path
-project_root = Path(__file__).resolve().parent.parent
+project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(project_root))
 
-from src.dataset_probe import ConceptProbeDataset, create_stratified_splits, get_transforms
+from src.data.dataset_probe import ConceptProbeDataset, create_stratified_splits, get_transforms
 from src.models.probe import StreetClipProbe
 
 def train_one_epoch(model, loader, criterion, optimizer, device, epoch):
