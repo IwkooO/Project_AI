@@ -56,10 +56,9 @@ def coordinate_loss(
                 1, device=pred_coords.device, dtype=pred_coords.dtype
             ).squeeze()
         
-        # Normalize distances to radians for gradient stability (distance / Earth Radius)
-        # This maps distances to approx [0, 3.14] range which is much better for optimization
-        EARTH_RADIUS_KM = 6371.0
-        normalized_distances = distances / EARTH_RADIUS_KM
+        # Normalize: Divide by 1000.0 so that 1.0 loss ~= 1000km error
+        # This balances the magnitude with CrossEntropy (~0.5 - 5.0)
+        normalized_distances = distances / 1000.0
         return normalized_distances.mean()
 
     raise ValueError(f"Unsupported coordinate loss type '{loss_type}'")
