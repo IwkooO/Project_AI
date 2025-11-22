@@ -1,0 +1,478 @@
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+Testing CBM model on test set...
+Model: checkpoints/cbm-finetuned/best_cbm_model.pth
+Test CSV: /home/igodzwon/Project_AI/data/691df1ee911f74393c53af8c/data_sa_beginner_test.csv
+Using device: cuda
+Loading model from checkpoints/cbm-finetuned/best_cbm_model.pth
+Loading backbone: geolocal/StreetCLIP
+Backbone frozen.
+Loading test dataset from /home/igodzwon/Project_AI/data/691df1ee911f74393c53af8c/data_sa_beginner_test.csv
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Test dataset size: 358
+
+Creating visualizations for 358 samples...
+Warning: GT concept 'Thick Arrows' not found in training set concepts
+Warning: GT concept 'License plate' not found in training set concepts
+Warning: GT concept 'Concrete blocks' not found in training set concepts
+Warning: GT concept 'Black yellow stripes' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig1.png
+Warning: GT concept 'Curvy poles' not found in training set concepts
+Warning: GT concept 'Concrete blocks' not found in training set concepts
+Warning: GT concept 'Chevrons' not found in training set concepts
+Warning: GT concept 'Curvy poles' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig2.png
+Warning: GT concept 'Thick Arrows' not found in training set concepts
+Warning: GT concept 'All yellow lines' not found in training set concepts
+Warning: GT concept 'Blue water tanks' not found in training set concepts
+Warning: GT concept 'Car meta' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig3.png
+Warning: GT concept 'Bollard' not found in training set concepts
+Warning: GT concept 'Kilometer marker' not found in training set concepts
+Warning: GT concept 'Pole' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig4.png
+Warning: GT concept 'Octagonal pole' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Colombian cross' not found in training set concepts
+Warning: GT concept 'White bollards and stone barriers' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig5.png
+Warning: GT concept 'Colombian cross' not found in training set concepts
+Warning: GT concept 'Octagonal pole' not found in training set concepts
+Warning: GT concept 'Bollard' not found in training set concepts
+Warning: GT concept 'Highway markers' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig6.png
+Warning: GT concept 'Triple road lines' not found in training set concepts
+Warning: GT concept 'Octagonal pole' not found in training set concepts
+Warning: GT concept 'Colombian cross' not found in training set concepts
+Warning: GT concept 'Thicc white signs post' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig7.png
+Warning: GT concept 'Highway markers' not found in training set concepts
+Warning: GT concept 'Road marker' not found in training set concepts
+Warning: GT concept 'Sign post' not found in training set concepts
+Warning: GT concept 'Double concrete pole' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig8.png
+Warning: GT concept 'Triple road lines' not found in training set concepts
+Warning: GT concept 'Colombian cross' not found in training set concepts
+Warning: GT concept 'All yellow lines' not found in training set concepts
+Warning: GT concept 'Double concrete pole' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig9.png
+Warning: GT concept 'Double concrete pole' not found in training set concepts
+Warning: GT concept 'Triple road lines' not found in training set concepts
+Warning: GT concept 'Paraná pines' not found in training set concepts
+Warning: GT concept 'Blue water tanks' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig10.png
+Warning: GT concept 'Bollard' not found in training set concepts
+Warning: GT concept 'Double concrete pole' not found in training set concepts
+Warning: GT concept 'Black yellow stripes' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig11.png
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Kilometer marker' not found in training set concepts
+Warning: GT concept 'Curvy poles' not found in training set concepts
+Warning: GT concept 'License plate' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig12.png
+Warning: GT concept 'Landscape + black car' not found in training set concepts
+Warning: GT concept 'Thick Arrows' not found in training set concepts
+Warning: GT concept 'Kilometer marker' not found in training set concepts
+Warning: GT concept 'Black yellow stripes' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig13.png
+Warning: GT concept 'Kilometer marker' not found in training set concepts
+Warning: GT concept 'Pole' not found in training set concepts
+Warning: GT concept 'Triple road lines' not found in training set concepts
+Warning: GT concept 'Bollard' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig14.png
+Warning: GT concept 'Landscape + black car' not found in training set concepts
+Warning: GT concept 'All yellow lines' not found in training set concepts
+Warning: GT concept 'Black back of signs.' not found in training set concepts
+Warning: GT concept 'Car meta' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig15.png
+Warning: GT concept 'Road marker' not found in training set concepts
+Warning: GT concept 'Landscape + black car' not found in training set concepts
+Warning: GT concept 'Thick Arrows' not found in training set concepts
+Warning: GT concept 'Pole' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig16.png
+Warning: GT concept 'Blue water tanks' not found in training set concepts
+Warning: GT concept 'Black back of signs.' not found in training set concepts
+Warning: GT concept 'Triple road lines' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig17.png
+Warning: GT concept 'Kilometer marker' not found in training set concepts
+Warning: GT concept 'Road marker' not found in training set concepts
+Warning: GT concept 'Trident poles' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig18.png
+Warning: GT concept 'Trident poles' not found in training set concepts
+Warning: GT concept 'White bollards and stone barriers' not found in training set concepts
+Warning: GT concept 'Pickup car' not found in training set concepts
+Warning: GT concept 'Paraná pines' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig19.png
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Chevrons' not found in training set concepts
+Warning: GT concept 'Paraná pines' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig20.png
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Chevrons' not found in training set concepts
+Warning: GT concept 'White bollards and stone barriers' not found in training set concepts
+Warning: GT concept 'Colombian cross' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig21.png
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Thicc white signs post' not found in training set concepts
+Warning: GT concept 'Bollard' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig22.png
+Warning: GT concept 'All yellow lines' not found in training set concepts
+Warning: GT concept 'Sign post' not found in training set concepts
+Warning: GT concept 'Paraná pines' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig23.png
+Warning: GT concept 'Thicc white signs post' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Bollard' not found in training set concepts
+Warning: GT concept 'Octagonal pole' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig24.png
+Warning: GT concept 'Chevrons' not found in training set concepts
+Warning: GT concept 'Yellow plates' not found in training set concepts
+Warning: GT concept 'Chevrons' not found in training set concepts
+Warning: GT concept 'Paraná pines' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig25.png
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Car meta' not found in training set concepts
+Warning: GT concept 'Sign post' not found in training set concepts
+Warning: GT concept 'Yellow plates' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig26.png
+Warning: GT concept 'Yellow plates' not found in training set concepts
+Warning: GT concept 'Rounded electric counter' not found in training set concepts
+Warning: GT concept 'White bollards and stone barriers' not found in training set concepts
+Warning: GT concept 'Rounded electric counter' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig27.png
+Warning: GT concept 'Car meta' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig28.png
+Warning: GT concept 'Chevrons' not found in training set concepts
+Warning: GT concept 'Black yellow stripes' not found in training set concepts
+Warning: GT concept 'Road marker' not found in training set concepts
+Warning: GT concept 'Kilometer marker' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig29.png
+Warning: GT concept 'Highway markers' not found in training set concepts
+Warning: GT concept 'Electricity counter' not found in training set concepts
+Warning: GT concept 'Blue water tanks' not found in training set concepts
+Warning: GT concept 'Electricity counter' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig30.png
+Warning: GT concept 'All yellow lines' not found in training set concepts
+Warning: GT concept 'Landscape + black car' not found in training set concepts
+Warning: GT concept 'Landscape + black car' not found in training set concepts
+Warning: GT concept 'Yellow plates' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig31.png
+Warning: GT concept 'Bollard' not found in training set concepts
+Warning: GT concept 'White bollards and stone barriers' not found in training set concepts
+Warning: GT concept 'Concrete blocks' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig32.png
+Warning: GT concept 'Concrete blocks' not found in training set concepts
+Warning: GT concept 'Paraná pines' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'White bollards and stone barriers' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig33.png
+Warning: GT concept 'Chevrons' not found in training set concepts
+Warning: GT concept 'Trident poles' not found in training set concepts
+Warning: GT concept 'Octagonal pole' not found in training set concepts
+Warning: GT concept 'License plate' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig34.png
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Pole' not found in training set concepts
+Warning: GT concept 'Blue water tanks' not found in training set concepts
+Warning: GT concept 'Bollard' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig35.png
+Warning: GT concept 'Kilometer marker' not found in training set concepts
+Warning: GT concept 'Kilometer marker' not found in training set concepts
+Warning: GT concept 'Pickup car' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig36.png
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Pole' not found in training set concepts
+Warning: GT concept 'Paraná pines' not found in training set concepts
+Warning: GT concept 'Rounded electric counter' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig37.png
+Warning: GT concept 'Blue water tanks' not found in training set concepts
+Warning: GT concept 'Yellow plates' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Blue water tanks' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig38.png
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Road marker' not found in training set concepts
+Warning: GT concept 'Landscape + black car' not found in training set concepts
+Warning: GT concept 'License plate' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig39.png
+Warning: GT concept 'Colombian cross' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Pole' not found in training set concepts
+Warning: GT concept 'Pickup car' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig40.png
+Warning: GT concept 'Concrete blocks' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Pole' not found in training set concepts
+Warning: GT concept 'Colombian cross' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig41.png
+Warning: GT concept 'Concrete blocks' not found in training set concepts
+Warning: GT concept 'Paraná pines' not found in training set concepts
+Warning: GT concept 'Sign post' not found in training set concepts
+Warning: GT concept 'Bollard' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig42.png
+Warning: GT concept 'Sign post' not found in training set concepts
+Warning: GT concept 'Sign post' not found in training set concepts
+Warning: GT concept 'Kilometer marker' not found in training set concepts
+Warning: GT concept 'Pickup car' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig43.png
+Warning: GT concept 'Car meta' not found in training set concepts
+Warning: GT concept 'Pickup car' not found in training set concepts
+Warning: GT concept 'White bollards and stone barriers' not found in training set concepts
+Warning: GT concept 'All yellow lines' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig44.png
+Warning: GT concept 'Double concrete pole' not found in training set concepts
+Warning: GT concept 'Chevrons' not found in training set concepts
+Warning: GT concept 'Bollard' not found in training set concepts
+Warning: GT concept 'Electricity counter' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig45.png
+Warning: GT concept 'All yellow lines' not found in training set concepts
+Warning: GT concept 'Bollard' not found in training set concepts
+Warning: GT concept 'Thick Arrows' not found in training set concepts
+Warning: GT concept 'Kilometer marker' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig46.png
+Warning: GT concept 'Pole' not found in training set concepts
+Warning: GT concept 'Thicc white signs post' not found in training set concepts
+Warning: GT concept 'Trident poles' not found in training set concepts
+Warning: GT concept 'Black yellow stripes' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig47.png
+Warning: GT concept 'Thicc white signs post' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Kilometer marker' not found in training set concepts
+Warning: GT concept 'Octagonal pole' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig48.png
+Warning: GT concept 'Yellow plates' not found in training set concepts
+Warning: GT concept 'Octagonal pole' not found in training set concepts
+Warning: GT concept 'Highway markers' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig49.png
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Electricity counter' not found in training set concepts
+Warning: GT concept 'Kilometer marker' not found in training set concepts
+Warning: GT concept 'Pole' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig50.png
+Warning: GT concept 'Trident poles' not found in training set concepts
+Warning: GT concept 'Car meta' not found in training set concepts
+Warning: GT concept 'Black yellow stripes' not found in training set concepts
+Warning: GT concept 'Pole' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig51.png
+Warning: GT concept 'Black back of signs.' not found in training set concepts
+Warning: GT concept 'Kilometer marker' not found in training set concepts
+Warning: GT concept 'Double concrete pole' not found in training set concepts
+Warning: GT concept 'Black back of signs.' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig52.png
+Warning: GT concept 'Black yellow stripes' not found in training set concepts
+Warning: GT concept 'Pole' not found in training set concepts
+Warning: GT concept 'Thick Arrows' not found in training set concepts
+Warning: GT concept 'Rounded electric counter' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig53.png
+Warning: GT concept 'All yellow lines' not found in training set concepts
+Warning: GT concept 'Pickup car' not found in training set concepts
+Warning: GT concept 'Sign post' not found in training set concepts
+Warning: GT concept 'Landscape + black car' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig54.png
+Warning: GT concept 'Thicc white signs post' not found in training set concepts
+Warning: GT concept 'Road marker' not found in training set concepts
+Warning: GT concept 'Electricity counter' not found in training set concepts
+Warning: GT concept 'Road marker' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig55.png
+Warning: GT concept 'Pickup car' not found in training set concepts
+Warning: GT concept 'Black back of signs.' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Double concrete pole' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig56.png
+Warning: GT concept 'Double concrete pole' not found in training set concepts
+Warning: GT concept 'Double concrete pole' not found in training set concepts
+Warning: GT concept 'Bollard' not found in training set concepts
+Warning: GT concept 'Colombian cross' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig57.png
+Warning: GT concept 'Colombian cross' not found in training set concepts
+Warning: GT concept 'Octagonal pole' not found in training set concepts
+Warning: GT concept 'Bollard' not found in training set concepts
+Warning: GT concept 'Pole' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig58.png
+Warning: GT concept 'Thicc white signs post' not found in training set concepts
+Warning: GT concept 'Curvy poles' not found in training set concepts
+Warning: GT concept 'Kilometer marker' not found in training set concepts
+Warning: GT concept 'Pole' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig59.png
+Warning: GT concept 'Concrete blocks' not found in training set concepts
+Warning: GT concept 'Pickup car' not found in training set concepts
+Warning: GT concept 'Bollard' not found in training set concepts
+Warning: GT concept 'Pole' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig60.png
+Warning: GT concept 'Highway markers' not found in training set concepts
+Warning: GT concept 'Road marker' not found in training set concepts
+Warning: GT concept 'Electricity counter' not found in training set concepts
+Warning: GT concept 'Thick Arrows' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig61.png
+Warning: GT concept 'Colombian cross' not found in training set concepts
+Warning: GT concept 'Highway markers' not found in training set concepts
+Warning: GT concept 'Triple road lines' not found in training set concepts
+Warning: GT concept 'Yellow plates' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig62.png
+Warning: GT concept 'Rounded electric counter' not found in training set concepts
+Warning: GT concept 'Concrete blocks' not found in training set concepts
+Warning: GT concept 'License plate' not found in training set concepts
+Warning: GT concept 'License plate' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig63.png
+Warning: GT concept 'Triple road lines' not found in training set concepts
+Warning: GT concept 'Thicc white signs post' not found in training set concepts
+Warning: GT concept 'Triple road lines' not found in training set concepts
+Warning: GT concept 'Pole' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig64.png
+Warning: GT concept 'Thick Arrows' not found in training set concepts
+Warning: GT concept 'Electricity counter' not found in training set concepts
+Warning: GT concept 'Rounded electric counter' not found in training set concepts
+Warning: GT concept 'Pickup car' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig65.png
+Warning: GT concept 'Paraná pines' not found in training set concepts
+Warning: GT concept 'Rounded electric counter' not found in training set concepts
+Warning: GT concept 'Black back of signs.' not found in training set concepts
+Warning: GT concept 'Landscape + black car' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig66.png
+Warning: GT concept 'License plate' not found in training set concepts
+Warning: GT concept 'Kilometer marker' not found in training set concepts
+Warning: GT concept 'Trident poles' not found in training set concepts
+Warning: GT concept 'License plate' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig67.png
+Warning: GT concept 'Concrete blocks' not found in training set concepts
+Warning: GT concept 'Octagonal pole' not found in training set concepts
+Warning: GT concept 'Sign post' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig68.png
+Warning: GT concept 'Sign post' not found in training set concepts
+Warning: GT concept 'Yellow plates' not found in training set concepts
+Warning: GT concept 'Blue water tanks' not found in training set concepts
+Warning: GT concept 'All yellow lines' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig69.png
+Warning: GT concept 'All yellow lines' not found in training set concepts
+Warning: GT concept 'Landscape + black car' not found in training set concepts
+Warning: GT concept 'Pole' not found in training set concepts
+Warning: GT concept 'Chevrons' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig70.png
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Highway markers' not found in training set concepts
+Warning: GT concept 'White bollards and stone barriers' not found in training set concepts
+Warning: GT concept 'Black yellow stripes' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig71.png
+Warning: GT concept 'Bollard' not found in training set concepts
+Warning: GT concept 'Kilometer marker' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Rounded electric counter' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig72.png
+Warning: GT concept 'Kilometer marker' not found in training set concepts
+Warning: GT concept 'Octagonal pole' not found in training set concepts
+Warning: GT concept 'Trident poles' not found in training set concepts
+Warning: GT concept 'Car meta' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig73.png
+Warning: GT concept 'Trident poles' not found in training set concepts
+Warning: GT concept 'Triple road lines' not found in training set concepts
+Warning: GT concept 'Electricity counter' not found in training set concepts
+Warning: GT concept 'Rounded electric counter' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig74.png
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Highway markers' not found in training set concepts
+Warning: GT concept 'Thick Arrows' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig75.png
+Warning: GT concept 'Car meta' not found in training set concepts
+Warning: GT concept 'Road marker' not found in training set concepts
+Warning: GT concept 'Curvy poles' not found in training set concepts
+Warning: GT concept 'Double concrete pole' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig76.png
+Warning: GT concept 'Curvy poles' not found in training set concepts
+Warning: GT concept 'Black back of signs.' not found in training set concepts
+Warning: GT concept 'Bollard' not found in training set concepts
+Warning: GT concept 'License plate' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig77.png
+Warning: GT concept 'Kilometer marker' not found in training set concepts
+Warning: GT concept 'Black back of signs.' not found in training set concepts
+Warning: GT concept 'Curvy poles' not found in training set concepts
+Warning: GT concept 'Electricity counter' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig78.png
+Warning: GT concept 'Rounded electric counter' not found in training set concepts
+Warning: GT concept 'License plate' not found in training set concepts
+Warning: GT concept 'Black back of signs.' not found in training set concepts
+Warning: GT concept 'Sign post' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig79.png
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Thicc white signs post' not found in training set concepts
+Warning: GT concept 'Pole' not found in training set concepts
+Warning: GT concept 'Kilometer marker' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig80.png
+Warning: GT concept 'Trident poles' not found in training set concepts
+Warning: GT concept 'Thicc white signs post' not found in training set concepts
+Warning: GT concept 'Bollard' not found in training set concepts
+Warning: GT concept 'Curvy poles' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig81.png
+Warning: GT concept 'Curvy poles' not found in training set concepts
+Warning: GT concept 'Bollard' not found in training set concepts
+Warning: GT concept 'Bollard' not found in training set concepts
+Warning: GT concept 'Trident poles' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig82.png
+Warning: GT concept 'Pickup car' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Pole' not found in training set concepts
+Warning: GT concept 'Curvy poles' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig83.png
+Warning: GT concept 'Thick Arrows' not found in training set concepts
+Warning: GT concept 'Car meta' not found in training set concepts
+Warning: GT concept 'Highway markers' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig84.png
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Black yellow stripes' not found in training set concepts
+Warning: GT concept 'Unique car' not found in training set concepts
+Warning: GT concept 'Concrete blocks' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig85.png
+Warning: GT concept 'Car meta' not found in training set concepts
+Warning: GT concept 'Black yellow stripes' not found in training set concepts
+Warning: GT concept 'Yellow plates' not found in training set concepts
+Warning: GT concept 'Pole' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig86.png
+Warning: GT concept 'Yellow plates' not found in training set concepts
+Warning: GT concept 'Road marker' not found in training set concepts
+Warning: GT concept 'Blue water tanks' not found in training set concepts
+Warning: GT concept 'White bollards and stone barriers' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig87.png
+Warning: GT concept 'Kilometer marker' not found in training set concepts
+Warning: GT concept 'Pole' not found in training set concepts
+Warning: GT concept 'White bollards and stone barriers' not found in training set concepts
+Warning: GT concept 'Landscape + black car' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig88.png
+Warning: GT concept 'Bollard' not found in training set concepts
+Warning: GT concept 'Black back of signs.' not found in training set concepts
+Warning: GT concept 'Paraná pines' not found in training set concepts
+Warning: GT concept 'Electricity counter' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig89.png
+Warning: GT concept 'Triple road lines' not found in training set concepts
+Warning: GT concept 'Blue water tanks' not found in training set concepts
+Saved visualization to visualizations/test_predictions/test_predictions_fig90.png
+
+All visualizations saved to: visualizations/test_predictions
+Testing finished.
