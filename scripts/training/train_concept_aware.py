@@ -28,7 +28,7 @@ from src.models.streetclip_encoder import StreetCLIPEncoder, StreetCLIPConfig
 from src.models.concept_aware_cbm import ConceptAwareGeoModel
 from src.losses import contrastive_alignment_loss, concept_divergence_loss, coordinate_loss
 from src.concepts.utils import extract_concepts_from_dataset
-from src.evaluation import denormalize_coordinates, haversine_distance, sphere_to_latlng
+from src.evaluation import denormalize_coordinates, haversine_distance, sphere_to_latlng, accuracy_within_threshold
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -822,6 +822,9 @@ def validate(model, val_loader, device, args):
     total_country_correct = 0
     total_country_count = 0
     
+    # Collect all distances for threshold accuracy computation
+    all_distances = []
+    
     for batch in val_loader:
         images, concept_idx, target_idx, coords, _ = batch
         images = images.to(device)
@@ -843,6 +846,11 @@ def validate(model, val_loader, device, args):
         total_country_correct += country_correct
         total_country_count += len(target_idx)
         
+        # Compute distances for threshold accuracy
+        batch_distances = haversine_distance(pred_coords, coords)
+        if batch_distances.numel() > 0:
+            all_distances.append(batch_distances.cpu())
+        
         loss_contrastive = contrastive_alignment_loss(z_img, z_loc, temperature=args.temperature)
         loss_divergence = concept_divergence_loss(z_img, z_loc, sigma=args.sigma)
         loss_concept = nn.functional.cross_entropy(z_img, concept_idx, label_smoothing=args.label_smoothing)
@@ -857,6 +865,29 @@ def validate(model, val_loader, device, args):
         total_concept_loss += loss_concept.item()
         total_country_loss += loss_country.item()
         total_coords_loss += loss_coords.item()
+    
+    # Compute threshold accuracies
+    threshold_accuracies = {}
+    if all_distances:
+        all_distances_tensor = torch.cat(all_distances)
+        thresholds = {
+            'street': 1.0,      # 1 km
+            'city': 25.0,       # 25 km
+            'region': 200.0,    # 200 km
+            'country': 750.0,    # 750 km
+            'continent': 2500.0  # 2500 km
+        }
+        for level, threshold_km in thresholds.items():
+            acc = accuracy_within_threshold(all_distances_tensor, threshold_km)
+            threshold_accuracies[f'acc_{level}'] = acc
+    else:
+        threshold_accuracies = {
+            'acc_street': 0.0,
+            'acc_city': 0.0,
+            'acc_region': 0.0,
+            'acc_country': 0.0,
+            'acc_continent': 0.0
+        }
         
     avg_loss = total_loss / len(val_loader)
     avg_concept_loss = total_concept_loss / len(val_loader)
@@ -864,7 +895,11 @@ def validate(model, val_loader, device, args):
     avg_coords_loss = total_coords_loss / len(val_loader)
     val_concept_acc = total_concept_correct / total_concept_count if total_concept_count > 0 else 0.0
     val_country_acc = total_country_correct / total_country_count if total_country_count > 0 else 0.0
-    logger.info(f"Validation Loss: {avg_loss:.4f}, Concept Loss: {avg_concept_loss:.4f}, Country Loss: {avg_country_loss:.4f}, Coords Loss: {avg_coords_loss:.4f}, Val Concept Acc: {val_concept_acc:.4f}, Val Country Acc: {val_country_acc:.4f}")
+    
+    # Log threshold accuracies
+    log_msg = f"Validation Loss: {avg_loss:.4f}, Concept Loss: {avg_concept_loss:.4f}, Country Loss: {avg_country_loss:.4f}, Coords Loss: {avg_coords_loss:.4f}, Val Concept Acc: {val_concept_acc:.4f}, Val Country Acc: {val_country_acc:.4f}"
+    log_msg += f", Street Acc (1km): {threshold_accuracies['acc_street']:.4f}, City Acc (25km): {threshold_accuracies['acc_city']:.4f}, Region Acc (200km): {threshold_accuracies['acc_region']:.4f}, Country Acc (750km): {threshold_accuracies['acc_country']:.4f}, Continent Acc (2500km): {threshold_accuracies['acc_continent']:.4f}"
+    logger.info(log_msg)
     
     if args.use_wandb:
         wandb.log({
@@ -875,7 +910,12 @@ def validate(model, val_loader, device, args):
             "val_country_loss": avg_country_loss,
             "val_coords_loss": avg_coords_loss,
             "val_concept_accuracy": val_concept_acc,
-            "val_country_accuracy": val_country_acc
+            "val_country_accuracy": val_country_acc,
+            "val_acc_street_1km": threshold_accuracies['acc_street'],
+            "val_acc_city_25km": threshold_accuracies['acc_city'],
+            "val_acc_region_200km": threshold_accuracies['acc_region'],
+            "val_acc_country_750km": threshold_accuracies['acc_country'],
+            "val_acc_continent_2500km": threshold_accuracies['acc_continent']
         })
     
     return {
@@ -884,7 +924,8 @@ def validate(model, val_loader, device, args):
         'concept_acc': val_concept_acc,
         'country_loss': avg_country_loss,
         'coords_loss': avg_coords_loss,
-        'country_acc': val_country_acc
+        'country_acc': val_country_acc,
+        **threshold_accuracies
     }
 
 # ------- Main Entry Point -------
