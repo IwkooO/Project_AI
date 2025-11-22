@@ -30,6 +30,7 @@ class ConceptAwareGeoModel(nn.Module):
         num_countries: int,
         streetclip_dim: int = 768,
         location_encoder_dim: int = 512,
+        coord_output_dim: int = 2,
     ):
         """
         Args:
@@ -39,6 +40,7 @@ class ConceptAwareGeoModel(nn.Module):
             num_countries: Number of countries (c)
             streetclip_dim: Output dimension of StreetCLIP encoder
             location_encoder_dim: Output dimension of LocationEncoder (default 512)
+            coord_output_dim: Output dimension for coordinate head (2 for lat/lng, 3 for sphere)
         """
         super().__init__()
         self.image_encoder = image_encoder
@@ -46,6 +48,7 @@ class ConceptAwareGeoModel(nn.Module):
         self.num_concepts = num_concepts
         self.num_countries = num_countries
         self.streetclip_dim = streetclip_dim
+        self.coord_output_dim = coord_output_dim
         
         # Ensure concept features are float32 and on the correct device (handled in forward/to)
         # We register E_concept as a buffer so it's saved with the model but not updated by optimizer
@@ -76,14 +79,14 @@ class ConceptAwareGeoModel(nn.Module):
             nn.Linear(256, num_countries)
         )
         
-        # Coordinate Regression Head: Maps concept activations to (lat, lng)
-        # Input: k (concepts), Output: 2 (lat, lng)
+        # Coordinate Regression Head: Maps concept activations to coordinates
+        # Input: k (concepts), Output: coord_output_dim (2 or 3)
         self.coord_head = nn.Sequential(
             nn.Linear(num_concepts, 256),
             nn.LayerNorm(256),
             nn.GELU(),
             nn.Dropout(0.3),
-            nn.Linear(256, 2)
+            nn.Linear(256, coord_output_dim)
         )
 
         # Location Adapter: Maps LocationEncoder output (512) to StreetCLIP dimension
@@ -127,6 +130,10 @@ class ConceptAwareGeoModel(nn.Module):
         
         # Predict coordinates from concept activations
         pred_coords = self.coord_head(z_img)
+        
+        # If predicting 3D sphere coordinates, normalize to unit sphere
+        if self.coord_output_dim == 3:
+            pred_coords = F.normalize(pred_coords, p=2, dim=1)
         
         # If no GPS coordinates provided, return image concept vector, country logits, and pred_coords (Inference mode)
         if gps_coords is None:

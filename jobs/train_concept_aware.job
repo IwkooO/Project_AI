@@ -22,7 +22,7 @@ export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
 # Run training
 python scripts/training/train_concept_aware.py \
     --encoder_model "geolocal/StreetCLIP" \
-    --batch_size 12 \
+    --batch_size 128 \
     --epochs 20 \
     --lr 3e-4 \
     --weight_decay 0.1 \
@@ -31,7 +31,8 @@ python scripts/training/train_concept_aware.py \
     --label_smoothing 0.1 \
     --early_stopping_patience 5 \
     --save_interval 5 \
-    --use_wandb \
-    --country_filter "India" \
+    --use_wandb #\
+    #--country_filter "South America" \
+    #--coordinate_loss_type "haversine" \
 
 

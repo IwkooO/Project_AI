@@ -28,7 +28,7 @@ from src.models.streetclip_encoder import StreetCLIPEncoder, StreetCLIPConfig
 from src.models.concept_aware_cbm import ConceptAwareGeoModel
 from src.losses import contrastive_alignment_loss, concept_divergence_loss, coordinate_loss
 from src.concepts.utils import extract_concepts_from_dataset
-from src.evaluation import denormalize_coordinates, haversine_distance
+from src.evaluation import denormalize_coordinates, haversine_distance, sphere_to_latlng
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -127,21 +127,31 @@ def visualize_predictions(model, val_loader, concept_names, idx_to_country, devi
             gt_country = metadata[i]['country']
             
             # Get predicted coordinates from the regression head
-            pred_coords_np = pred_coords[i].cpu().numpy()
+            pred_coords_raw = pred_coords[i].detach().cpu()
             
-            # If coordinates are normalized, denormalize them. The dataset returns raw degrees,
-            # but model output might need checking depending on how it was trained.
-            # Based on recent fixes, dataset returns raw degrees and model learns raw degrees.
-            # But let's be safe and check if we need to denormalize if they are small.
-            # ACTUALLY, in this script we set use_normalized_coordinates=False, so they are raw degrees.
-            pred_lat = pred_coords_np[0]
-            pred_lng = pred_coords_np[1]
+            # Handle 3D sphere coordinates -> 2D lat/lng
+            if pred_coords_raw.shape[0] == 3:
+                # sphere_to_latlng expects [N, 3], so unsqueeze
+                pred_coords_deg = sphere_to_latlng(pred_coords_raw.unsqueeze(0)).squeeze(0)
+                pred_lat = pred_coords_deg[0].item()
+                pred_lng = pred_coords_deg[1].item()
+            else:
+                # 2D output (assumed raw degrees)
+                pred_coords_np = pred_coords_raw.numpy()
+                pred_lat = pred_coords_np[0]
+                pred_lng = pred_coords_np[1]
             
             # Calculate Haversine distance
             # We need to use the same distance function as training/eval
             # Convert to tensors for haversine_distance
             gt_coord_tensor = coords[i].unsqueeze(0)
-            pred_coord_tensor = pred_coords[i].unsqueeze(0)
+            
+            # Ensure pred_coord_tensor is appropriate for haversine_distance
+            if pred_coords_raw.shape[0] == 3:
+                pred_coord_tensor = torch.tensor([pred_lat, pred_lng], device=device).unsqueeze(0)
+            else:
+                pred_coord_tensor = pred_coords[i].unsqueeze(0)
+                
             distance_km = haversine_distance(pred_coord_tensor, gt_coord_tensor).item()
             
             # Classification Prediction
@@ -174,7 +184,7 @@ def visualize_predictions(model, val_loader, concept_names, idx_to_country, devi
             title = f"Epoch {epoch} | Image ID: {metadata[i]['pano_id']}\n"
             title += f"Country: Pred: {pred_country_cls} | True: {gt_country}\n"
             title += f"Coords: Pred({pred_lat:.3f}, {pred_lng:.3f}) | True({gt_lat:.3f}, {gt_lng:.3f})\n"
-            title += f"Concept: GT: {gt_concept_name} | Pred: {top_concept_name}" + f"✗" if gt_concept_idx == top_concept_idx else f"✓" + f"\n"
+            title += f"Concept: GT: {gt_concept_name} | Pred: {top_concept_name}\n"
             title += f"Dist Error: {distance_km:.1f} km"
             
             ax_img.set_title(title, fontsize=10)
@@ -235,9 +245,6 @@ def dump_diagnostics(
     model.eval()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     rows = []
-
-    # We will use in-batch retrieval for location prediction in diagnostics for now,
-    # consistent with visualize_predictions.
     
     for batch in dataloader:
         if len(rows) >= max_samples:
@@ -258,21 +265,6 @@ def dump_diagnostics(
         # Country probabilities
         country_probs = torch.softmax(country_logits, dim=1)
         
-        # In-Batch Retrieval for Location (exclude self if possible? No, for diagnostics 
-        # we ideally want to see if it retrieves the correct one, but if we are 
-        # using the same batch, it might trivially retrieve itself. 
-        # However, typically retrieval is done against a gallery. 
-        # Here we just do in-batch retrieval as a proxy.)
-        z_img_norm = torch.nn.functional.normalize(z_img, p=2, dim=1)
-        z_loc_norm = torch.nn.functional.normalize(z_loc, p=2, dim=1)
-        similarity = torch.matmul(z_img_norm, z_loc_norm.t())
-        
-        # Mask self for retrieval to be non-trivial
-        mask = torch.eye(len(images), device=similarity.device, dtype=torch.bool)
-        similarity_masked = similarity.masked_fill(mask, float('-inf'))
-        
-        best_loc_indices = similarity_masked.argmax(dim=1)
-        
         for i in range(len(images)):
             if len(rows) >= max_samples:
                 break
@@ -289,17 +281,28 @@ def dump_diagnostics(
             true_country_idx_val = target_idx[i].item()
             true_country_cls = idx_to_country[true_country_idx_val]
             
-            # Location info (Retrieval based)
-            best_loc_idx = best_loc_indices[i].item()
-            
+            # Location info (regression based)
             gt_lat = metadata[i]['lat']
             gt_lng = metadata[i]['lng']
-            pred_lat = metadata[best_loc_idx]['lat']
-            pred_lng = metadata[best_loc_idx]['lng']
+            
+            # Get coordinate prediction from regression head
+            pred_coords_raw = pred_coords[i].detach().cpu()
+            if pred_coords_raw.shape[0] == 3:
+                pred_coords_deg = sphere_to_latlng(pred_coords_raw.unsqueeze(0)).squeeze(0)
+                pred_lat = pred_coords_deg[0].item()
+                pred_lng = pred_coords_deg[1].item()
+            else:
+                pred_coords_np = pred_coords_raw.numpy()
+                pred_lat = pred_coords_np[0]
+                pred_lng = pred_coords_np[1]
             
             # Calculate distance
             gt_coord_tensor = coords[i].unsqueeze(0)
-            pred_coord_tensor = coords[best_loc_idx].unsqueeze(0)
+            if pred_coords_raw.shape[0] == 3:
+                pred_coord_tensor = torch.tensor([pred_lat, pred_lng], device=device).unsqueeze(0)
+            else:
+                pred_coord_tensor = pred_coords[i].unsqueeze(0)
+            
             distance_km = haversine_distance(pred_coord_tensor, gt_coord_tensor).item()
             
             # Build row dict - only include pano_id if it exists in metadata
@@ -552,13 +555,18 @@ def train(args):
     assert E_concept.shape[1] == actual_feature_dim, \
         f"Concept basis dimension {E_concept.shape[1]} must match vision encoder dimension {actual_feature_dim}"
     
+    # Determine coordinate output dimension
+    coord_output_dim = 3 if args.coordinate_loss_type == "sphere" else 2
+    logger.info(f"Coordinate output dimension: {coord_output_dim}")
+
     model = ConceptAwareGeoModel(
         image_encoder=image_encoder,
         concept_features=E_concept,
         num_concepts=len(concept_names),
         num_countries=len(full_dataset.country_to_idx),
         streetclip_dim=actual_feature_dim,
-        location_encoder_dim=512 # GeoCLIP default
+        location_encoder_dim=512, # GeoCLIP default
+        coord_output_dim=coord_output_dim
     )
     model.to(device)
 
