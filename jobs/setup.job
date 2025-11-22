@@ -15,6 +15,6 @@ module load Anaconda3/2025.06-1
 conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main
 conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
 
-cd $HOME/Project_AI/
+cd /scratch-shared/pnair/Project_AI/
 conda env create -f environment.yml
 

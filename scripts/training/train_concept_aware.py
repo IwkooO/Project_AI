@@ -6,6 +6,8 @@ Training script for Concept-Aware Global Image-GPS Alignment.
 import argparse
 import logging
 import os
+import csv
+from typing import Dict, Tuple, List, Optional
 from pathlib import Path
 import io
 
@@ -18,8 +20,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from collections import Counter
 from PIL import Image as PILImage
-
+from datetime import datetime
+import pandas as pd
 from src.dataset import PanoramaCBMDataset, create_splits_stratified, get_transforms_from_processor
+from src.iwo_dataset import CBMDataset
 from src.models.streetclip_encoder import StreetCLIPEncoder, StreetCLIPConfig
 from src.models.concept_aware_cbm import ConceptAwareGeoModel
 from src.losses import contrastive_alignment_loss, concept_divergence_loss
@@ -28,6 +32,13 @@ from src.evaluation import denormalize_coordinates, haversine_distance
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Mapping from encoder model names to short names for directory/file naming
+ENCODER_MODEL_TO_NAME = {
+    "geolocal/StreetCLIP": "streetclip",
+    "facebook/dinov3-vit7b16-pretrain-lvd1689m": "dinov3",
+    "facebook/dinov2-base": "dinov2",
+}
 
 def collate_batch(batch):
     """
@@ -43,24 +54,29 @@ def collate_batch(batch):
     return images, concept_indices, target_indices, coordinates, metadata
 
 @torch.no_grad()
-def visualize_predictions(model, val_loader, concept_names, device, args, num_samples=5):
+def visualize_predictions(model, val_loader, concept_names, idx_to_country, device, args, checkpoint_dir, epoch, num_samples=4):
     """
     Visualize top predicted concepts and in-batch location retrieval for validation samples.
-    Creates separate charts for each sample and logs to wandb if enabled.
+    Creates a single combined chart for all samples, saves it to disk, and logs to wandb if enabled.
     Self-matches are masked out (diagonal of similarity matrix set to -inf) to ensure
     proper retrieval evaluation. Only uses validation set (unseen during training).
     """
     model.eval()
     logger.info(f"\n=== Visualizing Predictions (Top 5 Concepts & In-Batch Retrieval) ===")
     
+    # Create visualization directory
+    viz_dir = checkpoint_dir / "visualizations" / f"epoch_{epoch}"
+    viz_dir.mkdir(parents=True, exist_ok=True)
+    
     # Get a batch
     for batch in val_loader:
-        images, _, _, coords, metadata = batch
+        images, concept_indices, _, coords, metadata = batch
         images = images.to(device)
         coords = coords.to(device)
+        concept_indices = concept_indices.to(device)
         
         # Forward pass
-        z_img, z_loc = model(images, coords)
+        z_img, z_loc, country_logits = model(images, coords)
         
         # In-Batch Retrieval Similarity
         z_img_norm = torch.nn.functional.normalize(z_img, p=2, dim=1)
@@ -72,17 +88,21 @@ def visualize_predictions(model, val_loader, concept_names, device, args, num_sa
         mask = torch.eye(len(images), device=similarity.device, dtype=torch.bool)
         similarity_masked = similarity.masked_fill(mask, float('-inf'))
         
-        # Create separate figures for each sample (excluding self-matches)
-        samples_visualized = 0
-        for i in range(len(images)):
-            if samples_visualized >= num_samples:
-                break
-                
+        # Create single figure for all samples
+        # Height per sample = 4 inches, Width = 15 inches
+        n_display = min(len(images), num_samples)
+        fig, axes = plt.subplots(n_display, 2, figsize=(15, 4 * n_display))
+        
+        # Handle case where num_samples=1 (axes is 1D array)
+        if n_display == 1:
+            axes = axes.reshape(1, -1)
+            
+        for i in range(n_display):
             # Find best match (diagonal is masked, so no self-matches possible)
             best_loc_idx = similarity_masked[i].argmax().item()
             
-            # Create separate figure for this sample
-            fig, axes = plt.subplots(1, 2, figsize=(15, 4))
+            ax_img = axes[i, 0]
+            ax_bar = axes[i, 1]
             
             # 1. Image & Concepts
             probs = z_img[i]
@@ -98,11 +118,10 @@ def visualize_predictions(model, val_loader, concept_names, device, args, num_sa
             img_disp = np.clip(img_disp, 0, 1)
             
             # Left column: Image + Retrieval Info
-            axes[0].imshow(img_disp)
-            axes[0].axis('off')
+            ax_img.imshow(img_disp)
+            ax_img.axis('off')
             
             # Retrieval Info
-            # metadata is now a list of dicts, not a dict of lists
             gt_lat = metadata[i]['lat']
             gt_lng = metadata[i]['lng']
             gt_country = metadata[i]['country']
@@ -110,45 +129,210 @@ def visualize_predictions(model, val_loader, concept_names, device, args, num_sa
             pred_lng = metadata[best_loc_idx]['lng']
             pred_country = metadata[best_loc_idx]['country']
             
+            # Classification Prediction
+            pred_country_idx = country_logits[i].argmax().item()
+            pred_country_cls = idx_to_country[pred_country_idx]
+            
             # Convert to tensors for haversine_distance if needed
             gt_coord_tensor = coords[i].unsqueeze(0)
             pred_coord_tensor = coords[best_loc_idx].unsqueeze(0)
             distance_km = haversine_distance(pred_coord_tensor, gt_coord_tensor).item()
             
             title = f"GT: {gt_country} ({gt_lat:.2f}, {gt_lng:.2f})\n"
-            title += f"Pred: {pred_country} ({pred_lat:.2f}, {pred_lng:.2f})\n"
+            title += f"Pred (Ret): {pred_country} ({pred_lat:.2f}, {pred_lng:.2f})\n"
+            title += f"Pred (Cls): {pred_country_cls}\n"
             title += f"Error: {distance_km:.1f} km"
             
-            axes[0].set_title(title, fontsize=10)
+            ax_img.set_title(title, fontsize=10)
             
             # Right column: Bar Chart of Concepts
             scores_np = top_scores.cpu().numpy()
             concepts_np = [concept_names[idx.item()] for idx in top_indices]
+            top_indices_cpu = top_indices.cpu().numpy()
+            gt_concept_idx = concept_indices[i].item()
+            
+            # Color logic: Orange if GT, else SteelBlue
+            bar_colors = ['orange' if idx == gt_concept_idx else 'steelblue' for idx in top_indices_cpu]
+            
             y_pos = np.arange(len(concepts_np))
             
-            axes[1].barh(y_pos, scores_np, align='center')
-            axes[1].set_yticks(y_pos)
-            axes[1].set_yticklabels(concepts_np)
-            axes[1].invert_yaxis()  # labels read top-to-bottom
-            axes[1].set_xlabel('Activation Score')
-            axes[1].set_title(f"GT Concept: {metadata[i]['meta_name']}")
+            ax_bar.barh(y_pos, scores_np, align='center', color=bar_colors)
+            ax_bar.set_yticks(y_pos)
+            ax_bar.set_yticklabels(concepts_np)
+            ax_bar.invert_yaxis()  # labels read top-to-bottom
+            ax_bar.set_xlabel('Activation Score')
+            ax_bar.set_title(f"GT Concept: {metadata[i]['meta_name']}")
 
-            plt.tight_layout()
-            
-            # Log to WandB with unique key for each sample
-            if args.use_wandb:
-                # Convert plot to image
-                buf = io.BytesIO()
-                plt.savefig(buf, format='png', dpi=100)
-                buf.seek(0)
-                pil_img = PILImage.open(buf)
-                wandb.log({f"prediction_viz_sample_{samples_visualized}": wandb.Image(pil_img)})
-                buf.close()
-            
-            plt.close(fig)
-            samples_visualized += 1
+        plt.tight_layout()
         
+        # Save to disk as one combined image
+        save_path = viz_dir / f"combined_epoch_{epoch}.png"
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        
+        if args.use_wandb:
+            wandb.log({f"predictions/epoch_{epoch}": wandb.Image(str(save_path), caption=f"Epoch {epoch} Predictions")})
+        
+        plt.close(fig)
+        logger.info(f"Saved combined visualization to {save_path}")
         break # Only one batch
+
+@torch.no_grad()
+def dump_diagnostics(
+    model,
+    dataloader,
+    device,
+    output_path: Path,
+    concept_names: List[str],
+    idx_to_country: Dict[int, str],
+    max_samples: int = 64,
+    log_to_wandb: bool = False,
+    wandb_step: Optional[int] = None,
+):
+    model.eval()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    rows = []
+
+    # We will use in-batch retrieval for location prediction in diagnostics for now,
+    # consistent with visualize_predictions.
+    
+    for batch in dataloader:
+        if len(rows) >= max_samples:
+            break
+            
+        images, concept_idx, target_idx, coords, metadata = batch
+        images = images.to(device)
+        coords = coords.to(device)
+        concept_idx = concept_idx.to(device)
+        target_idx = target_idx.to(device)
+        
+        # Forward pass
+        z_img, z_loc, country_logits = model(images, coords)
+        
+        # Concept probabilities
+        concept_probs = torch.softmax(z_img, dim=1)
+        
+        # Country probabilities
+        country_probs = torch.softmax(country_logits, dim=1)
+        
+        # In-Batch Retrieval for Location (exclude self if possible? No, for diagnostics 
+        # we ideally want to see if it retrieves the correct one, but if we are 
+        # using the same batch, it might trivially retrieve itself. 
+        # However, typically retrieval is done against a gallery. 
+        # Here we just do in-batch retrieval as a proxy.)
+        z_img_norm = torch.nn.functional.normalize(z_img, p=2, dim=1)
+        z_loc_norm = torch.nn.functional.normalize(z_loc, p=2, dim=1)
+        similarity = torch.matmul(z_img_norm, z_loc_norm.t())
+        
+        # Mask self for retrieval to be non-trivial
+        mask = torch.eye(len(images), device=similarity.device, dtype=torch.bool)
+        similarity_masked = similarity.masked_fill(mask, float('-inf'))
+        
+        best_loc_indices = similarity_masked.argmax(dim=1)
+        
+        for i in range(len(images)):
+            if len(rows) >= max_samples:
+                break
+                
+            # Concept info
+            top_concept_idx = concept_probs[i].argmax().item()
+            top_concept = concept_names[top_concept_idx]
+            true_concept_idx_val = concept_idx[i].item()
+            true_concept = concept_names[true_concept_idx_val]
+            
+            # Country info
+            pred_country_idx = country_probs[i].argmax().item()
+            pred_country_cls = idx_to_country[pred_country_idx]
+            true_country_idx_val = target_idx[i].item()
+            true_country_cls = idx_to_country[true_country_idx_val]
+            
+            # Location info (Retrieval based)
+            best_loc_idx = best_loc_indices[i].item()
+            
+            gt_lat = metadata[i]['lat']
+            gt_lng = metadata[i]['lng']
+            pred_lat = metadata[best_loc_idx]['lat']
+            pred_lng = metadata[best_loc_idx]['lng']
+            
+            # Calculate distance
+            gt_coord_tensor = coords[i].unsqueeze(0)
+            pred_coord_tensor = coords[best_loc_idx].unsqueeze(0)
+            distance_km = haversine_distance(pred_coord_tensor, gt_coord_tensor).item()
+            
+            rows.append({
+                "pano_id": metadata[i]["pano_id"],
+                "pred_lat": float(pred_lat),
+                "pred_lng": float(pred_lng),
+                "true_lat": float(gt_lat),
+                "true_lng": float(gt_lng),
+                "distance_km": distance_km,
+                "top_concept": top_concept,
+                "true_concept": true_concept,
+                "pred_country_cls": pred_country_cls,
+                "true_country_cls": true_country_cls,
+                "concept_correct": bool(top_concept_idx == true_concept_idx_val),
+                "country_correct": bool(pred_country_idx == true_country_idx_val)
+            })
+
+    if not rows:
+        return
+
+    fieldnames = list(rows[0].keys())
+    with output_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+        
+    logger.info(f"Dumped {len(rows)} diagnostic samples to {output_path}")
+
+    if log_to_wandb:
+        table = wandb.Table(columns=fieldnames)
+        for row in rows:
+            table.add_data(*[row[col] for col in fieldnames])
+        wandb.log({f"diagnostics/{output_path.stem}": table}, step=wandb_step)
+
+def create_checkpoint_dir(
+    encoder_model: str = None,
+    country_filter: str = None,
+) -> Path:
+    """Create checkpoint directory with format:
+    results/concept-aware/<encoder_name>/<country>/<timestamp>/
+    where:
+    - encoder_name: sanitized encoder model name (replace "/" with "-")
+    - country: country name or "global" if no country filter
+    - timestamp: formatted date and time (YYYY-MM-DD_HH-MM-SS)
+
+    Creates subdirectories: checkpoints/, logs/, visualizations/, diagnostics/
+    """
+    now = datetime.now()
+    timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
+
+    # Encoder name: sanitize model name (replace "/" with "-")
+    if encoder_model:
+        encoder_name = ENCODER_MODEL_TO_NAME.get(encoder_model, encoder_model)
+        encoder_name = encoder_name.replace("/", "-")
+    else:
+        encoder_name = "unknown"
+
+    # Country: use filter or "global" if None
+    country = country_filter if country_filter else "global"
+
+    # Create full directory structure
+    timestamp_dir = (
+        Path("results")
+        / "concept-aware"
+        / encoder_name
+        / country
+        / timestamp
+    )
+    timestamp_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create subdirectories
+    (timestamp_dir / "checkpoints").mkdir(exist_ok=True)
+    (timestamp_dir / "logs").mkdir(exist_ok=True)
+    (timestamp_dir / "visualizations").mkdir(exist_ok=True)
+    (timestamp_dir / "diagnostics").mkdir(exist_ok=True)
+
+    return timestamp_dir
 
 def train(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -165,6 +349,7 @@ def train(args):
         require_coordinates=True,
         country=args.country_filter 
     )
+    #full_dataset = CBMDataset(dataframe=pd.read_csv("/scratch-shared/pnair/Project_AI/data/sa-dataset.csv"))
     
     # Diagnostic: Check concept distribution
     all_concepts = [s['meta_name'] for s in full_dataset.samples]
@@ -205,8 +390,17 @@ def train(args):
         collate_fn=collate_batch
     )
     
-    logger.info(f"Split sizes: Train={len(train_dataset)}, Val={len(val_dataset)}, Test={len(test_samples)}")
-    logger.info(f"Batches per epoch: Train={len(train_loader)}, Val={len(val_loader)}")
+    test_dataset = SubsetDataset(full_dataset, test_samples)
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=4,
+        collate_fn=collate_batch
+    )
+    
+    logger.info(f"Split sizes: Train={len(train_dataset)}, Val={len(val_dataset)}, Test={len(test_dataset)}")
+    logger.info(f"Batches per epoch: Train={len(train_loader)}, Val={len(val_loader)}, Test={len(test_loader)}")
     
     # Check train concept distribution
     train_concepts = [s['meta_name'] for s in train_samples]
@@ -303,6 +497,7 @@ def train(args):
         image_encoder=image_encoder,
         concept_features=E_concept,
         num_concepts=len(concept_names),
+        num_countries=len(full_dataset.country_to_idx),
         streetclip_dim=actual_feature_dim,
         location_encoder_dim=512 # GeoCLIP default
     )
@@ -320,9 +515,51 @@ def train(args):
         optimizer, mode='min', factor=0.5, patience=3, verbose=True
     )
 
-    # 5. Training Loop
+    # 5. Setup Output Directory
+    if args.output_dir is None:
+        checkpoint_dir = create_checkpoint_dir(
+            encoder_model=args.encoder_model,
+            country_filter=args.country_filter
+        )
+    else:
+        checkpoint_dir = Path(args.output_dir)
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        # Ensure subdirectories exist
+        (checkpoint_dir / "checkpoints").mkdir(exist_ok=True)
+        (checkpoint_dir / "logs").mkdir(exist_ok=True)
+        (checkpoint_dir / "visualizations").mkdir(exist_ok=True)
+        (checkpoint_dir / "diagnostics").mkdir(exist_ok=True)
+    
+    logger.info(f"Checkpoint directory: {checkpoint_dir}")
+    
+    # Setup file logging
+    log_file = checkpoint_dir / "logs" / "training.log"
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setLevel(logging.INFO)
+    file_formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    file_handler.setFormatter(file_formatter)
+    logger.addHandler(file_handler)
+    logger.info(f"Logging to {log_file}")
+
+    # 6. Training Loop
     if args.use_wandb:
-        wandb.init(project="concept-aware-geolocation", config=args)
+        # Create tags
+        tags = [
+            args.encoder_model,
+            args.country_filter if args.country_filter else "global",
+            "finetuned" if args.finetune_encoder else "frozen",
+            "concept_aware"
+        ]
+        
+        wandb.init(
+            project="concept-aware-geolocation",
+            name=f"concept-aware-geolocation-{args.country_filter if args.country_filter else 'global'}-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
+            config=args,
+            tags=tags,
+            dir=str(checkpoint_dir)
+        )
 
     logger.info("Starting training...")
     best_val_acc = 0.0
@@ -333,22 +570,26 @@ def train(args):
         total_contrastive = 0
         total_divergence = 0
         total_concept_loss = 0
+        total_country_loss = 0
         
         pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{args.epochs}")
         total_concept_correct = 0
         total_concept_count = 0
+        total_country_correct = 0
+        total_country_count = 0
         
         for batch in pbar:
             # Unpack batch
             # image, concept_idx, target_idx, coordinates, metadata
-            images, concept_idx, _, coords, _ = batch
+            images, concept_idx, target_idx, coords, _ = batch
             
             images = images.to(device)
             coords = coords.to(device)
             concept_idx = concept_idx.to(device)
+            target_idx = target_idx.to(device)
             
             # Forward
-            z_img, z_loc = model(images, coords)
+            z_img, z_loc, country_logits = model(images, coords)
             
             # Compute concept accuracy
             pred_concepts = z_img.argmax(dim=1)
@@ -356,13 +597,21 @@ def train(args):
             total_concept_correct += concept_correct
             total_concept_count += len(concept_idx)
             
+            # Compute country accuracy
+            pred_countries = country_logits.argmax(dim=1)
+            country_correct = (pred_countries == target_idx).sum().item()
+            total_country_correct += country_correct
+            total_country_count += len(target_idx)
+            
             # Loss
             loss_contrastive = contrastive_alignment_loss(z_img, z_loc, temperature=args.temperature)
             loss_divergence = concept_divergence_loss(z_img, z_loc, sigma=args.sigma)
             # Use label smoothing to reduce overfitting
             loss_concept = nn.functional.cross_entropy(z_img, concept_idx, label_smoothing=args.label_smoothing)
+            # Country loss
+            loss_country = nn.functional.cross_entropy(country_logits, target_idx, label_smoothing=args.label_smoothing)
             
-            loss = loss_contrastive + args.lambda_divergence * loss_divergence + args.lambda_concept * loss_concept
+            loss = loss_contrastive + args.lambda_divergence * loss_divergence + args.lambda_concept * loss_concept + args.lambda_country * loss_country
             
             # Backward
             optimizer.zero_grad()
@@ -374,15 +623,19 @@ def train(args):
             total_contrastive += loss_contrastive.item()
             total_divergence += loss_divergence.item()
             total_concept_loss += loss_concept.item()
+            total_country_loss += loss_country.item()
             
             batch_concept_acc = concept_correct / len(concept_idx)
+            batch_country_acc = country_correct / len(target_idx)
             
             pbar.set_postfix({
                 "loss": f"{loss.item():.4f}", 
                 "cont": f"{loss_contrastive.item():.4f}",
                 "div": f"{loss_divergence.item():.4f}",
                 "cls": f"{loss_concept.item():.4f}",
-                "concept_acc": f"{batch_concept_acc:.3f}"
+                "ctry": f"{loss_country.item():.4f}",
+                "concept_acc": f"{batch_concept_acc:.3f}",
+                "country_acc": f"{batch_country_acc:.3f}"
             })
             
             if args.use_wandb:
@@ -391,20 +644,26 @@ def train(args):
                     "batch_contrastive": loss_contrastive.item(),
                     "batch_divergence": loss_divergence.item(),
                     "batch_concept_loss": loss_concept.item(),
-                    "batch_concept_accuracy": batch_concept_acc
+                    "batch_country_loss": loss_country.item(),
+                    "batch_concept_accuracy": batch_concept_acc,
+                    "batch_country_accuracy": batch_country_acc
                 })
 
         # Validation
         avg_train_loss = total_loss / len(train_loader)
         avg_train_concept_loss = total_concept_loss / len(train_loader)
+        avg_train_country_loss = total_country_loss / len(train_loader)
         train_concept_acc = total_concept_correct / total_concept_count if total_concept_count > 0 else 0.0
-        logger.info(f"Epoch {epoch+1} Train Loss: {avg_train_loss:.4f}, Concept Loss: {avg_train_concept_loss:.4f}, Train Concept Acc: {train_concept_acc:.4f}")
+        train_country_acc = total_country_correct / total_country_count if total_country_count > 0 else 0.0
+        logger.info(f"Epoch {epoch+1} Train Loss: {avg_train_loss:.4f}, Concept Loss: {avg_train_concept_loss:.4f}, Country Loss: {avg_train_country_loss:.4f}, Train Concept Acc: {train_concept_acc:.4f}, Train Country Acc: {train_country_acc:.4f}")
         
         if args.use_wandb:
             wandb.log({
                 "train_loss": avg_train_loss,
                 "train_concept_loss": avg_train_concept_loss,
-                "train_concept_accuracy": train_concept_acc
+                "train_country_loss": avg_train_country_loss,
+                "train_concept_accuracy": train_concept_acc,
+                "train_country_accuracy": train_country_acc
             })
         
         val_metrics = validate(model, val_loader, device, args)
@@ -418,8 +677,7 @@ def train(args):
             best_val_acc = val_concept_acc
             patience_counter = 0
             # Save best model
-            best_model_path = Path(args.output_dir) / "best_model.pt"
-            best_model_path.parent.mkdir(parents=True, exist_ok=True)
+            best_model_path = checkpoint_dir / "checkpoints" / "best_model.pt"
             torch.save(model.state_dict(), best_model_path)
             logger.info(f"Saved best model with Val Concept Acc: {best_val_acc:.4f}")
         else:
@@ -428,16 +686,55 @@ def train(args):
                 logger.info(f"Early stopping triggered after {epoch+1} epochs. Best Val Acc: {best_val_acc:.4f}")
                 break
         
-        # Visualization
+        # Visualization & Diagnostics
         if (epoch + 1) % args.save_interval == 0:
-             visualize_predictions(model, val_loader, concept_names, device, args)
+             visualize_predictions(model, val_loader, concept_names, full_dataset.idx_to_country, device, args, checkpoint_dir, epoch + 1)
+             
+             # Diagnostics
+             diag_path = checkpoint_dir / "diagnostics" / f"epoch_{epoch+1}.csv"
+             dump_diagnostics(
+                 model, 
+                 val_loader, 
+                 device, 
+                 diag_path, 
+                 concept_names,
+                 full_dataset.idx_to_country,
+                 log_to_wandb=args.use_wandb, 
+                 wandb_step=epoch+1
+             )
 
         # Checkpoint
         if (epoch + 1) % args.save_interval == 0:
-            save_path = Path(args.output_dir) / f"checkpoint_epoch_{epoch+1}.pt"
-            save_path.parent.mkdir(parents=True, exist_ok=True)
+            save_path = checkpoint_dir / "checkpoints" / f"checkpoint_epoch_{epoch+1}.pt"
             torch.save(model.state_dict(), save_path)
             logger.info(f"Saved checkpoint to {save_path}")
+
+    # Final Test Evaluation
+    logger.info("Evaluating on test set...")
+    # Load best model if saved
+    best_model_path = checkpoint_dir / "checkpoints" / "best_model.pt"
+    if best_model_path.exists():
+        model.load_state_dict(torch.load(best_model_path))
+        logger.info("Loaded best model for testing.")
+        
+    test_metrics = validate(model, test_loader, device, args)
+    logger.info(f"Test Metrics: {test_metrics}")
+    
+    if args.use_wandb:
+        wandb.log({f"test/{k}": v for k, v in test_metrics.items()})
+        
+        # Dump test diagnostics
+        test_diag_path = checkpoint_dir / "diagnostics" / "test_diagnostics.csv"
+        dump_diagnostics(
+            model, 
+            test_loader, 
+            device, 
+            test_diag_path, 
+            concept_names,
+            full_dataset.idx_to_country,
+            max_samples=len(test_dataset), # Dump all test samples
+            log_to_wandb=True
+        )
 
 
 @torch.no_grad()
@@ -447,16 +744,20 @@ def validate(model, val_loader, device, args):
     total_contrastive = 0
     total_divergence = 0
     total_concept_loss = 0
+    total_country_loss = 0
     total_concept_correct = 0
     total_concept_count = 0
+    total_country_correct = 0
+    total_country_count = 0
     
     for batch in val_loader:
-        images, concept_idx, _, coords, _ = batch
+        images, concept_idx, target_idx, coords, _ = batch
         images = images.to(device)
         coords = coords.to(device)
         concept_idx = concept_idx.to(device)
+        target_idx = target_idx.to(device)
         
-        z_img, z_loc = model(images, coords)
+        z_img, z_loc, country_logits = model(images, coords)
         
         # Compute concept accuracy
         pred_concepts = z_img.argmax(dim=1)
@@ -464,21 +765,31 @@ def validate(model, val_loader, device, args):
         total_concept_correct += concept_correct
         total_concept_count += len(concept_idx)
         
+        # Compute country accuracy
+        pred_countries = country_logits.argmax(dim=1)
+        country_correct = (pred_countries == target_idx).sum().item()
+        total_country_correct += country_correct
+        total_country_count += len(target_idx)
+        
         loss_contrastive = contrastive_alignment_loss(z_img, z_loc, temperature=args.temperature)
         loss_divergence = concept_divergence_loss(z_img, z_loc, sigma=args.sigma)
         loss_concept = nn.functional.cross_entropy(z_img, concept_idx, label_smoothing=args.label_smoothing)
+        loss_country = nn.functional.cross_entropy(country_logits, target_idx, label_smoothing=args.label_smoothing)
         
-        loss = loss_contrastive + args.lambda_divergence * loss_divergence + args.lambda_concept * loss_concept
+        loss = loss_contrastive + args.lambda_divergence * loss_divergence + args.lambda_concept * loss_concept + args.lambda_country * loss_country
         
         total_loss += loss.item()
         total_contrastive += loss_contrastive.item()
         total_divergence += loss_divergence.item()
         total_concept_loss += loss_concept.item()
+        total_country_loss += loss_country.item()
         
     avg_loss = total_loss / len(val_loader)
     avg_concept_loss = total_concept_loss / len(val_loader)
+    avg_country_loss = total_country_loss / len(val_loader)
     val_concept_acc = total_concept_correct / total_concept_count if total_concept_count > 0 else 0.0
-    logger.info(f"Validation Loss: {avg_loss:.4f}, Concept Loss: {avg_concept_loss:.4f}, Val Concept Acc: {val_concept_acc:.4f}")
+    val_country_acc = total_country_correct / total_country_count if total_country_count > 0 else 0.0
+    logger.info(f"Validation Loss: {avg_loss:.4f}, Concept Loss: {avg_concept_loss:.4f}, Country Loss: {avg_country_loss:.4f}, Val Concept Acc: {val_concept_acc:.4f}, Val Country Acc: {val_country_acc:.4f}")
     
     if args.use_wandb:
         wandb.log({
@@ -486,13 +797,17 @@ def validate(model, val_loader, device, args):
             "val_contrastive": total_contrastive / len(val_loader),
             "val_divergence": total_divergence / len(val_loader),
             "val_concept_loss": avg_concept_loss,
-            "val_concept_accuracy": val_concept_acc
+            "val_country_loss": avg_country_loss,
+            "val_concept_accuracy": val_concept_acc,
+            "val_country_accuracy": val_country_acc
         })
     
     return {
         'loss': avg_loss,
         'concept_loss': avg_concept_loss,
-        'concept_acc': val_concept_acc
+        'concept_acc': val_concept_acc,
+        'country_loss': avg_country_loss,
+        'country_acc': val_country_acc
     }
 
 
@@ -515,11 +830,12 @@ if __name__ == "__main__":
     parser.add_argument("--temperature", type=float, default=0.07)
     parser.add_argument("--lambda_divergence", type=float, default=0.1)
     parser.add_argument("--lambda_concept", type=float, default=1.0)
+    parser.add_argument("--lambda_country", type=float, default=1.0)
     parser.add_argument("--sigma", type=float, default=1.0)
     parser.add_argument("--label_smoothing", type=float, default=0.1)
     
     # Misc
-    parser.add_argument("--output_dir", type=str, default="results/concept_aware")
+    parser.add_argument("--output_dir", type=str, default=None, help="Output directory (auto-generated if not provided)")
     parser.add_argument("--save_interval", type=int, default=5)
     parser.add_argument("--use_wandb", action="store_true", default=True)
     

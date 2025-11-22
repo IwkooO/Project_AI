@@ -27,6 +27,7 @@ class ConceptAwareGeoModel(nn.Module):
         image_encoder: nn.Module,
         concept_features: torch.Tensor,
         num_concepts: int,
+        num_countries: int,
         streetclip_dim: int = 768,
         location_encoder_dim: int = 512,
     ):
@@ -35,6 +36,7 @@ class ConceptAwareGeoModel(nn.Module):
             image_encoder: Pretrained StreetCLIPEncoder
             concept_features: Pre-computed concept text embeddings (E_concept) [k, d_streetclip]
             num_concepts: Number of concepts (k)
+            num_countries: Number of countries (c)
             streetclip_dim: Output dimension of StreetCLIP encoder
             location_encoder_dim: Output dimension of LocationEncoder (default 512)
         """
@@ -42,6 +44,7 @@ class ConceptAwareGeoModel(nn.Module):
         self.image_encoder = image_encoder
         self.location_encoder = LocationEncoder()
         self.num_concepts = num_concepts
+        self.num_countries = num_countries
         self.streetclip_dim = streetclip_dim
         
         # Ensure concept features are float32 and on the correct device (handled in forward/to)
@@ -63,6 +66,10 @@ class ConceptAwareGeoModel(nn.Module):
             nn.Linear(256, num_concepts)
         )
         
+        # Country Head: Maps concept activations to country logits
+        # Input: k (concepts), Output: c (countries)
+        self.country_head = nn.Linear(num_concepts, num_countries)
+        
         # Location Adapter: Maps LocationEncoder output (512) to StreetCLIP dimension
         # This allows the location embedding x_loc to be compatible with the basis B
         self.location_adapter = nn.Linear(location_encoder_dim, streetclip_dim)
@@ -76,7 +83,7 @@ class ConceptAwareGeoModel(nn.Module):
         basis = self.concept_basis_init + self.delta
         return basis.t()
 
-    def forward(self, images: torch.Tensor, gps_coords: Optional[torch.Tensor] = None) -> Union[Tuple[torch.Tensor, torch.Tensor], torch.Tensor]:
+    def forward(self, images: torch.Tensor, gps_coords: Optional[torch.Tensor] = None) -> Union[Tuple[torch.Tensor, torch.Tensor, torch.Tensor], Tuple[torch.Tensor, torch.Tensor]]:
         """
         Args:
             images: Image tensor [batch, 3, H, W]
@@ -86,8 +93,10 @@ class ConceptAwareGeoModel(nn.Module):
             If gps_coords is provided (Training):
                 z_img: Image concept activations [batch, k]
                 z_loc: Location concept activations [batch, k]
+                country_logits: Country predictions [batch, c]
             If gps_coords is None (Inference):
                 z_img: Image concept activations [batch, k]
+                country_logits: Country predictions [batch, c]
         """
         # 1. Image Path (Always executed)
         # x_img: [batch, d_streetclip]
@@ -95,9 +104,12 @@ class ConceptAwareGeoModel(nn.Module):
         # z_img: [batch, k]
         z_img = self.image_projector(x_img)
         
-        # If no GPS coordinates provided, return only image concept vector (Inference mode)
+        # Predict country from concept activations
+        country_logits = self.country_head(z_img)
+        
+        # If no GPS coordinates provided, return image concept vector and country logits (Inference mode)
         if gps_coords is None:
-            return z_img
+            return z_img, country_logits
             
         # 2. Location Path (Training mode)
         # x_loc_raw: [batch, 512]
@@ -112,7 +124,7 @@ class ConceptAwareGeoModel(nn.Module):
         # z_loc = x_loc @ B  -> [batch, d] @ [d, k] = [batch, k]
         z_loc = torch.matmul(x_loc, B)
         
-        return z_img, z_loc
+        return z_img, z_loc, country_logits
         
     def encode_location(self, gps_coords: torch.Tensor) -> torch.Tensor:
         """
@@ -134,5 +146,6 @@ class ConceptAwareGeoModel(nn.Module):
             list(self.image_projector.parameters()) + 
             list(self.location_adapter.parameters()) + 
             list(self.location_encoder.parameters()) + 
+            list(self.country_head.parameters()) +
             [self.delta]
         )

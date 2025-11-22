@@ -3,7 +3,8 @@ from pathlib import Path
 from tqdm import tqdm
 from time import sleep
 
-geoguessrId = "6906237dc7731161a37282b2"
+#geoguessrId = "6906237dc7731161a37282b2"
+geoguessrId = "69061e1f2019c6dbc2c01a95"
 meta_folder = Path(f"data/{geoguessrId}/metas/")
 
 pano_folder = Path(f"data/{geoguessrId}/panorama/")

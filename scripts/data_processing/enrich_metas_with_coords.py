@@ -6,14 +6,21 @@ Enrich meta JSON files with coordinate information from locations data.
 import json
 from pathlib import Path
 from tqdm import tqdm
-
-geoguessrId = "6906237dc7731161a37282b2"
-data_root = Path("data")
-folder = data_root / geoguessrId
-meta_folder = folder / "metas"
-loc_file = folder / f"locations_{geoguessrId}.json"
+import argparse
 
 def main():
+    parser = argparse.ArgumentParser(description="Enrich meta JSON files with coordinates")
+    parser.add_argument("--geoguessr-id", type=str, required=True,
+                        help="GeoGuessr map ID")
+    parser.add_argument("--data-root", type=str, default="data",
+                        help="Root directory for data")
+    args = parser.parse_args()
+    
+    geoguessrId = args.geoguessr_id
+    data_root = Path(args.data_root)
+    folder = data_root / geoguessrId
+    meta_folder = folder / "metas"
+    loc_file = folder / f"locations_{geoguessrId}.json"
     # Load locations data
     if not loc_file.exists():
         print(f"Error: {loc_file} not found!")

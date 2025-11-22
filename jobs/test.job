@@ -14,4 +14,5 @@ module load Anaconda3/2025.06-1
 source activate streetview_pnair
 export PYTHONNOUSERSITE=1
 #python scripts/tests/export_dataset_to_csv.py --output dataset_export_thailand.csv --country "Thailand" --require-coordinates 
-python src/dataset.py
+#python src/dataset.py
+python geodata.py

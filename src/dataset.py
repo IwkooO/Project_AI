@@ -14,18 +14,14 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 from torchvision.transforms import InterpolationMode
 from transformers import AutoImageProcessor
+import os
 
 import random
 from tqdm import tqdm
+import argparse
 
 CLIP_IMAGE_MEAN = (0.48145466, 0.4578275, 0.40821073)
-CLIP_IMAGE_STD = (0.26862954, 0.26130258, 0.27577711)
-
-geoguessrId = "6906237dc7731161a37282b2"
-data_root = Path("data")
-folder = data_root / geoguessrId
-meta_folder = folder / "metas"
-image_folder = folder / "panorama_processed"
+CLIP_IMAGE_STD = (0.26862954, 0.26130258, 0.27577711) 
 
 def extract_image_size(processor: Optional[AutoImageProcessor] = None, image_size: Optional[Tuple[int, int]] = None) -> Tuple[int, int]:
     """
@@ -148,7 +144,9 @@ class PanoramaCBMDataset(Dataset):
                  country: Optional[str] = None,
                  require_coordinates: bool = False,
                  encoder_model: Optional[str] = None,
-                 return_cartesian: bool = False):
+                 return_cartesian: bool = False,
+                 geoguessr_id: str = "6906237dc7731161a37282b2",
+                 data_root: Optional[Path] = None):
         """
         Args:
             transform: Optional torchvision transforms (overrides encoder_model preprocessing)
@@ -159,6 +157,8 @@ class PanoramaCBMDataset(Dataset):
             encoder_model: HuggingFace model identifier (e.g., 'facebook/dinov2-base')
                           If provided, will use AutoImageProcessor to get correct preprocessing
             return_cartesian: If True, returns 3D Cartesian coordinates on unit sphere instead of normalized 2D
+            geoguessr_id: GeoGuessr map ID
+            data_root: Root directory for data (defaults to "data")
         """
         self.transform = transform
         self.max_samples = max_samples
@@ -166,6 +166,19 @@ class PanoramaCBMDataset(Dataset):
         self.require_coordinates = require_coordinates
         self.encoder_model = encoder_model
         self.return_cartesian = return_cartesian
+        self.geoguessr_id = geoguessr_id
+        
+        if data_root is None:
+            data_root = Path("data")
+        self.data_root = Path(data_root)
+        self.folder = self.data_root / geoguessr_id
+        self.meta_folder = self.folder / "metas"
+        
+        # Check if panorama_processed folder exists, if not use panorama folder
+        if os.path.exists(self.folder / "panorama_processed"):
+            self.image_folder = self.folder / "panorama_processed"
+        else:
+            self.image_folder = self.folder / "panorama"
 
         # Set up transforms based on encoder model or defaults
         if self.transform is None:
@@ -226,7 +239,7 @@ class PanoramaCBMDataset(Dataset):
             target_country_norm = str(self.country).strip().lower()
 
         # Get all meta files
-        meta_files = list(meta_folder.glob("*.json"))
+        meta_files = list(self.meta_folder.glob("*.json"))
 
         for meta_path in tqdm(meta_files, desc="Loading samples"):
             # Stop if we've reached max_samples (applied after filtering)
@@ -236,7 +249,7 @@ class PanoramaCBMDataset(Dataset):
             pano_id = meta_path.stem
 
             # Check if image exists
-            image_path = image_folder / f"image_{pano_id}.jpg"
+            image_path = self.image_folder / f"image_{pano_id}.jpg"
             if not image_path.exists():
                 skipped_no_image += 1
                 continue
@@ -614,8 +627,21 @@ def latlon_to_cartesian(lat: float, lng: float) -> torch.Tensor:
     return torch.tensor([x, y, z], dtype=torch.float32)
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Test PanoramaCBMDataset")
+    parser.add_argument("--geoguessr-id", type=str, default="6906237dc7731161a37282b2",
+                        help="GeoGuessr map ID")
+    parser.add_argument("--data-root", type=str, default="data",
+                        help="Root directory for data")
+    parser.add_argument("--country", type=str, default="Australia",
+                        help="Country filter")
+    args = parser.parse_args()
+    
     # Test the dataset
-    dataset = PanoramaCBMDataset(country="Australia")  
+    dataset = PanoramaCBMDataset(
+        country=args.country,
+        geoguessr_id=args.geoguessr_id,
+        data_root=args.data_root
+    )  
 
     # Test statistics
     stats = get_statistics(dataset.samples)

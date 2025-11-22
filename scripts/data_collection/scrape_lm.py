@@ -4,14 +4,23 @@ import json
 from pathlib import Path
 import time
 from tqdm import tqdm
+import argparse
 
-geoguessrId = "6906237dc7731161a37282b2"
-endpoint = f"https://learnablemeta.com/api/userscript/map/{geoguessrId}/"
-
-data_root = Path("data")
-data_root.mkdir(exist_ok=True)
-folder = data_root / geoguessrId
-folder.mkdir(exist_ok=True)
+def main():
+    parser = argparse.ArgumentParser(description="Scrape LearnableMeta data")
+    parser.add_argument("--geoguessr-id", type=str, required=True,
+                        help="GeoGuessr map ID")
+    parser.add_argument("--data-root", type=str, default="data",
+                        help="Root directory for data")
+    args = parser.parse_args()
+    
+    geoguessrId = args.geoguessr_id
+    endpoint = f"https://learnablemeta.com/api/userscript/map/{geoguessrId}/"
+    
+    data_root = Path(args.data_root)
+    data_root.mkdir(exist_ok=True)
+    folder = data_root / geoguessrId
+    folder.mkdir(exist_ok=True)
 
 ## get metadata
 md_file = folder / f"metadata_{geoguessrId}.json"
@@ -75,4 +84,7 @@ for loc in tqdm(location_data['customCoordinates']):
 
     time.sleep(0.5)
 
-print(f"Collected metas for {len(seen_this_session)} locations!")
+    print(f"Collected metas for {len(seen_this_session)} locations!")
+
+if __name__ == "__main__":
+    main()

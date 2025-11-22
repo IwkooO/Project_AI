@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
-#SBATCH --job-name=train_concept_aware
+#SBATCH --job-name=ca
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=9
-#SBATCH --time=04:00:00
+#SBATCH --time=14:00:00
 #SBATCH --output=jobs/outputs/train_concept_aware.log
 
 # Load modules
@@ -22,7 +22,7 @@ export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
 # Run training
 python scripts/training/train_concept_aware.py \
     --encoder_model "geolocal/StreetCLIP" \
-    --batch_size 16 \
+    --batch_size 12 \
     --epochs 20 \
     --lr 3e-4 \
     --weight_decay 0.1 \
@@ -33,5 +33,6 @@ python scripts/training/train_concept_aware.py \
     --output_dir "results/concept_aware" \
     --save_interval 5 \
     --use_wandb \
+    --country_filter "India" \
 
 
