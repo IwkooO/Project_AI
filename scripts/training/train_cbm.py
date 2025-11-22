@@ -72,7 +72,12 @@ def visualize_validation_samples(model, dataset, epoch, output_dir, device, num_
         
         pred_lat, pred_lon = coord_preds[0].cpu().numpy()
         true_lat, true_lon = coords.numpy()
-        dist_km = haversine(coord_preds.cpu(), coords.unsqueeze(0)).item()
+        
+        # Coordinates are already in degrees (raw), no denormalization needed
+        # Calculate distance using Haversine (expects degrees)
+        pred_coords_tensor = coord_preds.cpu()
+        true_coords_tensor = coords.unsqueeze(0)
+        dist_km = haversine(pred_coords_tensor, true_coords_tensor).item()
         
         # Plot
         fig, axes = plt.subplots(1, 2, figsize=(12, 6))
@@ -237,6 +242,14 @@ def main():
     parser.add_argument("--w-country", type=float, default=1.0, help="Weight for Country Loss")
     parser.add_argument("--w-concepts", type=float, default=0.5, help="Weight for Concept Loss")
     
+    # Fine-tuning args
+    parser.add_argument("--unfreeze-epoch", type=int, default=11, help="Epoch to unfreeze backbone (default: 11, meaning 1-10 are frozen)")
+    parser.add_argument("--backbone-lr", type=float, default=1e-5, help="Learning rate for backbone after unfreezing")
+    parser.add_argument("--backbone-bs", type=int, default=64, help="Batch size for backbone")
+
+    parser.add_argument("--pretrained-model-path", type=str, required=False, default=None, help="Path to pretrained model")
+    
+    parser.add_argument("--save-every-epoch", type=bool, default=False, help="Save every epoch")
     args = parser.parse_args()
     
     # Setup device
@@ -272,6 +285,9 @@ def main():
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, pin_memory=True)
+
+    train_backbone_loader = DataLoader(train_dataset, batch_size=args.backbone_bs, shuffle=True, num_workers=args.num_workers, pin_memory=True)
+    val_backbone_loader = DataLoader(val_dataset, batch_size=args.backbone_bs, shuffle=False, num_workers=args.num_workers, pin_memory=True)
     
     # Initialize model
     model = GeoCBM(
@@ -289,10 +305,14 @@ def main():
     print(f'Coordinate head parameters: {sum(p.numel() for p in model.coord_head.parameters())}')
     
     # Load pretrained probe weights (Warm Start)
-    if os.path.exists(args.probe_path):
+    if os.path.exists(args.probe_path) and args.pretrained_model_path is None:
         model.load_probe_weights(args.probe_path)
+        print(f"Loaded probe weights from {args.probe_path}")
+    elif args.pretrained_model_path is not None:
+        model.load_state_dict(torch.load(args.pretrained_model_path, map_location=device)['model_state_dict'])
+        print(f"Loaded pretrained model from {args.pretrained_model_path}")
     else:
-        print(f"Warning: Probe checkpoint not found at {args.probe_path}. Training from scratch.")
+        print(f"Warning: Probe checkpoint not found at {args.probe_path} and no pretrained model path provided. Training from scratch.")
         
     model = model.to(device)
     
@@ -320,6 +340,32 @@ def main():
     
     print("Starting CBM training...")
     for epoch in range(1, args.epochs + 1):
+        # Check for unfreezing
+        if epoch == args.unfreeze_epoch:
+            print(f"Unfreezing backbone at epoch {epoch} with LR {args.backbone_lr}...")
+            
+            # Unfreeze all backbone parameters
+            for param in model.backbone.parameters():
+                param.requires_grad = True
+            
+            # Re-create optimizer to include backbone parameters with a lower learning rate
+            # We keep the original LR for the heads
+            params_to_optimize = [
+                {'params': model.concept_head.parameters(), 'lr': args.lr},
+                {'params': model.country_head.parameters(), 'lr': args.lr},
+                {'params': model.coord_head.parameters(), 'lr': args.lr},
+                {'params': model.backbone.parameters(), 'lr': args.backbone_lr}
+            ]
+            
+            optimizer = optim.Adam(params_to_optimize)
+
+            print(f'Train Loader and Val Loader switched to backbone loader')
+            train_loader = train_backbone_loader
+            val_loader = val_backbone_loader
+            
+            # Reset scheduler for the new phase (loss dynamics will change)
+            scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3)
+
         train_metrics = train_one_epoch(model, train_loader, criterion, optimizer, device, epoch)
         val_metrics = evaluate(model, val_loader, criterion, device)
         
@@ -347,8 +393,20 @@ def main():
                 'concepts': train_dataset.concepts,
                 'countries': train_dataset.countries
             }, save_path)
-            print(f"  Saved best model to {save_path}")
+            print(f"  [IMPROVED] Best model updated (Dist: {best_val_dist:.1f} km) -> {save_path}")
             
+        # Save regular checkpoint every epoch
+        if args.save_every_epoch:
+            checkpoint_path = output_dir / f"cbm_epoch_{epoch}.pth"
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'val_metrics': val_metrics,
+                'concepts': train_dataset.concepts,
+                'countries': train_dataset.countries
+            }, checkpoint_path)
+            print(f"  Saved checkpoint: {checkpoint_path}")
     print("Training complete.")
     print(f"Best Validation Distance: {best_val_dist:.1f} km")
 

@@ -16,7 +16,7 @@ cd $HOME/Project_AI/
 source activate streetview
 
 # Upgrade torch to >= 2.6 to fix security vulnerability error
-pip install "torch>=2.6" torchvision --upgrade
+#pip install "torch>=2.6" torchvision --upgrade
 
 # Create output directories
 mkdir -p jobs/outputs/train
@@ -36,13 +36,16 @@ python -u scripts/training/train_cbm.py \
     --csv-path "$DATASET_CSV" \
     --probe-path "$PROBE_PATH" \
     --batch-size 128 \
+    --backbone-bs 64 \
+    --pretrained-model-path "checkpoints/cbm/best_cbm_model.pth" \
     --num-workers 12 \
     --epochs 20 \
     --lr 2e-3 \
     --w-coords 1.0 \
     --w-country 1.0 \
     --w-concepts 0.5 \
-    --output-dir "checkpoints/cbm"
+    --unfreeze-epoch 1 \
+    --backbone-lr 1e-5 \
+    --output-dir "checkpoints/cbm-finetuned"
 
 echo "Training finished."
-

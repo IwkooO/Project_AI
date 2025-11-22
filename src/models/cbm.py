@@ -59,7 +59,7 @@ class GeoCBM(nn.Module):
             nn.Dropout(0.1),
             nn.Linear(hidden_dim_coord, hidden_dim_coord // 2),
             nn.ReLU(),
-            nn.Linear(hidden_dim_coord // 2, 2) # Output: Lat, Lon (Degrees)
+            nn.Linear(hidden_dim_coord // 2, 2), # Output: Lat, Lon (Degrees)
         )
         
     def forward(self, images, return_attentions: bool = False):
@@ -106,13 +106,16 @@ class GeoCBM(nn.Module):
         concept_logits = self.concept_head(image_features)
         
         # 3. Downstream Predictions (Strict Bottleneck)
-        # We use logits as input. 
-        # Ideally, if concepts are "presence", we might want sigmoid(logits), 
-        # but logits preserve more information for gradients.
         # Using raw logits is standard for "soft" CBMs.
         
         country_logits = self.country_head(concept_logits)
         coord_preds = self.coord_head(concept_logits)
+
+        # Clamp coordinates to valid ranges
+        # Latitude: [-90, 90], Longitude: [-180, 180]
+        coord_preds = torch.clamp(coord_preds, 
+                                   min=torch.tensor([-90.0, -180.0], device=coord_preds.device),
+                                   max=torch.tensor([90.0, 180.0], device=coord_preds.device))
         
         outputs = (concept_logits, country_logits, coord_preds)
         
