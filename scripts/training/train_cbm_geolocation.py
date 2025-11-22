@@ -997,6 +997,7 @@ def main():
         country=args.country_filter,
         require_coordinates=args.require_coordinates,
         encoder_model=encoder_model,
+        use_normalized_coordinates=True,
     )
 
     logger.info(f"Dataset image size: {dataset.image_size}")

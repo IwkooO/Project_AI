@@ -78,8 +78,16 @@ def haversine_distance(pred_coords: torch.Tensor, true_coords: torch.Tensor) -> 
     if mask.sum() == 0:
         return torch.zeros(0, device=pred_coords.device)
 
-    pred = denormalize_coordinates(pred_coords[mask])
-    true = denormalize_coordinates(true_coords[mask])
+    # Check if coordinates seem normalized (max value <= 1.0001)
+    # This is a heuristic to determine if we need to denormalize
+    is_normalized = pred_coords[mask].abs().max() <= 1.0001 and true_coords[mask].abs().max() <= 1.0001
+    
+    if is_normalized:
+        pred = denormalize_coordinates(pred_coords[mask])
+        true = denormalize_coordinates(true_coords[mask])
+    else:
+        pred = pred_coords[mask]
+        true = true_coords[mask]
 
     lat1 = torch.deg2rad(true[:, 0])
     lon1 = torch.deg2rad(true[:, 1])
@@ -148,8 +156,16 @@ def compute_geolocation_metrics(
                 for threshold in [1, 10, 100, 1000]:
                     metrics[f"acc@{threshold}km"] = accuracy_within_threshold(distances, threshold)
 
-            pred_deg = denormalize_coordinates(predicted_coords_for_metrics[mask])
-            true_deg = denormalize_coordinates(coordinate_targets[mask])
+            # Check if normalized to correctly denormalize for bias metrics
+            is_normalized = predicted_coords_for_metrics[mask].abs().max() <= 1.0001 and coordinate_targets[mask].abs().max() <= 1.0001
+            
+            if is_normalized:
+                pred_deg = denormalize_coordinates(predicted_coords_for_metrics[mask])
+                true_deg = denormalize_coordinates(coordinate_targets[mask])
+            else:
+                pred_deg = predicted_coords_for_metrics[mask]
+                true_deg = coordinate_targets[mask]
+
             lat_bias = pred_deg[:, 0] - true_deg[:, 0]
             lng_bias = pred_deg[:, 1] - true_deg[:, 1]
             metrics["lat_bias_deg"] = float(lat_bias.mean().item())

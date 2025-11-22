@@ -145,6 +145,7 @@ class PanoramaCBMDataset(Dataset):
                  require_coordinates: bool = False,
                  encoder_model: Optional[str] = None,
                  return_cartesian: bool = False,
+                 use_normalized_coordinates: bool = False,
                  geoguessr_id: str = "6906237dc7731161a37282b2",
                  data_root: Optional[Path] = None):
         """
@@ -157,6 +158,7 @@ class PanoramaCBMDataset(Dataset):
             encoder_model: HuggingFace model identifier (e.g., 'facebook/dinov2-base')
                           If provided, will use AutoImageProcessor to get correct preprocessing
             return_cartesian: If True, returns 3D Cartesian coordinates on unit sphere instead of normalized 2D
+            use_normalized_coordinates: If True, returns coordinates normalized to [-1, 1]. If False, returns raw (lat, lng).
             geoguessr_id: GeoGuessr map ID
             data_root: Root directory for data (defaults to "data")
         """
@@ -166,6 +168,7 @@ class PanoramaCBMDataset(Dataset):
         self.require_coordinates = require_coordinates
         self.encoder_model = encoder_model
         self.return_cartesian = return_cartesian
+        self.use_normalized_coordinates = use_normalized_coordinates
         self.geoguessr_id = geoguessr_id
         
         if data_root is None:
@@ -341,8 +344,14 @@ class PanoramaCBMDataset(Dataset):
                 coordinates = latlon_to_cartesian(sample['lat'], sample['lng'])
             else:
                 coordinates = torch.tensor([float('nan')] * 3, dtype=torch.float32)
-        else:
+        elif self.use_normalized_coordinates:
             coordinates = normalize_coordinates(sample['lat'], sample['lng'])
+        else:
+            # Return raw coordinates
+            if sample['lat'] is not None and sample['lng'] is not None:
+                coordinates = torch.tensor([float(sample['lat']), float(sample['lng'])], dtype=torch.float32)
+            else:
+                coordinates = torch.tensor([float('nan'), float('nan')], dtype=torch.float32)
 
         # Metadata dict
         metadata = {

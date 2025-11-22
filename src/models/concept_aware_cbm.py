@@ -68,8 +68,24 @@ class ConceptAwareGeoModel(nn.Module):
         
         # Country Head: Maps concept activations to country logits
         # Input: k (concepts), Output: c (countries)
-        self.country_head = nn.Linear(num_concepts, num_countries)
+        self.country_head = nn.Sequential(
+            nn.Linear(num_concepts, 256),
+            nn.LayerNorm(256),
+            nn.GELU(),
+            nn.Dropout(0.3),
+            nn.Linear(256, num_countries)
+        )
         
+        # Coordinate Regression Head: Maps concept activations to (lat, lng)
+        # Input: k (concepts), Output: 2 (lat, lng)
+        self.coord_head = nn.Sequential(
+            nn.Linear(num_concepts, 256),
+            nn.LayerNorm(256),
+            nn.GELU(),
+            nn.Dropout(0.3),
+            nn.Linear(256, 2)
+        )
+
         # Location Adapter: Maps LocationEncoder output (512) to StreetCLIP dimension
         # This allows the location embedding x_loc to be compatible with the basis B
         self.location_adapter = nn.Linear(location_encoder_dim, streetclip_dim)
@@ -83,7 +99,7 @@ class ConceptAwareGeoModel(nn.Module):
         basis = self.concept_basis_init + self.delta
         return basis.t()
 
-    def forward(self, images: torch.Tensor, gps_coords: Optional[torch.Tensor] = None) -> Union[Tuple[torch.Tensor, torch.Tensor, torch.Tensor], Tuple[torch.Tensor, torch.Tensor]]:
+    def forward(self, images: torch.Tensor, gps_coords: Optional[torch.Tensor] = None) -> Union[Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor], Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]:
         """
         Args:
             images: Image tensor [batch, 3, H, W]
@@ -94,9 +110,11 @@ class ConceptAwareGeoModel(nn.Module):
                 z_img: Image concept activations [batch, k]
                 z_loc: Location concept activations [batch, k]
                 country_logits: Country predictions [batch, c]
+                pred_coords: Predicted coordinates [batch, 2]
             If gps_coords is None (Inference):
                 z_img: Image concept activations [batch, k]
                 country_logits: Country predictions [batch, c]
+                pred_coords: Predicted coordinates [batch, 2]
         """
         # 1. Image Path (Always executed)
         # x_img: [batch, d_streetclip]
@@ -107,9 +125,12 @@ class ConceptAwareGeoModel(nn.Module):
         # Predict country from concept activations
         country_logits = self.country_head(z_img)
         
-        # If no GPS coordinates provided, return image concept vector and country logits (Inference mode)
+        # Predict coordinates from concept activations
+        pred_coords = self.coord_head(z_img)
+        
+        # If no GPS coordinates provided, return image concept vector, country logits, and pred_coords (Inference mode)
         if gps_coords is None:
-            return z_img, country_logits
+            return z_img, country_logits, pred_coords
             
         # 2. Location Path (Training mode)
         # x_loc_raw: [batch, 512]
@@ -124,7 +145,7 @@ class ConceptAwareGeoModel(nn.Module):
         # z_loc = x_loc @ B  -> [batch, d] @ [d, k] = [batch, k]
         z_loc = torch.matmul(x_loc, B)
         
-        return z_img, z_loc, country_logits
+        return z_img, z_loc, country_logits, pred_coords
         
     def encode_location(self, gps_coords: torch.Tensor) -> torch.Tensor:
         """
@@ -147,5 +168,6 @@ class ConceptAwareGeoModel(nn.Module):
             list(self.location_adapter.parameters()) + 
             list(self.location_encoder.parameters()) + 
             list(self.country_head.parameters()) +
+            list(self.coord_head.parameters()) +
             [self.delta]
         )

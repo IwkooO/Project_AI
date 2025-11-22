@@ -30,7 +30,6 @@ python scripts/training/train_concept_aware.py \
     --lambda_concept 1.0 \
     --label_smoothing 0.1 \
     --early_stopping_patience 5 \
-    --output_dir "results/concept_aware" \
     --save_interval 5 \
     --use_wandb \
     --country_filter "India" \

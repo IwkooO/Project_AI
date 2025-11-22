@@ -55,7 +55,12 @@ def coordinate_loss(
             return torch.zeros(
                 1, device=pred_coords.device, dtype=pred_coords.dtype
             ).squeeze()
-        return distances.mean()
+        
+        # Normalize distances to radians for gradient stability (distance / Earth Radius)
+        # This maps distances to approx [0, 3.14] range which is much better for optimization
+        EARTH_RADIUS_KM = 6371.0
+        normalized_distances = distances / EARTH_RADIUS_KM
+        return normalized_distances.mean()
 
     raise ValueError(f"Unsupported coordinate loss type '{loss_type}'")
 
