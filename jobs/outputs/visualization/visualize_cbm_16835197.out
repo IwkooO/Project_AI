@@ -1,0 +1,37 @@
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Using device: cuda
+Loading model from /home/igodzwon/Project_AI/checkpoints/cbm/best_cbm_model.pth
+Loading backbone: geolocal/StreetCLIP
+Backbone frozen.
+Loading test split...
+Dataset size: 2663
+Grouping images by concept...
+Found 123 concepts with at least 8 images
+Visualizing concepts:   0%|          | 0/10 [00:00<?, ?it/s]Visualizing concepts:   0%|          | 0/10 [00:00<?, ?it/s]
+Traceback (most recent call last):
+  File "/gpfs/home4/igodzwon/Project_AI/scripts/visualization/visualize_concept_consistency.py", line 333, in <module>
+    main()
+  File "/gpfs/home4/igodzwon/Project_AI/scripts/visualization/visualize_concept_consistency.py", line 318, in main
+    visualize_concept_group(
+  File "/gpfs/home4/igodzwon/Project_AI/scripts/visualization/visualize_concept_consistency.py", line 65, in visualize_concept_group
+    image, concept_label, country_label, coords = dataset[idx]
+                                                  ~~~~~~~^^^^^
+  File "/gpfs/home4/igodzwon/Project_AI/src/data/dataset_cbm.py", line 65, in __getitem__
+    coordinates = torch.tensor([lat_norm, lng_norm], dtype=torch.float32)
+                                ^^^^^^^^
+NameError: name 'lat_norm' is not defined

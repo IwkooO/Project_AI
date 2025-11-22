@@ -65,8 +65,19 @@ class CBMLoss(nn.Module):
         country_loss = self.cross_entropy(country_logits, country_targets)
         
         # 3. Coordinate Loss (Haversine)
+
+        pred_lat = pred_coords[:, 0]
+        pred_lng = pred_coords[:, 1]
+        
+        target_lat = target_coords[:, 0]
+        target_lng = target_coords[:, 1]
+        
+        # Recombine into (B, 2) tensors
+        pred_deg = torch.stack([pred_lat, pred_lng], dim=1)
+        target_deg = torch.stack([target_lat, target_lng], dim=1)
+        
         # Calculate raw distance in km
-        haversine_dist = self.haversine(pred_coords, target_coords)
+        haversine_dist = self.haversine(pred_deg, target_deg)
         
         # Normalize: Divide by 1000.0 so that 1.0 loss ~= 1000km error
         # This balances the magnitude with CrossEntropy (~0.5 - 5.0)
@@ -84,4 +95,3 @@ class CBMLoss(nn.Module):
             "coord_loss": coord_loss, # Normalized loss
             "haversine_dist": haversine_dist # Raw distance in km
         }
-
