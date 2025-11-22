@@ -5,3 +5,4 @@ checkpoints/
 results/
 *.env
 .cursor/
+visualizations/
