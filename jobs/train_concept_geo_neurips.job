@@ -36,5 +36,6 @@ python scripts/training/train_concept_aware.py \
     --save_interval 1 \
     --coordinate_loss_type "haversine" \
     --country_filter "India" \
+    --min_samples_per_cell 20 \
     --use_wandb
 

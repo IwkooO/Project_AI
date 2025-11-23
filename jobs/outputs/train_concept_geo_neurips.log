@@ -33,13 +33,34 @@ INFO:__main__:Batches per epoch: Train=73, Val=22, Test=10
 INFO:__main__:Train set: 2362 samples across 446 concepts
 INFO:__main__:Pre-computing Note Embeddings for Semantic Alignment...
 INFO:__main__:  Samples per concept - Min: 1, Max: 35, Avg: 5.3
+INFO:__main__:Checkpoint directory: results/concept-aware/streetclip/India/haversine/2025-11-23_16-41-37
+INFO:__main__:Logging to results/concept-aware/streetclip/India/haversine/2025-11-23_16-41-37/logs/training.log
+wandb: Currently logged in as: pradyut-nair (project-ai-geoguessr) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.23.0
+wandb: Run data is saved locally in results/concept-aware/streetclip/India/haversine/2025-11-23_16-41-37/wandb/run-20251123_164137-h80opvs4
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run concept-aware-geolocation-India-20251123-164137
+wandb: ⭐️ View project at https://wandb.ai/project-ai-geoguessr/concept-aware-geolocation
+wandb: 🚀 View run at https://wandb.ai/project-ai-geoguessr/concept-aware-geolocation/runs/h80opvs4
 INFO:__main__:Generating Semantic Geocells (Per-Country Clustering)...
 Loaded 3361 samples
 Loaded 3361 samples
 Concepts: 446
 Countries: 1
-Clustering Countries:   0%|          | 0/1 [00:00<?, ?it/s]Clustering Countries: 100%|██████████| 1/1 [00:00<00:00, 11.65it/s]
-INFO:__main__:Generated 6 Semantic Geocells.
+Clustering Countries:   0%|          | 0/1 [00:00<?, ?it/s]Clustering Countries: 100%|██████████| 1/1 [00:00<00:00,  2.64it/s]Clustering Countries: 100%|██████████| 1/1 [00:00<00:00,  2.64it/s]
+INFO:__main__:Generated 168 Semantic Geocells.
+INFO:choreographer.browsers.chromium:Chromium init'ed with kwargs {}
+WARNING:__main__:Failed to visualize geocells with Plotly/Folium: 
+
+Kaleido requires Google Chrome to be installed.
+
+Either download and install Chrome yourself following Google's instructions for your operating system,
+or install it from your terminal by running:
+
+    $ plotly_get_chrome
+
+
+INFO:__main__:Saved fallback geocell visualization to geocells_map.png
 INFO:__main__:Extracting and encoding concepts...
 INFO:__main__:Found 446 unique concepts.
 INFO:__main__:Concept alignment verified.
@@ -50,31 +71,24 @@ INFO:__main__:StreetCLIP vision encoder dimension: 1024
 WARNING:__main__:Dimension mismatch: Concept embeddings have dim 768, but vision encoder has dim 1024. Projecting concept embeddings to match vision dimension...
 INFO:__main__:Projected Concept Basis shape: torch.Size([446, 1024])
 INFO:__main__:Coordinate output dimension: 2
-INFO:__main__:Checkpoint directory: results/concept-aware/streetclip/India/haversine/2025-11-23_16-15-02
-INFO:__main__:Logging to results/concept-aware/streetclip/India/haversine/2025-11-23_16-15-02/logs/training.log
-wandb: Currently logged in as: pradyut-nair (project-ai-geoguessr) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
-wandb: Tracking run with wandb version 0.23.0
-wandb: Run data is saved locally in results/concept-aware/streetclip/India/haversine/2025-11-23_16-15-02/wandb/run-20251123_161502-mk55uzzj
-wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run concept-aware-geolocation-India-20251123-161502
-wandb: ⭐️ View project at https://wandb.ai/project-ai-geoguessr/concept-aware-geolocation
-wandb: 🚀 View run at https://wandb.ai/project-ai-geoguessr/concept-aware-geolocation/runs/mk55uzzj
+/gpfs/scratch1/shared/pnair/Project_AI/scripts/training/train_concept_aware.py:1062: FutureWarning:
+
+`torch.cuda.amp.GradScaler(args...)` is deprecated. Please use `torch.amp.GradScaler('cuda', args...)` instead.
+
+INFO:__main__:AMP enabled: False
+INFO:__main__:Gradient accumulation steps: 1
 INFO:__main__:Starting training...
-Epoch 1/20:   0%|          | 0/73 [00:00<?, ?it/s]/gpfs/scratch1/shared/pnair/Project_AI/scripts/training/train_concept_aware.py:951: UserWarning: Using a target size (torch.Size([32, 768])) that is different to the input size (torch.Size([32, 1024])). This will likely lead to incorrect results due to broadcasting. Please ensure they have the same size.
-  loss_semantic = nn.functional.mse_loss(pred_note_norm, target_note_norm)
-Epoch 1/20:   0%|          | 0/73 [00:25<?, ?it/s]
+Epoch 1/20:   0%|          | 0/73 [00:00<?, ?it/s]/gpfs/scratch1/shared/pnair/Project_AI/scripts/training/train_concept_aware.py:1103: FutureWarning:
+
+`torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+
+Epoch 1/20:   0%|          | 0/73 [00:26<?, ?it/s]
 Traceback (most recent call last):
-  File "/gpfs/scratch1/shared/pnair/Project_AI/scripts/training/train_concept_aware.py", line 1327, in <module>
-    train(args)
-  File "/gpfs/scratch1/shared/pnair/Project_AI/scripts/training/train_concept_aware.py", line 951, in train
-    loss_semantic = nn.functional.mse_loss(pred_note_norm, target_note_norm)
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/pnair/.conda/envs/streetview_pnair/lib/python3.11/site-packages/torch/nn/functional.py", line 3884, in mse_loss
-    expanded_input, expanded_target = torch.broadcast_tensors(input, target)
-                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/pnair/.conda/envs/streetview_pnair/lib/python3.11/site-packages/torch/functional.py", line 76, in broadcast_tensors
-    return _VF.broadcast_tensors(tensors)  # type: ignore[attr-defined]
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-RuntimeError: The size of tensor a (1024) must match the size of tensor b (768) at non-singleton dimension 1
+  File "/gpfs/scratch1/shared/pnair/Project_AI/scripts/training/train_concept_aware.py", line 1734, in <module>
+    )
+  File "/gpfs/scratch1/shared/pnair/Project_AI/scripts/training/train_concept_aware.py", line 1225, in train
+    batch_cell_centers[:, 2],
+    ^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Namespace' object has no attribute 'lambda_divergence'
 [1;34mwandb[0m: 
-[1;34mwandb[0m: 🚀 View run [33mconcept-aware-geolocation-India-20251123-161502[0m at: [34m[0m
+[1;34mwandb[0m: 🚀 View run [33mconcept-aware-geolocation-India-20251123-164137[0m at: [34m[0m
