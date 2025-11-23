@@ -92,17 +92,27 @@ class CBMDataset(Dataset):
             if pd.isna(row.get('image_path')) or pd.isna(row.get('meta_name')) or pd.isna(row.get('country')):
                 continue
             
+            # Check coordinates
+            lat = row.get('lat')
+            lng = row.get('lng')
+            if pd.isna(lat) or pd.isna(lng):
+                # Skip if missing coordinates are critical
+                continue
+            
             sample = {
                 'pano_id': str(row.get('pano_id', f'row_{idx}')),  # Use pano_id if available, else row index
                 'image_path': Path(row['image_path']),
                 'meta_name': str(row['meta_name']),
                 'country': str(row['country']),
-                'lat': row.get('lat') if not pd.isna(row.get('lat')) else None,
-                'lng': row.get('lng') if not pd.isna(row.get('lng')) else None,
+                'lat': lat,
+                'lng': lng,
                 'note': str(row.get('note', '')),
                 'images': row.get('images', []) if isinstance(row.get('images'), list) else []
             }
             samples.append(sample)
+        
+        if len(samples) == 0:
+            raise RuntimeError("No valid samples found in DataFrame! Check for missing 'lat', 'lng', 'image_path', 'meta_name', or 'country'.")
         
         return samples
     

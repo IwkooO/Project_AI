@@ -1,40 +1,40 @@
 #!/bin/bash
 #SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
-#SBATCH --job-name=ca
-#SBATCH --ntasks=1
+#SBATCH --job-name=concept_geo_neurips
+#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/train_concept_geo_neurips.log
+#SBATCH --time=10:00:00
 #SBATCH --cpus-per-task=9
-#SBATCH --time=4:00:00
-#SBATCH --output=jobs/outputs/train_concept_aware.log
-
-# Load modules
-module load 2025
-module load Anaconda3/2025.06-1
-module load CUDA/12.8.0
+#SBATCH --mem=32G
 
 # Activate environment
+module load 2025
+module load Anaconda3/2025.06-1
+cd /scratch-shared/pnair/Project_AI/
+module load CUDA/12.8.0
+
 source activate streetview_pnair
 export PYTHONNOUSERSITE=1
-
-cd /scratch-shared/pnair/Project_AI/
 export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
 
-# Run training
+# Run Training with NeurIPS configuration
 python scripts/training/train_concept_aware.py \
     --encoder_model "geolocal/StreetCLIP" \
     --batch_size 32 \
     --epochs 20 \
     --lr 3e-4 \
     --weight_decay 0.1 \
-    --lambda_divergence 0.05 \
+    --temperature 0.07 \
     --lambda_concept 1.0 \
+    --lambda_semantic 1.0 \
+    --lambda_cell 1.0 \
+    --lambda_offset 10.0 \
+    --lambda_country 0.1 \
+    --sigma 1.0 \
     --label_smoothing 0.1 \
     --early_stopping_patience 5 \
-    --save_interval 5 \
-    --use_wandb \
-    --country_filter "India" \
+    --save_interval 1 \
     --coordinate_loss_type "haversine" \
-    --data_root /scratch-shared/igodzwon/Project_AI/data \
-    --geoguessr_id 6921d7831744c5356b098bf7_balanced 
-
+    --country_filter "India" \
+    --use_wandb
 

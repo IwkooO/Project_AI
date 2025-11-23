@@ -276,10 +276,16 @@ class PanoramaCBMDataset(Dataset):
                 # Extract coordinates if available
                 lat = meta.get('lat')
                 lng = meta.get('lng')
-
+                
                 if self.require_coordinates and (lat is None or lng is None):
                     skipped_no_coords += 1
                     continue
+                    
+                # Extract note if available
+                note = meta.get('note', '')
+                if self.require_coordinates and not note:
+                     # In strict mode we might want to skip, but for now we pass empty notes
+                     pass 
 
                 sample = {
                     'pano_id': pano_id,
@@ -289,7 +295,7 @@ class PanoramaCBMDataset(Dataset):
                     'country': meta['country'],
                     'lat': lat,
                     'lng': lng,
-                    'note': meta.get('note', ''),
+                    'note': note,
                     'images': meta.get('images', [])
                 }
 
@@ -307,6 +313,9 @@ class PanoramaCBMDataset(Dataset):
             print(f"  - Skipped (no image): {skipped_no_image}")
             if self.require_coordinates:
                 print(f"  - Skipped (no coordinates): {skipped_no_coords}")
+        
+        if len(samples) == 0:
+             raise RuntimeError(f"No samples found! Check your country filter ('{self.country}') or coordinate requirements.")
 
         return samples
 

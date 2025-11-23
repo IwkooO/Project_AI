@@ -28,9 +28,11 @@ class ConceptAwareGeoModel(nn.Module):
         concept_features: torch.Tensor,
         num_concepts: int,
         num_countries: int,
+        num_cells: int,
         streetclip_dim: int = 768,
         location_encoder_dim: int = 512,
         coord_output_dim: int = 2,
+        text_encoder: Optional[nn.Module] = None,
     ):
         """
         Args:
@@ -38,15 +40,19 @@ class ConceptAwareGeoModel(nn.Module):
             concept_features: Pre-computed concept text embeddings (E_concept) [k, d_streetclip]
             num_concepts: Number of concepts (k)
             num_countries: Number of countries (c)
+            num_cells: Number of semantic geocells
             streetclip_dim: Output dimension of StreetCLIP encoder
             location_encoder_dim: Output dimension of LocationEncoder (default 512)
             coord_output_dim: Output dimension for coordinate head (2 for lat/lng, 3 for sphere)
+            text_encoder: Frozen text encoder for semantic loss
         """
         super().__init__()
         self.image_encoder = image_encoder
+        self.text_encoder = text_encoder # Should be frozen/handled externally but good to have ref
         self.location_encoder = LocationEncoder()
         self.num_concepts = num_concepts
         self.num_countries = num_countries
+        self.num_cells = num_cells
         self.streetclip_dim = streetclip_dim
         self.coord_output_dim = coord_output_dim
         
@@ -60,17 +66,36 @@ class ConceptAwareGeoModel(nn.Module):
         
         # Image Projector (f_img): Maps image embeddings to concept activations
         # Input: d_streetclip, Output: k (concepts)
-        # Added dropout for regularization to prevent overfitting
         self.image_projector = nn.Sequential(
             nn.Linear(streetclip_dim, 256),
             nn.LayerNorm(256),
             nn.GELU(),
-            nn.Dropout(0.3),  # Dropout for regularization
+            nn.Dropout(0.3),
             nn.Linear(256, num_concepts)
         )
         
-        # Country Head: Maps concept activations to country logits
-        # Input: k (concepts), Output: c (countries)
+        # Semantic Geocell Head (Coarse)
+        # Input: [Concepts, z_img] -> Fused Dimension
+        fused_dim = num_concepts + streetclip_dim
+        self.cell_head = nn.Sequential(
+            nn.Linear(fused_dim, 1024),
+            nn.LayerNorm(1024),
+            nn.GELU(),
+            nn.Dropout(0.3),
+            nn.Linear(1024, num_cells)
+        )
+        
+        # Offset Head (Fine)
+        # Input: Fused Dimension -> 2 (lat, lng offset) or 3 (xyz)
+        self.offset_head = nn.Sequential(
+            nn.Linear(fused_dim, 512),
+            nn.LayerNorm(512),
+            nn.GELU(),
+            nn.Dropout(0.3),
+            nn.Linear(512, coord_output_dim)
+        )
+        
+        # Country Head: Maps Concept Activations to Country Logits (Auxiliary)
         self.country_head = nn.Sequential(
             nn.Linear(num_concepts, 256),
             nn.LayerNorm(256),
@@ -79,18 +104,7 @@ class ConceptAwareGeoModel(nn.Module):
             nn.Linear(256, num_countries)
         )
         
-        # Coordinate Regression Head: Maps concept activations to coordinates
-        # Input: k (concepts), Output: coord_output_dim (2 or 3)
-        self.coord_head = nn.Sequential(
-            nn.Linear(num_concepts, 256),
-            nn.LayerNorm(256),
-            nn.GELU(),
-            nn.Dropout(0.3),
-            nn.Linear(256, coord_output_dim)
-        )
-
         # Location Adapter: Maps LocationEncoder output (512) to StreetCLIP dimension
-        # This allows the location embedding x_loc to be compatible with the basis B
         self.location_adapter = nn.Linear(location_encoder_dim, streetclip_dim)
         
     def get_concept_basis(self) -> torch.Tensor:
@@ -102,22 +116,19 @@ class ConceptAwareGeoModel(nn.Module):
         basis = self.concept_basis_init + self.delta
         return basis.t()
 
-    def forward(self, images: torch.Tensor, gps_coords: Optional[torch.Tensor] = None) -> Union[Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor], Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]:
+    def forward(self, images: torch.Tensor, gps_coords: Optional[torch.Tensor] = None):
         """
         Args:
             images: Image tensor [batch, 3, H, W]
             gps_coords: GPS coordinates [batch, 2] (lat, lon) - Optional for inference
             
         Returns:
-            If gps_coords is provided (Training):
-                z_img: Image concept activations [batch, k]
-                z_loc: Location concept activations [batch, k]
-                country_logits: Country predictions [batch, c]
-                pred_coords: Predicted coordinates [batch, 2]
-            If gps_coords is None (Inference):
-                z_img: Image concept activations [batch, k]
-                country_logits: Country predictions [batch, c]
-                pred_coords: Predicted coordinates [batch, 2]
+            z_img: Image concept activations [batch, k]
+            z_loc: Location concept activations [batch, k] (if gps provided)
+            country_logits: Country predictions [batch, c]
+            cell_logits: Geocell predictions [batch, num_cells]
+            pred_offsets: Predicted coordinate offsets [batch, coord_dim]
+            fused_features: [batch, fused_dim]
         """
         # 1. Image Path (Always executed)
         # x_img: [batch, d_streetclip]
@@ -125,42 +136,37 @@ class ConceptAwareGeoModel(nn.Module):
         # z_img: [batch, k]
         z_img = self.image_projector(x_img)
         
-        # Predict country from concept activations
+        # Fusion: [Concepts, StreetCLIP features]
+        fused_features = torch.cat([z_img, x_img], dim=1)
+        
+        # Hierarchical Heads
+        cell_logits = self.cell_head(fused_features)
+        pred_offsets = self.offset_head(fused_features)
+        
+        # Country from Concepts (Interpretability check)
         country_logits = self.country_head(z_img)
         
-        # Predict coordinates from concept activations
-        pred_coords = self.coord_head(z_img)
-        
-        # If predicting 3D sphere coordinates, normalize to unit sphere
-        if self.coord_output_dim == 3:
-            pred_coords = F.normalize(pred_coords, p=2, dim=1)
-        
-        # If no GPS coordinates provided, return image concept vector, country logits, and pred_coords (Inference mode)
-        if gps_coords is None:
-            return z_img, country_logits, pred_coords
+        result = {
+            "z_img": z_img,
+            "country_logits": country_logits,
+            "cell_logits": cell_logits,
+            "pred_offsets": pred_offsets,
+            "fused_features": fused_features
+        }
+
+        if gps_coords is not None:
+            # 2. Location Path (Training mode)
+            x_loc_raw = self.location_encoder(gps_coords)
+            x_loc = self.location_adapter(x_loc_raw)
+            B = self.get_concept_basis()
+            z_loc = torch.matmul(x_loc, B)
+            result["z_loc"] = z_loc
             
-        # 2. Location Path (Training mode)
-        # x_loc_raw: [batch, 512]
-        x_loc_raw = self.location_encoder(gps_coords)
-        # x_loc: [batch, d_streetclip]
-        x_loc = self.location_adapter(x_loc_raw)
-        
-        # 3. Projection to Concept Space via Basis B
-        # B: [d_streetclip, k]
-        B = self.get_concept_basis()
-        
-        # z_loc = x_loc @ B  -> [batch, d] @ [d, k] = [batch, k]
-        z_loc = torch.matmul(x_loc, B)
-        
-        return z_img, z_loc, country_logits, pred_coords
+        return result
         
     def encode_location(self, gps_coords: torch.Tensor) -> torch.Tensor:
         """
         Encode GPS coordinates into concept space (for building gallery).
-        Args:
-            gps_coords: [batch, 2]
-        Returns:
-            z_loc: [batch, k]
         """
         x_loc_raw = self.location_encoder(gps_coords)
         x_loc = self.location_adapter(x_loc_raw)
@@ -175,6 +181,7 @@ class ConceptAwareGeoModel(nn.Module):
             list(self.location_adapter.parameters()) + 
             list(self.location_encoder.parameters()) + 
             list(self.country_head.parameters()) +
-            list(self.coord_head.parameters()) +
+            list(self.cell_head.parameters()) +
+            list(self.offset_head.parameters()) +
             [self.delta]
         )

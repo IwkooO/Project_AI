@@ -29,18 +29,127 @@ from src.models.concept_aware_cbm import ConceptAwareGeoModel
 from src.losses import contrastive_alignment_loss, concept_divergence_loss, coordinate_loss
 from src.concepts.utils import extract_concepts_from_dataset
 from src.evaluation import denormalize_coordinates, haversine_distance, sphere_to_latlng, accuracy_within_threshold
+from sklearn.cluster import KMeans
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ------- Constants -------
+# ---------- Constants ----------
 ENCODER_MODEL_TO_NAME = {
     "geolocal/StreetCLIP": "streetclip",
     "facebook/dinov3-vit7b16-pretrain-lvd1689m": "dinov3",
     "facebook/dinov2-base": "dinov2",
 }
 
-# ------- Helper Functions -------
+# ---------- Helper Functions ----------
+def generate_semantic_geocells(dataset, min_samples_per_cell=500):
+    """
+    Generate semantic geocells using Admin-like clustering.
+    Algorithm: For each country, if samples > min_samples_per_cell, run K-Means to split it.
+    Returns:
+        - cell_centers: Tensor [N_cells, 3] (Cartesian)
+        - sample_to_cell: Tensor [Total_Samples] mapping each sample index to cell ID
+    """
+    logger.info("Generating Semantic Geocells (Per-Country Clustering)...")
+    
+    # Collect all data
+    all_coords = [] # (lat, lng)
+    all_countries = []
+    
+    # Iterate dataset to gather metadata (this might be slow for huge datasets, but okay for 43k)
+    # CBMDataset stores samples in .samples list
+    if hasattr(dataset, 'samples'):
+        samples = dataset.samples
+    elif hasattr(dataset, 'data'):
+        # Fallback for raw CBMDataset if samples not exposed (but it is in our code)
+        samples = dataset.samples
+    else:
+        raise ValueError("Dataset format not recognized for cell generation")
+    
+    for s in samples:
+        all_coords.append([s['lat'], s['lng']])
+        all_countries.append(s['country'])
+        
+    all_coords = np.array(all_coords)
+    all_countries = np.array(all_countries)
+    
+    unique_countries = np.unique(all_countries)
+    
+    cell_centers_list = []
+    sample_to_cell_map = np.zeros(len(samples), dtype=int)
+    
+    current_cell_id_offset = 0
+    
+    for country in tqdm(unique_countries, desc="Clustering Countries"):
+        country_mask = (all_countries == country)
+        country_indices = np.where(country_mask)[0]
+        country_coords = all_coords[country_indices]
+        
+        n_samples = len(country_coords)
+        
+        if n_samples > min_samples_per_cell:
+            # Determine K for this country
+            # E.g., 1 cell per 500 samples
+            k = max(1, n_samples // min_samples_per_cell)
+            
+            # Perform K-Means on 3D sphere coords to avoid pole issues? 
+            # For simplicity on local regions, Lat/Lng K-Means is usually 'okay' but Cartesian is better.
+            # Let's convert to Cartesian for clustering
+            lat_rad = np.deg2rad(country_coords[:, 0])
+            lng_rad = np.deg2rad(country_coords[:, 1])
+            x = np.cos(lat_rad) * np.cos(lng_rad)
+            y = np.cos(lat_rad) * np.sin(lng_rad)
+            z = np.sin(lat_rad)
+            cart_coords = np.stack([x, y, z], axis=1)
+            
+            kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+            kmeans.fit(cart_coords)
+            
+            # Cluster centers are in Cartesian, need to be stored
+            centers = kmeans.cluster_centers_
+            # Normalize centers to unit sphere
+            centers = centers / np.linalg.norm(centers, axis=1, keepdims=True)
+            
+            # Assign cell IDs
+            local_labels = kmeans.labels_
+            global_labels = local_labels + current_cell_id_offset
+            
+            sample_to_cell_map[country_indices] = global_labels
+            
+            # Add centers
+            for center in centers:
+                cell_centers_list.append(center)
+                
+            current_cell_id_offset += k
+            
+        else:
+            # Country is too small, treat as single cell
+            # Compute mean center
+            lat_rad = np.deg2rad(country_coords[:, 0])
+            lng_rad = np.deg2rad(country_coords[:, 1])
+            x = np.cos(lat_rad) * np.cos(lng_rad)
+            y = np.cos(lat_rad) * np.sin(lng_rad)
+            z = np.sin(lat_rad)
+            
+            mean_x = np.mean(x)
+            mean_y = np.mean(y)
+            mean_z = np.mean(z)
+            
+            center = np.array([mean_x, mean_y, mean_z])
+            center = center / np.linalg.norm(center)
+            
+            cell_centers_list.append(center)
+            
+            sample_to_cell_map[country_indices] = current_cell_id_offset
+            current_cell_id_offset += 1
+            
+    cell_centers = torch.tensor(np.stack(cell_centers_list), dtype=torch.float32)
+    sample_to_cell = torch.tensor(sample_to_cell_map, dtype=torch.long)
+    
+    logger.info(f"Generated {len(cell_centers)} Semantic Geocells.")
+    return cell_centers, sample_to_cell
+
+
 def collate_batch(batch):
     """
     Custom collate function to handle variable-length metadata fields.
@@ -393,28 +502,34 @@ def create_checkpoint_dir(
 
     return timestamp_dir
 
-# ------- Main Training Function -------
+# ---------- Main Training Function ----------
 def train(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
 
-    # ------- Setup Data & Image Encoder -------
+    # ---------- Setup Data & Image Encoder ----------
     logger.info("Initializing Dataset...")
 
     # Use StreetCLIP transforms
     base_encoder = StreetCLIPEncoder(StreetCLIPConfig(model_name=args.encoder_model))
     transforms = get_transforms_from_processor(base_encoder.image_processor)
     
-    # full_dataset = PanoramaCBMDataset(
-    #     transform=transforms,
-    #     require_coordinates=True,
-    #     country=args.country_filter,
-    #     use_normalized_coordinates=False,
-    #     geoguessr_id=args.geoguessr_id,
-    #     data_root=args.data_root
-    # )
-    full_dataset = CBMDataset(dataframe=pd.read_csv("/scratch-shared/pnair/Project_AI/data/dataset-43k.csv"), country=args.country_filter)
-    
+    # Dataset to use
+    #full_dataset = PanoramaCBMDataset(
+    #         transform=transforms,
+    #         require_coordinates=True,
+    #         country=args.country_filter,
+    #         use_normalized_coordinates=False,
+    #         geoguessr_id=args.geoguessr_id,
+    #         data_root=args.data_root
+    #     )
+    full_dataset = CBMDataset(
+                dataframe=pd.read_csv("/scratch-shared/pnair/Project_AI/data/dataset-43k.csv"),
+                transform=transforms,
+                encoder_model=args.encoder_model,
+                country=args.country_filter
+    )
+
     # Diagnostic: Check concept distribution
     all_concepts = [s['meta_name'] for s in full_dataset.samples]
     concept_counts = Counter(all_concepts)
@@ -470,9 +585,138 @@ def train(args):
     train_concepts = [s['meta_name'] for s in train_samples]
     train_concept_counts = Counter(train_concepts)
     logger.info(f"Train set: {len(train_concepts)} samples across {len(train_concept_counts)} concepts")
+
+    # Precompute Note Embeddings for Training
+    logger.info("Pre-computing Note Embeddings for Semantic Alignment...")
+    all_notes = [s['note'] for s in full_dataset.samples]
+    
+    note_embeddings_list = []
+    with torch.no_grad():
+        for i in range(0, len(all_notes), 32):
+            batch_notes = all_notes[i:i+32]
+            # Replace empty notes with " " to avoid tokenizer errors
+            batch_notes = [n if n and n.strip() else " " for n in batch_notes]
+            feats = base_encoder.get_text_features(text=batch_notes)
+            note_embeddings_list.append(feats.cpu())
+    all_note_embeddings = torch.cat(note_embeddings_list, dim=0)
+    
+    # Inject into samples
+    for i, sample in enumerate(full_dataset.samples):
+        sample['note_embedding'] = all_note_embeddings[i]
+        
+    # Re-define collate to handle cells and note embeddings
+    def collate_batch_v2(batch):
+        images = torch.stack([item[0] for item in batch])
+        concept_indices = torch.tensor([item[1] for item in batch], dtype=torch.long)
+        target_indices = torch.tensor([item[2] for item in batch], dtype=torch.long)
+        coordinates = torch.stack([item[3] for item in batch])
+        metadata = [item[4] for item in batch]
+        
+        cell_labels = []
+        note_embs = []
+        
+        for m in metadata:
+            pid = m['pano_id']
+            cell_labels.append(pano_to_cell[pid])
+            note_embs.append(pano_to_note_emb[pid])
+            
+        cell_labels = torch.tensor(cell_labels, dtype=torch.long)
+        note_embs = torch.stack(note_embs)
+        
+        return images, concept_indices, target_indices, coordinates, metadata, cell_labels, note_embs
+
+    # Build lookup maps
+    pano_to_note_emb = {s['pano_id']: s['note_embedding'] for s in full_dataset.samples}
+    # pano_to_cell already built
+    
+    # Update DataLoaders to use v2 collate
+    train_loader = DataLoader(
+        train_dataset, 
+        batch_size=args.batch_size, 
+        shuffle=True, 
+        num_workers=4,
+        pin_memory=True,
+        drop_last=True,
+        collate_fn=collate_batch_v2
+    )
+    
+    val_loader = DataLoader(
+        val_dataset, 
+        batch_size=args.batch_size, 
+        shuffle=False, 
+        num_workers=4,
+        collate_fn=collate_batch_v2
+    )
+    
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=4,
+        collate_fn=collate_batch_v2
+    )
+    
     logger.info(f"  Samples per concept - Min: {min(train_concept_counts.values())}, Max: {max(train_concept_counts.values())}, Avg: {len(train_concepts)/len(train_concept_counts):.1f}")
 
-    # ------- Concept Extraction & Encoding -------
+    # ---------- Semantic Geocell Generation ----------
+    cell_centers, sample_to_cell = generate_semantic_geocells(full_dataset, min_samples_per_cell=500)
+    cell_centers = cell_centers.to(device)
+    num_cells = len(cell_centers)
+    
+    # Assign cell labels to datasets
+    # We need to be careful mapping back to train/val/test splits
+    # SubsetDataset doesn't easily support adding new attributes, so we'll create a lookup tensor/dict
+    # sample_to_cell is aligned with full_dataset.samples
+    
+    # We need to pass these cell labels into the batch.
+    # Update collate_batch or wrapper to fetch cell_label?
+    # Easiest way: Inject cell_label into the sample dict in full_dataset
+    for i, sample in enumerate(full_dataset.samples):
+        sample['cell_label'] = sample_to_cell[i].item()
+
+    # Re-define collate_batch to handle cell_label
+    def collate_batch_with_cells(batch):
+        images = torch.stack([item[0] for item in batch])
+        concept_indices = torch.tensor([item[1] for item in batch], dtype=torch.long)
+        target_indices = torch.tensor([item[2] for item in batch], dtype=torch.long)
+        coordinates = torch.stack([item[3] for item in batch])
+        metadata = [item[4] for item in batch]
+        
+        # Extract cell labels from metadata (since we injected it into samples, it should be in metadata if dataset returns it?)
+        # Wait, Dataset.__getitem__ returns metadata dict. Let's check if it includes everything from sample.
+        # CBMDataset and PanoramaCBMDataset construct metadata dict explicitly. We need to update them or hack it here.
+        # Since we modified full_dataset.samples in memory, let's check if __getitem__ uses that.
+        # Yes, __getitem__ pulls from self.samples[idx].
+        # BUT, __getitem__ constructs a NEW metadata dict explicitly selecting fields.
+        # So 'cell_label' won't be in the returned metadata dict unless we patch __getitem__.
+        
+        # Patching __getitem__ on the fly is messy.
+        # Better approach: The collate function receives the result of __getitem__.
+        # We can look up cell_label using the sample index? No, indices are local to batch.
+        
+        # Alternative: Pass sample_to_cell tensor to the training loop and look up using global indices?
+        # But we don't have global indices in the batch.
+        
+        # Let's inject 'cell_label' into the metadata dict returned by __getitem__
+        # We can monkey-patch the dataset class or just wrap the dataset.
+        
+        # Let's rely on 'pano_id' to look up cell label if we build a map.
+        # metadata contains 'pano_id'.
+        cell_labels = []
+        for m in metadata:
+            # We can rely on the fact that we updated full_dataset.samples
+            # We need a quick lookup pano_id -> cell_label
+            pass
+        
+        # Actually, let's just modify the metadata dict in the batch since we have 'cell_label' in full_dataset.samples?
+        # No, we can't access full_dataset from here easily without global scope.
+        
+        return images, concept_indices, target_indices, coordinates, metadata
+
+    # Create pano_id -> cell_label map for O(1) lookup during training
+    pano_to_cell = {s['pano_id']: s['cell_label'] for s in full_dataset.samples}
+
+    # ---------- Concept Extraction & Encoding ----------
     logger.info("Extracting and encoding concepts...")
     # We need concepts from the ENTIRE dataset to build the basis, not just training set
     concept_names, concept_map = extract_concepts_from_dataset(full_dataset)
@@ -519,7 +763,7 @@ def train(args):
     E_concept = torch.cat(concept_embeddings, dim=0) # [k, d]
     logger.info(f"Concept Basis shape: {E_concept.shape}")
 
-    # ------- Initialize Concept-Aware Model -------
+    # ---------- Initialize Concept-Aware Model ----------
     logger.info("Initializing ConceptAwareGeoModel...")
     # Configure StreetCLIP for training (finetune=False usually for encoder)
     encoder_config = StreetCLIPConfig(
@@ -566,13 +810,15 @@ def train(args):
         concept_features=E_concept,
         num_concepts=len(concept_names),
         num_countries=len(full_dataset.country_to_idx),
+        num_cells=num_cells, # Semantic Cells
         streetclip_dim=actual_feature_dim,
         location_encoder_dim=512, # GeoCLIP default
-        coord_output_dim=coord_output_dim
+        coord_output_dim=coord_output_dim,
+        text_encoder=base_encoder # Pass frozen encoder for semantic alignment
     )
     model.to(device)
 
-    # ------- Optimizer & Scheduler -------
+    # ---------- Optimizer & Scheduler ----------
     optimizer = torch.optim.AdamW(
         model.parameters_to_optimize(),
         lr=args.lr,
@@ -584,7 +830,7 @@ def train(args):
         optimizer, mode='min', factor=0.5, patience=3, verbose=True
     )
 
-    # ------- Setup Output Directory -------
+    # ---------- Setup Output Directory ----------
     if args.output_dir is None:
         checkpoint_dir = create_checkpoint_dir(
             encoder_model=args.encoder_model,
@@ -613,7 +859,7 @@ def train(args):
     logger.addHandler(file_handler)
     logger.info(f"Logging to {log_file}")
 
-    # ------- Training Loop -------
+    # ---------- Training Loop ----------
     if args.use_wandb:
         # Create tags
         tags = [
@@ -651,16 +897,26 @@ def train(args):
         total_country_count = 0
         
         for batch in pbar:
-            # ------- Forward Pass -------
-            images, concept_idx, target_idx, coords, _ = batch
+            # ---------- Forward Pass ----------
+            # Updated unpack to include note_embeddings and cell_labels
+            images, concept_idx, target_idx, coords, _, cell_labels, note_embs = batch
+            
             images = images.to(device)
             coords = coords.to(device)
             concept_idx = concept_idx.to(device)
             target_idx = target_idx.to(device)
+            cell_labels = cell_labels.to(device)
+            note_embs = note_embs.to(device)
             
-            z_img, z_loc, country_logits, pred_coords = model(images, coords)
+            # Model returns dict now
+            outputs = model(images, coords)
+            z_img = outputs['z_img']
+            z_loc = outputs.get('z_loc') # May be None if coords not passed (but they are)
+            country_logits = outputs['country_logits']
+            cell_logits = outputs['cell_logits']
+            pred_offsets = outputs['pred_offsets']
             
-            # ------- Compute Metrics -------
+            # ---------- Compute Metrics ----------
             pred_concepts = z_img.argmax(dim=1)
             concept_correct = (pred_concepts == concept_idx).sum().item()
             total_concept_correct += concept_correct
@@ -671,43 +927,98 @@ def train(args):
             total_country_correct += country_correct
             total_country_count += len(target_idx)
             
-            # ------- Compute Loss -------
+            # ---------- Compute Loss ----------
+            # 1. Contrastive Loss (Image vs Location Concept alignment)
             loss_contrastive = contrastive_alignment_loss(z_img, z_loc, temperature=args.temperature)
+            
+            # 2. Concept Divergence Loss
             loss_divergence = concept_divergence_loss(z_img, z_loc, sigma=args.sigma)
-            # Use label smoothing to reduce overfitting
+            
+            # 3. Concept Classification Loss
             loss_concept = nn.functional.cross_entropy(z_img, concept_idx, label_smoothing=args.label_smoothing)
-            # Country loss
+            
+            # 4. Country Classification Loss (Auxiliary)
             loss_country = nn.functional.cross_entropy(country_logits, target_idx, label_smoothing=args.label_smoothing)
-            # Coordinate loss
-            loss_coords = coordinate_loss(pred_coords, coords, loss_type=args.coordinate_loss_type)
             
-            loss = loss_contrastive + args.lambda_divergence * loss_divergence + args.lambda_concept * loss_concept + args.lambda_country * loss_country + args.lambda_coords * loss_coords
+            # 5. Semantic Reconstruction Loss (Neuro-Symbolic)
+            concept_probs = torch.softmax(z_img, dim=1)
+            basis = model.get_concept_basis().t() # [k, d]
+            pred_note_embs = torch.matmul(concept_probs, basis)
             
-            # ------- Backward Pass -------
+            # Normalize for Cosine Distance (MSE on normalized vectors)
+            pred_note_norm = torch.nn.functional.normalize(pred_note_embs, p=2, dim=1)
+            target_note_norm = torch.nn.functional.normalize(note_embs, p=2, dim=1)
+            loss_semantic = nn.functional.mse_loss(pred_note_norm, target_note_norm)
+            
+            # 6. Cell Classification Loss (Coarse Location)
+            loss_cell = nn.functional.cross_entropy(cell_logits, cell_labels, label_smoothing=args.label_smoothing)
+            
+            # 7. Offset Regression Loss (Fine Location)
+            batch_cell_centers = cell_centers[cell_labels] # [B, 3]
+            
+            # 3D vs 2D offsets
+            if model.coord_output_dim == 3:
+                # Convert True Coords (Lat/Lng) to Cartesian
+                from src.dataset import latlon_to_cartesian
+                lat_rad = torch.deg2rad(coords[:, 0])
+                lng_rad = torch.deg2rad(coords[:, 1])
+                x = torch.cos(lat_rad) * torch.cos(lng_rad)
+                y = torch.cos(lat_rad) * torch.sin(lng_rad)
+                z = torch.sin(lat_rad)
+                true_cart = torch.stack([x, y, z], dim=1) # [B, 3]
+                
+                target_offsets = true_cart - batch_cell_centers
+                loss_offset = nn.functional.mse_loss(pred_offsets, target_offsets)
+            else:
+                # 2D Lat/Lng offsets
+                # Convert cell centers to Lat/Lng
+                c_x, c_y, c_z = batch_cell_centers[:, 0], batch_cell_centers[:, 1], batch_cell_centers[:, 2]
+                c_lat = torch.rad2deg(torch.asin(c_z))
+                c_lng = torch.rad2deg(torch.atan2(c_y, c_x))
+                batch_cell_latlng = torch.stack([c_lat, c_lng], dim=1)
+                
+                if args.coordinate_loss_type == 'haversine':
+                    # Haversine loss on (Cell + Pred_Offset) vs True
+                    pred_latlng = batch_cell_latlng + pred_offsets
+                    loss_offset = coordinate_loss(pred_latlng, coords, loss_type='haversine')
+                else:
+                    target_offsets = coords - batch_cell_latlng
+                    # Handle wraparound
+                    target_offsets[:, 1] = (target_offsets[:, 1] + 180) % 360 - 180
+                    loss_offset = nn.functional.mse_loss(pred_offsets, target_offsets)
+
+            # Total Loss
+            loss = (
+                loss_contrastive + 
+                args.lambda_divergence * loss_divergence + 
+                args.lambda_concept * loss_concept + 
+                args.lambda_country * loss_country + 
+                args.lambda_semantic * loss_semantic +
+                args.lambda_cell * loss_cell +
+                args.lambda_offset * loss_offset
+            )
+            
+            # ---------- Backward Pass ----------
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             
-            # ------- Batch Logging -------
+            # ---------- Batch Logging ----------
             total_loss += loss.item()
             total_contrastive += loss_contrastive.item()
             total_divergence += loss_divergence.item()
             total_concept_loss += loss_concept.item()
             total_country_loss += loss_country.item()
-            total_coords_loss += loss_coords.item()
             
             batch_concept_acc = concept_correct / len(concept_idx)
             batch_country_acc = country_correct / len(target_idx)
             
             pbar.set_postfix({
                 "loss": f"{loss.item():.4f}", 
-                "cont": f"{loss_contrastive.item():.4f}",
-                "div": f"{loss_divergence.item():.4f}",
-                "cls": f"{loss_concept.item():.4f}",
-                "ctry": f"{loss_country.item():.4f}",
-                "dist": f"{loss_coords.item():.4f}",
+                "sem": f"{loss_semantic.item():.4f}",
+                "cell": f"{loss_cell.item():.4f}",
+                "off": f"{loss_offset.item():.4f}",
                 "concept_acc": f"{batch_concept_acc:.3f}",
-                "country_acc": f"{batch_country_acc:.3f}"
             })
             
             if args.use_wandb:
@@ -717,34 +1028,34 @@ def train(args):
                     "batch_divergence": loss_divergence.item(),
                     "batch_concept_loss": loss_concept.item(),
                     "batch_country_loss": loss_country.item(),
-                    "batch_coords_loss": loss_coords.item(),
+                    "batch_semantic_loss": loss_semantic.item(),
+                    "batch_cell_loss": loss_cell.item(),
+                    "batch_offset_loss": loss_offset.item(),
                     "batch_concept_accuracy": batch_concept_acc,
                     "batch_country_accuracy": batch_country_acc
                 })
 
-        # ------- Epoch Validation -------
+        # ---------- Epoch Validation ----------
         avg_train_loss = total_loss / len(train_loader)
         avg_train_concept_loss = total_concept_loss / len(train_loader)
-        avg_train_country_loss = total_country_loss / len(train_loader)
-        avg_train_coords_loss = total_coords_loss / len(train_loader)
         train_concept_acc = total_concept_correct / total_concept_count if total_concept_count > 0 else 0.0
         train_country_acc = total_country_correct / total_country_count if total_country_count > 0 else 0.0
-        logger.info(f"Epoch {epoch+1} Train Loss: {avg_train_loss:.4f}, Concept Loss: {avg_train_concept_loss:.4f}, Country Loss: {avg_train_country_loss:.4f}, Coords Loss: {avg_train_coords_loss:.4f}, Train Concept Acc: {train_concept_acc:.4f}, Train Country Acc: {train_country_acc:.4f}")
+        
+        logger.info(f"Epoch {epoch+1} Train Loss: {avg_train_loss:.4f}, Concept Acc: {train_concept_acc:.4f}, Country Acc: {train_country_acc:.4f}")
         
         if args.use_wandb:
             wandb.log({
                 "train_loss": avg_train_loss,
                 "train_concept_loss": avg_train_concept_loss,
-                "train_country_loss": avg_train_country_loss,
-                "train_coords_loss": avg_train_coords_loss,
                 "train_concept_accuracy": train_concept_acc,
                 "train_country_accuracy": train_country_acc
             })
         
-        val_metrics = validate(model, val_loader, device, args)
+        # Need to update validate function signature to accept cell info or handle it
+        val_metrics = validate(model, val_loader, device, args, cell_centers)
         val_concept_acc = val_metrics['concept_acc']
         
-        # ------- Learning Rate Scheduling & Early Stopping -------
+        # ---------- Learning Rate Scheduling & Early Stopping ----------
         scheduler.step(val_metrics['loss'])
         if val_concept_acc > best_val_acc:
             best_val_acc = val_concept_acc
@@ -759,7 +1070,7 @@ def train(args):
                 logger.info(f"Early stopping triggered after {epoch+1} epochs. Best Val Acc: {best_val_acc:.4f}")
                 break
         
-        # ------- Visualization & Diagnostics -------
+        # ---------- Visualization & Diagnostics ----------
         if (epoch + 1) % args.save_interval == 0:
              visualize_predictions(model, val_loader, concept_names, full_dataset.idx_to_country, device, args, checkpoint_dir, epoch + 1)
              
@@ -776,13 +1087,13 @@ def train(args):
                  wandb_step=epoch+1
              )
 
-        # ------- Save Checkpoint -------
+        # ---------- Save Checkpoint ----------
         if (epoch + 1) % args.save_interval == 0:
             save_path = checkpoint_dir / "checkpoints" / f"checkpoint_epoch_{epoch+1}.pt"
             torch.save(model.state_dict(), save_path)
             logger.info(f"Saved checkpoint to {save_path}")
 
-    # ------- Final Test Evaluation -------
+    # ---------- Final Test Evaluation ----------
     logger.info("Evaluating on test set...")
     # Load best model if saved
     best_model_path = checkpoint_dir / "checkpoints" / "best_model.pt"
@@ -809,32 +1120,37 @@ def train(args):
             log_to_wandb=True
         )
 
-# ------- Validation Function -------
+# ---------- Validation Function ----------
 @torch.no_grad()
-def validate(model, val_loader, device, args):
+def validate(model, val_loader, device, args, cell_centers):
     model.eval()
     total_loss = 0
-    total_contrastive = 0
-    total_divergence = 0
-    total_concept_loss = 0
-    total_country_loss = 0
-    total_coords_loss = 0
     total_concept_correct = 0
     total_concept_count = 0
     total_country_correct = 0
     total_country_count = 0
     
+    # New metrics
+    total_cell_correct = 0
+    
     # Collect all distances for threshold accuracy computation
     all_distances = []
     
     for batch in val_loader:
-        images, concept_idx, target_idx, coords, _ = batch
+        images, concept_idx, target_idx, coords, _, cell_labels, note_embs = batch
         images = images.to(device)
         coords = coords.to(device)
         concept_idx = concept_idx.to(device)
         target_idx = target_idx.to(device)
+        cell_labels = cell_labels.to(device)
+        note_embs = note_embs.to(device)
         
-        z_img, z_loc, country_logits, pred_coords = model(images, coords)
+        outputs = model(images, coords)
+        z_img = outputs['z_img']
+        z_loc = outputs.get('z_loc')
+        country_logits = outputs['country_logits']
+        cell_logits = outputs['cell_logits']
+        pred_offsets = outputs['pred_offsets']
         
         # Compute concept accuracy
         pred_concepts = z_img.argmax(dim=1)
@@ -848,25 +1164,66 @@ def validate(model, val_loader, device, args):
         total_country_correct += country_correct
         total_country_count += len(target_idx)
         
+        # Compute cell accuracy
+        pred_cells = cell_logits.argmax(dim=1)
+        cell_correct = (pred_cells == cell_labels).sum().item()
+        total_cell_correct += cell_correct
+        
+        # Compute Final Coordinate Prediction & Distance
+        # Pred = Cell_Center[Pred_Cell] + Pred_Offset
+        # We rely on predicted cell, not ground truth cell for validation metric!
+        # 1. Get predicted cell centers
+        pred_cell_centers = cell_centers[pred_cells] # [B, 3]
+        
+        # 2. Get predicted Lat/Lng
+        if model.coord_output_dim == 3:
+            # Prediction is in 3D Cartesian space
+            pred_cart = pred_cell_centers + pred_offsets
+            # Convert to Lat/Lng for haversine
+            # Normalize first to be on sphere? Or just assume noisy offset?
+            # Ideally normalize.
+            pred_cart = torch.nn.functional.normalize(pred_cart, p=2, dim=1)
+            pred_latlng_deg = sphere_to_latlng(pred_cart) # [B, 2]
+            pred_coords = pred_latlng_deg
+        else:
+            # Prediction is 2D Lat/Lng offset
+            # Convert cell center to Lat/Lng
+            c_x, c_y, c_z = pred_cell_centers[:, 0], pred_cell_centers[:, 1], pred_cell_centers[:, 2]
+            c_lat = torch.rad2deg(torch.asin(c_z))
+            c_lng = torch.rad2deg(torch.atan2(c_y, c_x))
+            pred_cell_latlng = torch.stack([c_lat, c_lng], dim=1)
+            
+            pred_coords = pred_cell_latlng + pred_offsets
+            # Normalize Lng to [-180, 180]? Haversine usually handles it but cleaner to normalize.
+        
         # Compute distances for threshold accuracy
         batch_distances = haversine_distance(pred_coords, coords)
         if batch_distances.numel() > 0:
             all_distances.append(batch_distances.cpu())
         
-        loss_contrastive = contrastive_alignment_loss(z_img, z_loc, temperature=args.temperature)
-        loss_divergence = concept_divergence_loss(z_img, z_loc, sigma=args.sigma)
+        # Compute Loss (Validation)
+        # ... (Mirror training loss logic but no backward)
+        # For brevity, just summing main components for monitoring 'loss'
         loss_concept = nn.functional.cross_entropy(z_img, concept_idx, label_smoothing=args.label_smoothing)
         loss_country = nn.functional.cross_entropy(country_logits, target_idx, label_smoothing=args.label_smoothing)
-        loss_coords = coordinate_loss(pred_coords, coords, loss_type=args.coordinate_loss_type)
+        loss_cell = nn.functional.cross_entropy(cell_logits, cell_labels, label_smoothing=args.label_smoothing)
         
-        loss = loss_contrastive + args.lambda_divergence * loss_divergence + args.lambda_concept * loss_concept + args.lambda_country * loss_country + args.lambda_coords * loss_coords
+        # Semantic loss
+        concept_probs = torch.softmax(z_img, dim=1)
+        basis = model.get_concept_basis().t()
+        pred_note_embs = torch.matmul(concept_probs, basis)
+        pred_note_norm = torch.nn.functional.normalize(pred_note_embs, p=2, dim=1)
+        target_note_norm = torch.nn.functional.normalize(note_embs, p=2, dim=1)
+        loss_semantic = nn.functional.mse_loss(pred_note_norm, target_note_norm)
+        
+        loss = (
+            args.lambda_concept * loss_concept + 
+            args.lambda_country * loss_country +
+            args.lambda_cell * loss_cell + 
+            args.lambda_semantic * loss_semantic
+        )
         
         total_loss += loss.item()
-        total_contrastive += loss_contrastive.item()
-        total_divergence += loss_divergence.item()
-        total_concept_loss += loss_concept.item()
-        total_country_loss += loss_country.item()
-        total_coords_loss += loss_coords.item()
     
     # Compute threshold accuracies
     threshold_accuracies = {}
@@ -882,37 +1239,37 @@ def validate(model, val_loader, device, args):
         for level, threshold_km in thresholds.items():
             acc = accuracy_within_threshold(all_distances_tensor, threshold_km)
             threshold_accuracies[f'acc_{level}'] = acc
+            
+        median_error = torch.median(all_distances_tensor).item()
+        threshold_accuracies['median_error_km'] = median_error
     else:
         threshold_accuracies = {
             'acc_street': 0.0,
             'acc_city': 0.0,
             'acc_region': 0.0,
             'acc_country': 0.0,
-            'acc_continent': 0.0
+            'acc_continent': 0.0,
+            'median_error_km': 0.0
         }
         
     avg_loss = total_loss / len(val_loader)
-    avg_concept_loss = total_concept_loss / len(val_loader)
-    avg_country_loss = total_country_loss / len(val_loader)
-    avg_coords_loss = total_coords_loss / len(val_loader)
     val_concept_acc = total_concept_correct / total_concept_count if total_concept_count > 0 else 0.0
     val_country_acc = total_country_correct / total_country_count if total_country_count > 0 else 0.0
+    val_cell_acc = total_cell_correct / total_concept_count if total_concept_count > 0 else 0.0 # Denom same as batch size
     
     # Log threshold accuracies
-    log_msg = f"Validation Loss: {avg_loss:.4f}, Concept Loss: {avg_concept_loss:.4f}, Country Loss: {avg_country_loss:.4f}, Coords Loss: {avg_coords_loss:.4f}, Val Concept Acc: {val_concept_acc:.4f}, Val Country Acc: {val_country_acc:.4f}"
-    log_msg += f", Street Acc (1km): {threshold_accuracies['acc_street']:.4f}, City Acc (25km): {threshold_accuracies['acc_city']:.4f}, Region Acc (200km): {threshold_accuracies['acc_region']:.4f}, Country Acc (750km): {threshold_accuracies['acc_country']:.4f}, Continent Acc (2500km): {threshold_accuracies['acc_continent']:.4f}"
+    log_msg = f"Validation Loss: {avg_loss:.4f}, Val Concept Acc: {val_concept_acc:.4f}, Val Country Acc: {val_country_acc:.4f}, Val Cell Acc: {val_cell_acc:.4f}"
+    log_msg += f", Median Error: {threshold_accuracies['median_error_km']:.1f}km"
     logger.info(log_msg)
+    logger.info(f"Thresholds: Street={threshold_accuracies['acc_street']:.3f}, City={threshold_accuracies['acc_city']:.3f}, Region={threshold_accuracies['acc_region']:.3f}")
     
     if args.use_wandb:
         wandb.log({
             "val_loss": avg_loss,
-            "val_contrastive": total_contrastive / len(val_loader),
-            "val_divergence": total_divergence / len(val_loader),
-            "val_concept_loss": avg_concept_loss,
-            "val_country_loss": avg_country_loss,
-            "val_coords_loss": avg_coords_loss,
             "val_concept_accuracy": val_concept_acc,
             "val_country_accuracy": val_country_acc,
+            "val_cell_accuracy": val_cell_acc,
+            "val_median_error_km": threshold_accuracies['median_error_km'],
             "val_acc_street_1km": threshold_accuracies['acc_street'],
             "val_acc_city_25km": threshold_accuracies['acc_city'],
             "val_acc_region_200km": threshold_accuracies['acc_region'],
@@ -922,47 +1279,46 @@ def validate(model, val_loader, device, args):
     
     return {
         'loss': avg_loss,
-        'concept_loss': avg_concept_loss,
         'concept_acc': val_concept_acc,
-        'country_loss': avg_country_loss,
-        'coords_loss': avg_coords_loss,
         'country_acc': val_country_acc,
+        'cell_acc': val_cell_acc,
         **threshold_accuracies
     }
 
-# ------- Main Entry Point -------
+# ---------- Main Entry Point ----------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train Concept-Aware CBM")
 
-    # ------- Dataset Arguments -------
+    # ---------- Dataset Arguments ----------
     parser.add_argument("--geoguessr_id", type=str, default="6906237dc7731161a37282b2", help="Geoguessr ID")
     parser.add_argument("--data_root", type=str, default="data", help="Data root directory")
     
-    # ------- Data & Model Arguments -------
+    # ---------- Data & Model Arguments ----------
     parser.add_argument("--encoder_model", type=str, default="geolocal/StreetCLIP", help="Image Encoder model to use")
     parser.add_argument("--finetune_encoder", action="store_true", help="Whether to finetune the encoder")
     parser.add_argument("--country_filter", type=str, default=None, help="Filter for country")
     
-    # ------- Training Hyperparameters -------
+    # ---------- Training Hyperparameters ----------
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size for training")
     parser.add_argument("--epochs", type=int, default=20, help="Number of epochs to train")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate for optimizer")
     parser.add_argument("--weight_decay", type=float, default=0.1, help="Weight decay for optimizer")
     parser.add_argument("--early_stopping_patience", type=int, default=5, help="Number of epochs to wait before early stopping")
     
-    # ------- Loss Hyperparameters -------
+    # ---------- Loss Hyperparameters ----------
     parser.add_argument("--temperature", type=float, default=0.07, help="Temperature for contrastive alignment loss")
-    parser.add_argument("--lambda_divergence", type=float, default=0.1, help="Weight for divergence loss")
+    parser.add_argument("--lambda_semantic", type=float, default=1.0, help="Weight for semantic reconstruction loss")
     parser.add_argument("--lambda_concept", type=float, default=1.0, help="Weight for concept loss")
-    parser.add_argument("--lambda_country", type=float, default=1.0, help="Weight for country loss")
-    parser.add_argument("--lambda_coords", type=float, default=0.01, help="Weight for coordinate loss")
+    parser.add_argument("--lambda_country", type=float, default=0.1, help="Weight for country loss (deprecated/auxiliary)")
+    parser.add_argument("--lambda_cell", type=float, default=1.0, help="Weight for cell classification loss")
+    parser.add_argument("--lambda_offset", type=float, default=10.0, help="Weight for offset regression loss")
     parser.add_argument("--sigma", type=float, default=1.0, help="Sigma for concept divergence loss")
     parser.add_argument("--label_smoothing", type=float, default=0.1)
     parser.add_argument("--coordinate_loss_type", type=str, default="haversine", 
                         choices=["haversine", "mse", "sphere"],
                         help="Type of coordinate loss: haversine, mse, or sphere")
     
-    # ------- Miscellaneous Arguments -------
+    # ---------- Miscellaneous Arguments ----------
     parser.add_argument("--output_dir", type=str, default=None, help="Output directory (auto-generated if not provided)")
     parser.add_argument("--save_interval", type=int, default=5, help="When to save checkpoints and run visualizations and diagnostics")
     parser.add_argument("--use_wandb", action="store_true", default=True, help="Whether to use Weights & Biases for logging")
