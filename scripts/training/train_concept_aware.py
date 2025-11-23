@@ -166,118 +166,77 @@ def generate_semantic_geocells(dataset, min_samples_per_cell=500, output_dir=Non
 
     logger.info(f"Generated {len(cell_centers)} Semantic Geocells.")
 
-    # Visualize Geocells on a Map (Folium)
+    # Visualize Geocells on a Geographic Map (Matplotlib only)
     try:
-        import folium
-        import plotly.express as px
-        import plotly.graph_objects as go
+        import matplotlib.pyplot as plt
+        from matplotlib.patches import Rectangle
 
-        # Create map centered on mean location
-        mean_lat = np.mean(all_coords[:, 0])
-        mean_lng = np.mean(all_coords[:, 1])
-
-        # 1. Static Plotly Map (for wandb)
-        # Need to convert cell centers to Lat/Lng
-        # cell_centers is [N, 3] Cartesian
+        # Convert cell centers to lat/lng for plotting
         cx, cy, cz = cell_centers[:, 0], cell_centers[:, 1], cell_centers[:, 2]
         clat = np.rad2deg(np.arcsin(cz.numpy()))
         clng = np.rad2deg(np.arctan2(cy.numpy(), cx.numpy()))
 
-        # Create a scatter plot of samples colored by cell ID
-        # Since plotting 40k samples might be heavy, let's plot centers + sample subset
-
-        fig = go.Figure()
-
-        # Add Cell Centers
-        fig.add_trace(
-            go.Scattergeo(
-                lon=clng,
-                lat=clat,
-                text=[f"Cell {i}" for i in range(len(cell_centers))],
-                marker=dict(size=8, color="red", symbol="star"),
-                name="Cell Centers",
-            )
-        )
-
-        # Add sample points (subsample for speed)
-        indices = np.random.choice(
-            len(all_coords), size=min(len(all_coords), 5000), replace=False
-        )
-        sub_lat = all_coords[indices, 0]
-        sub_lng = all_coords[indices, 1]
-        sub_cells = sample_to_cell_map[indices]
-
-        fig.add_trace(
-            go.Scattergeo(
-                lon=sub_lng,
-                lat=sub_lat,
-                marker=dict(size=3, color=sub_cells, colorscale="Viridis", opacity=0.7),
-                name="Samples",
-            )
-        )
-
-        fig.update_layout(
-            title=f"Semantic Geocells (K={len(cell_centers)})",
-            geo_scope="world",
-        )
-
-        # Determine output paths
+        # Determine output path
         if output_dir is not None:
             output_path = Path(output_dir)
             output_path.mkdir(parents=True, exist_ok=True)
-            html_path = output_path / "geocells_map.html"
             png_path = output_path / "geocells_map.png"
         else:
-            html_path = "geocells_map.html"
             png_path = "geocells_map.png"
 
-        # Save interactive HTML
-        fig.write_html(str(html_path))
-        # Save static image for wandb
-        fig.write_image(str(png_path))
-        logger.info(f"Saved geocell visualizations: {html_path}, {png_path}")
+        # Create figure with world map background
+        fig, ax = plt.subplots(figsize=(16, 9))
+        
+        # Subsample samples for visualization (max 10000 points)
+        max_samples_viz = min(len(all_coords), 10000)
+        if len(all_coords) > max_samples_viz:
+            indices = np.random.choice(len(all_coords), size=max_samples_viz, replace=False)
+            viz_lats = all_coords[indices, 0]
+            viz_lngs = all_coords[indices, 1]
+            viz_cells = sample_to_cell_map[indices]
+        else:
+            viz_lats = all_coords[:, 0]
+            viz_lngs = all_coords[:, 1]
+            viz_cells = sample_to_cell_map
+
+        # Plot samples colored by cell ID
+        scatter = ax.scatter(
+            viz_lngs, viz_lats, c=viz_cells, s=2, alpha=0.5, 
+            cmap='tab20', edgecolors='none'
+        )
+
+        # Plot cell centers as red stars
+        ax.scatter(clng, clat, c='red', s=100, marker='*', 
+                  edgecolors='black', linewidths=0.5, label='Cell Centers', zorder=10)
+
+        # Add colorbar for cell IDs
+        cbar = plt.colorbar(scatter, ax=ax, label='Cell ID')
+        
+        # Set world map bounds
+        ax.set_xlim([-180, 180])
+        ax.set_ylim([-90, 90])
+        
+        # Add gridlines
+        ax.grid(True, alpha=0.3, linestyle='--')
+        ax.set_xlabel('Longitude', fontsize=12)
+        ax.set_ylabel('Latitude', fontsize=12)
+        ax.set_title(f'Semantic Geocells Distribution (K={len(cell_centers)} cells)', fontsize=14, fontweight='bold')
+        ax.legend(loc='upper right', fontsize=10)
+
+        # Add world map outline (simple rectangle)
+        world_rect = Rectangle((-180, -90), 360, 180, 
+                               fill=False, edgecolor='black', linewidth=1.5)
+        ax.add_patch(world_rect)
+
+        plt.tight_layout()
+        plt.savefig(str(png_path), dpi=150, bbox_inches='tight')
+        plt.close()
+        logger.info(f"Saved geocell visualization to {png_path}")
 
     except Exception as e:
-        logger.warning(f"Failed to visualize geocells with Plotly/Folium: {e}")
-        # Fallback to basic matplotlib if advanced viz fails
-        try:
-            import matplotlib.pyplot as plt
-
-            # Convert centers to lat/lng for plotting
-            cx, cy, cz = cell_centers[:, 0], cell_centers[:, 1], cell_centers[:, 2]
-            clat = np.rad2deg(np.arcsin(cz.numpy()))
-            clng = np.rad2deg(np.arctan2(cy.numpy(), cx.numpy()))
-
-            plt.figure(figsize=(12, 6))
-            # Plot all samples first as background
-            sample_lats = [s["lat"] for s in samples]
-            sample_lngs = [s["lng"] for s in samples]
-            plt.scatter(
-                sample_lngs, sample_lats, s=1, alpha=0.3, c="lightgray", label="Samples"
-            )
-
-            # Plot cell centers
-            plt.scatter(clng, clat, c="red", s=20, marker="x", label="Cell Centers")
-
-            plt.title(f"Semantic Geocells (K={len(cell_centers)})")
-            plt.xlabel("Longitude")
-            plt.ylabel("Latitude")
-            plt.legend()
-            plt.grid(True, alpha=0.3)
-            
-            # Determine output path
-            if output_dir is not None:
-                output_path = Path(output_dir)
-                output_path.mkdir(parents=True, exist_ok=True)
-                png_path = output_path / "geocells_map.png"
-            else:
-                png_path = "geocells_map.png"
-            
-            plt.savefig(str(png_path))
-            plt.close()
-            logger.info(f"Saved fallback geocell visualization to {png_path}")
-        except Exception as e2:
-            logger.warning(f"Failed fallback visualization: {e2}")
+        logger.error(f"Failed to visualize geocells: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
 
     return cell_centers, sample_to_cell
 
@@ -306,6 +265,7 @@ def visualize_predictions(
     args,
     checkpoint_dir,
     epoch,
+    cell_centers,
     num_samples=4,
 ):
     """
@@ -327,13 +287,35 @@ def visualize_predictions(
     wandb_images = []
 
     for batch in val_loader:
-        images, concept_indices, _, coords, metadata = batch
+        images, concept_indices, _, coords, metadata, cell_labels, note_embs = batch
         images = images.to(device)
         coords = coords.to(device)
         concept_indices = concept_indices.to(device)
 
         # Forward pass
-        z_img, z_loc, country_logits, pred_coords = model(images, coords)
+        outputs = model(images, coords)
+        z_img = outputs["z_img"]
+        z_loc = outputs.get("z_loc")
+        country_logits = outputs["country_logits"]
+        cell_logits = outputs["cell_logits"]
+        pred_offsets = outputs["pred_offsets"]
+
+        # Reconstruct predicted coordinates
+        pred_cells = cell_logits.argmax(dim=1)
+        batch_cell_centers = cell_centers[pred_cells] # [B, 3]
+
+        if model.coord_output_dim == 3:
+            # Prediction is in 3D Cartesian space
+            pred_cart = batch_cell_centers + pred_offsets
+            pred_cart = torch.nn.functional.normalize(pred_cart, p=2, dim=1)
+            pred_coords = sphere_to_latlng(pred_cart) # [B, 2]
+        else:
+            # Prediction is 2D Lat/Lng offset
+            c_x, c_y, c_z = batch_cell_centers[:, 0], batch_cell_centers[:, 1], batch_cell_centers[:, 2]
+            c_lat = torch.rad2deg(torch.asin(c_z))
+            c_lng = torch.rad2deg(torch.atan2(c_y, c_x))
+            batch_cell_latlng = torch.stack([c_lat, c_lng], dim=1)
+            pred_coords = batch_cell_latlng + pred_offsets
 
         # In-Batch Retrieval Similarity
         z_img_norm = torch.nn.functional.normalize(z_img, p=2, dim=1)
@@ -506,6 +488,7 @@ def dump_diagnostics(
     output_path: Path,
     concept_names: List[str],
     idx_to_country: Dict[int, str],
+    cell_centers: torch.Tensor,
     max_samples: int = 64,
     log_to_wandb: bool = False,
     wandb_step: Optional[int] = None,
@@ -518,14 +501,34 @@ def dump_diagnostics(
         if len(rows) >= max_samples:
             break
 
-        images, concept_idx, target_idx, coords, metadata = batch
+        images, concept_idx, target_idx, coords, metadata, cell_labels, note_embs = batch
         images = images.to(device)
         coords = coords.to(device)
         concept_idx = concept_idx.to(device)
         target_idx = target_idx.to(device)
 
         # Forward pass
-        z_img, z_loc, country_logits, pred_coords = model(images, coords)
+        outputs = model(images, coords)
+        z_img = outputs["z_img"]
+        z_loc = outputs.get("z_loc")
+        country_logits = outputs["country_logits"]
+        cell_logits = outputs["cell_logits"]
+        pred_offsets = outputs["pred_offsets"]
+
+        # Reconstruct coordinates
+        pred_cells = cell_logits.argmax(dim=1)
+        batch_cell_centers = cell_centers[pred_cells]
+
+        if model.coord_output_dim == 3:
+            pred_cart = batch_cell_centers + pred_offsets
+            pred_cart = torch.nn.functional.normalize(pred_cart, p=2, dim=1)
+            pred_coords = sphere_to_latlng(pred_cart)
+        else:
+            c_x, c_y, c_z = batch_cell_centers[:, 0], batch_cell_centers[:, 1], batch_cell_centers[:, 2]
+            c_lat = torch.rad2deg(torch.asin(c_z))
+            c_lng = torch.rad2deg(torch.atan2(c_y, c_x))
+            batch_cell_latlng = torch.stack([c_lat, c_lng], dim=1)
+            pred_coords = batch_cell_latlng + pred_offsets
 
         # Concept probabilities
         concept_probs = torch.softmax(z_img, dim=1)
@@ -1078,7 +1081,7 @@ def train(args):
     )
 
     # Initialize AMP scaler
-    scaler = torch.cuda.amp.GradScaler(enabled=args.use_amp)
+    scaler = torch.amp.GradScaler('cuda', enabled=args.use_amp)
     logger.info(f"AMP enabled: {args.use_amp}")
     logger.info(f"Gradient accumulation steps: {args.gradient_accumulation_steps}")
 
@@ -1119,7 +1122,7 @@ def train(args):
             note_embs = note_embs.to(device)
 
             # AMP Context
-            with torch.cuda.amp.autocast(enabled=args.use_amp):
+            with torch.amp.autocast('cuda', enabled=args.use_amp):
                 # Model returns dict now
                 outputs = model(images, coords)
                 z_img = outputs["z_img"]
@@ -1240,7 +1243,7 @@ def train(args):
 
                 # Total Loss
                 loss = (
-                    loss_contrastive
+                    args.lambda_contrastive * loss_contrastive
                     + args.lambda_divergence * loss_divergence
                     + args.lambda_concept * loss_concept
                     + args.lambda_country * loss_country
@@ -1362,6 +1365,7 @@ def train(args):
                 args,
                 checkpoint_dir,
                 epoch + 1,
+                cell_centers=cell_centers,
             )
 
             # Diagnostics
@@ -1373,6 +1377,7 @@ def train(args):
                 diag_path,
                 concept_names,
                 full_dataset.idx_to_country,
+                cell_centers=cell_centers,
                 log_to_wandb=args.use_wandb,
                 wandb_step=epoch + 1,
             )
@@ -1393,7 +1398,7 @@ def train(args):
         model.load_state_dict(torch.load(best_model_path))
         logger.info("Loaded best model for testing.")
 
-    test_metrics = validate(model, test_loader, device, args)
+    test_metrics = validate(model, test_loader, device, args, cell_centers)
     logger.info(f"Test Metrics: {test_metrics}")
 
     if args.use_wandb:
@@ -1408,6 +1413,7 @@ def train(args):
             test_diag_path,
             concept_names,
             full_dataset.idx_to_country,
+            cell_centers=cell_centers,
             max_samples=len(test_dataset),  # Dump all test samples
             log_to_wandb=True,
         )
@@ -1697,7 +1703,16 @@ if __name__ == "__main__":
         help="Weight for semantic reconstruction loss",
     )
     parser.add_argument(
-        "--lambda_concept", type=float, default=1.0, help="Weight for concept loss"
+        "--lambda_divergence",
+        type=float,
+        default=0.1,
+        help="Weight for concept divergence loss",
+    )
+    parser.add_argument(
+        "--lambda_concept", type=float, default=10.0, help="Weight for concept loss"
+    )
+    parser.add_argument(
+        "--lambda_contrastive", type=float, default=0.1, help="Weight for contrastive loss"
     )
     parser.add_argument(
         "--lambda_country",

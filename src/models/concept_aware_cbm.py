@@ -66,12 +66,13 @@ class ConceptAwareGeoModel(nn.Module):
         
         # Image Projector (f_img): Maps image embeddings to concept activations
         # Input: d_streetclip, Output: k (concepts)
+        # Increased capacity: 256 -> 512
         self.image_projector = nn.Sequential(
-            nn.Linear(streetclip_dim, 256),
-            nn.LayerNorm(256),
+            nn.Linear(streetclip_dim, 512),
+            nn.LayerNorm(512),
             nn.GELU(),
             nn.Dropout(0.3),
-            nn.Linear(256, num_concepts)
+            nn.Linear(512, num_concepts)
         )
         
         # Semantic Geocell Head (Coarse)
