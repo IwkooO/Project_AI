@@ -1,97 +1,0 @@
-============================================================================================== 
-Warning! Mixing Conda and module environments may lead to corruption of the
-user environment. 
-We do not recommend users mixing those two environments unless absolutely
-necessary. Note that 
-SURF does not provide any support for Conda environment.
-For more information, please refer to our software policy page:
-https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
-
-Remember that many packages have already been installed on the system and can
-be loaded using 
-the 'module load <package__name>' command. If you are uncertain if a package is
-already available 
-on the system, please use 'module avail' or 'module spider' to search for it.
-============================================================================================== 
-Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
-Using device: cuda
-Loading model from /home/igodzwon/Project_AI/checkpoints/cbm-finetuned/best_cbm_model.pth
-Loading backbone: geolocal/StreetCLIP
-Backbone frozen.
-Loading test split...
-Dataset size: 2663
-Grouping images by concept...
-Found 123 concepts with at least 8 images
-Visualizing concepts:   0%|          | 0/10 [00:00<?, ?it/s]Visualizing concepts:  10%|█         | 1/10 [00:07<01:06,  7.43s/it]Visualizing concepts:  20%|██        | 2/10 [00:14<00:55,  6.94s/it]Visualizing concepts:  30%|███       | 3/10 [00:21<00:49,  7.03s/it]Visualizing concepts:  40%|████      | 4/10 [00:28<00:42,  7.05s/it]Visualizing concepts:  50%|█████     | 5/10 [00:35<00:34,  6.97s/it]Visualizing concepts:  60%|██████    | 6/10 [00:42<00:28,  7.04s/it]Visualizing concepts:  70%|███████   | 7/10 [00:49<00:21,  7.10s/it]Visualizing concepts:  80%|████████  | 8/10 [00:57<00:14,  7.24s/it]Visualizing concepts:  90%|█████████ | 9/10 [01:04<00:07,  7.23s/it]Visualizing concepts: 100%|██████████| 10/10 [01:10<00:00,  7.06s/it]Visualizing concepts: 100%|██████████| 10/10 [01:10<00:00,  7.09s/it]
-Concept: Chiloé Island
-  Images: 8
-  Avg Error: 177.6km (std: 96.0km)
-  Pred Coord Std: Lat=1.69°, Lon=0.58°
-  GT Coord Std: Lat=0.38°, Lon=0.14°
-  Saved to: visualizations/concept_consistency/concept_Chiloé_Island.png
-
-Concept: Ruta 9
-  Images: 8
-  Avg Error: 157.2km (std: 75.0km)
-  Pred Coord Std: Lat=1.07°, Lon=0.76°
-  GT Coord Std: Lat=0.56°, Lon=0.45°
-  Saved to: visualizations/concept_consistency/concept_Ruta_9.png
-
-Concept: Rutas 201/203
-  Images: 8
-  Avg Error: 80.5km (std: 60.9km)
-  Pred Coord Std: Lat=0.49°, Lon=0.53°
-  GT Coord Std: Lat=0.13°, Lon=0.08°
-  Saved to: visualizations/concept_consistency/concept_Rutas_201_203.png
-
-Concept: Los Flamencos National Reserve
-  Images: 8
-  Avg Error: 168.9km (std: 104.3km)
-  Pred Coord Std: Lat=0.52°, Lon=1.13°
-  GT Coord Std: Lat=0.10°, Lon=0.21°
-  Saved to: visualizations/concept_consistency/concept_Los_Flamencos_National_Reserve.png
-
-Concept: RN3 (paved)
-  Images: 8
-  Avg Error: 152.0km (std: 68.7km)
-  Pred Coord Std: Lat=1.61°, Lon=0.50°
-  GT Coord Std: Lat=0.53°, Lon=0.41°
-  Saved to: visualizations/concept_consistency/concept_RN3_(paved).png
-
-Concept: RP55 & RN148
-  Images: 8
-  Avg Error: 266.2km (std: 118.9km)
-  Pred Coord Std: Lat=1.15°, Lon=1.19°
-  GT Coord Std: Lat=0.96°, Lon=0.09°
-  Saved to: visualizations/concept_consistency/concept_RP55_&_RN148.png
-
-Concept: Ruta 41 Gen 4
-  Images: 8
-  Avg Error: 342.9km (std: 74.5km)
-  Pred Coord Std: Lat=0.70°, Lon=0.32°
-  GT Coord Std: Lat=0.04°, Lon=0.18°
-  Saved to: visualizations/concept_consistency/concept_Ruta_41_Gen_4.png
-
-Concept: Cerro Castillo National Park
-  Images: 8
-  Avg Error: 136.8km (std: 99.3km)
-  Pred Coord Std: Lat=0.98°, Lon=0.54°
-  GT Coord Std: Lat=0.07°, Lon=0.08°
-  Saved to: visualizations/concept_consistency/concept_Cerro_Castillo_National_Park.png
-
-Concept: Eastern Santiago Southern Roads
-  Images: 8
-  Avg Error: 185.8km (std: 67.8km)
-  Pred Coord Std: Lat=0.52°, Lon=0.75°
-  GT Coord Std: Lat=0.09°, Lon=0.09°
-  Saved to: visualizations/concept_consistency/concept_Eastern_Santiago_Southern_Roads.png
-
-Concept: Ruta 4, Vila Vila to Buena Vista
-  Images: 8
-  Avg Error: 200.1km (std: 102.8km)
-  Pred Coord Std: Lat=0.46°, Lon=2.14°
-  GT Coord Std: Lat=0.19°, Lon=0.80°
-  Saved to: visualizations/concept_consistency/concept_Ruta_4,_Vila_Vila_to_Buena_Vista.png
-
-
-All visualizations saved to: visualizations/concept_consistency

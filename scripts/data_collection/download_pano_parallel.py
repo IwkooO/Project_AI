@@ -5,10 +5,10 @@ from time import sleep
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import sys
 
-geoguessrId = "691df1ee911f74393c53af8c"
-meta_folder = Path(f"data/{geoguessrId}/metas/")
-pano_folder = Path(f"data/{geoguessrId}/panorama/")
-pano_folder.mkdir(exist_ok=True)
+geoguessrId = "6921d7831744c5356b098bf7"
+meta_folder = Path(f"data/{geoguessrId}_balanced/metas/")
+pano_folder = Path(f"/scratch-shared/igodzwon/Project_AI/data/{geoguessrId}_balanced/panorama/")
+pano_folder.mkdir(parents=True, exist_ok=True)
 
 def download_pano(fn):
     pano_path = pano_folder / f"image_{fn.stem}.jpg"

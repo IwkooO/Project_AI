@@ -7,14 +7,14 @@ import json
 from pathlib import Path
 from tqdm import tqdm
 
-geoguessrId = "691df1ee911f74393c53af8c"
+geoguessrId = "6921d7831744c5356b098bf7"
 data_root = Path("data")
 folder = data_root / geoguessrId
 meta_folder = folder / "metas"
 loc_file = folder / f"locations_{geoguessrId}.json"
 
 def main():
-    # Load locations data
+    # Load locations dataoo
     if not loc_file.exists():
         print(f"Error: {loc_file} not found!")
         return
