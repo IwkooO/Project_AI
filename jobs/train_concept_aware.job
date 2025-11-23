@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=9
 #SBATCH --time=4:00:00
-#SBATCH --output=jobs/outputs/train_concept_aware.log
+#SBATCH --output=jobs/outputs/train_concept_aware_iwo.log
 
 # Load modules
 module load 2025
@@ -22,7 +22,7 @@ export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
 # Run training
 python scripts/training/train_concept_aware.py \
     --encoder_model "geolocal/StreetCLIP" \
-    --batch_size 12 \
+    --batch_size 32 \
     --epochs 20 \
     --lr 3e-4 \
     --weight_decay 0.1 \
@@ -34,5 +34,7 @@ python scripts/training/train_concept_aware.py \
     --use_wandb \
     --country_filter "India" \
     --coordinate_loss_type "haversine" \
+    --data_root /scratch-shared/igodzwon/Project_AI/data \
+    --geoguessr_id 6921d7831744c5356b098bf7_balanced \
 
 

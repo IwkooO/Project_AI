@@ -409,7 +409,9 @@ def train(args):
         transform=transforms,
         require_coordinates=True,
         country=args.country_filter,
-        use_normalized_coordinates=False
+        use_normalized_coordinates=False,
+        geoguessr_id=args.geoguessr_id,
+        data_root=args.data_root
     )
     #full_dataset = CBMDataset(dataframe=pd.read_csv("/scratch-shared/pnair/Project_AI/data/sa-dataset.csv"))
     
@@ -931,6 +933,10 @@ def validate(model, val_loader, device, args):
 # ------- Main Entry Point -------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train Concept-Aware CBM")
+
+    # ------- Dataset Arguments -------
+    parser.add_argument("--geoguessr_id", type=str, default="6906237dc7731161a37282b2", help="Geoguessr ID")
+    parser.add_argument("--data_root", type=str, default="data", help="Data root directory")
     
     # ------- Data & Model Arguments -------
     parser.add_argument("--encoder_model", type=str, default="geolocal/StreetCLIP", help="Image Encoder model to use")
