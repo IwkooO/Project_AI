@@ -97,7 +97,9 @@ def haversine_distance(pred_coords: torch.Tensor, true_coords: torch.Tensor) -> 
     dlat = lat2 - lat1
     dlon = lon2 - lon1
     a = torch.sin(dlat / 2) ** 2 + torch.cos(lat1) * torch.cos(lat2) * torch.sin(dlon / 2) ** 2
-    c = 2 * torch.atan2(torch.sqrt(a), torch.sqrt(1 - a))
+    # Clamp a to [0, 1] to avoid numerical instability in sqrt/asin
+    a = torch.clamp(a, min=0.0, max=1.0)
+    c = 2 * torch.asin(torch.sqrt(a))
     distances = EARTH_RADIUS_KM * c
     return distances
 

@@ -4,7 +4,7 @@
 #SBATCH --job-name=ca
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=9
-#SBATCH --time=14:00:00
+#SBATCH --time=4:00:00
 #SBATCH --output=jobs/outputs/train_concept_aware.log
 
 # Load modules
@@ -22,7 +22,7 @@ export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
 # Run training
 python scripts/training/train_concept_aware.py \
     --encoder_model "geolocal/StreetCLIP" \
-    --batch_size 128 \
+    --batch_size 12 \
     --epochs 20 \
     --lr 3e-4 \
     --weight_decay 0.1 \
@@ -31,8 +31,8 @@ python scripts/training/train_concept_aware.py \
     --label_smoothing 0.1 \
     --early_stopping_patience 5 \
     --save_interval 5 \
-    --use_wandb #\
-    #--country_filter "South America" \
-    #--coordinate_loss_type "haversine" \
+    --use_wandb \
+    --country_filter "India" \
+    --coordinate_loss_type "haversine" \
 
 
