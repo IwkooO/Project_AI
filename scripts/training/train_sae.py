@@ -21,6 +21,19 @@ sys.path.append(str(project_root))
 from src.models.sae import TopKSAE
 from src.data.dataset_sae import SAEDataset
 
+class TensorDataset(torch.utils.data.Dataset):
+    """Dataset for loading pre-computed embeddings."""
+    def __init__(self, tensor_path):
+        print(f"Loading vectors from {tensor_path}...")
+        self.data = torch.load(tensor_path)
+        print(f"Loaded {len(self.data)} vectors.")
+
+    def __getitem__(self, idx):
+        return self.data[idx]
+
+    def __len__(self):
+        return len(self.data)
+
 def main():
     parser = argparse.ArgumentParser(description="Train Top-K SAE on StreetCLIP embeddings")
     parser.add_argument("--csv-path", type=str, required=True, help="Path to training dataset CSV")
@@ -34,6 +47,15 @@ def main():
     parser.add_argument("--k", type=int, default=32, help="Top-K sparsity")
     parser.add_argument("--num-workers", type=int, default=8, help="Number of dataloader workers")
     parser.add_argument("--resample-freq", type=int, default=5, help="Resample dead neurons every N epochs")
+    
+    # New arguments for cached training
+    parser.add_argument("--use-cached", action="store_true", help="Use pre-computed embeddings instead of running backbone")
+    parser.add_argument("--cached-train-path", type=str, default=None, help="Path to cached training .pt file")
+    parser.add_argument("--cached-val-path", type=str, default=None, help="Path to cached validation .pt file")
+
+    # Argument for restarting training from a checkpoint
+    parser.add_argument("--checkpoint-path", type=str, default=None, help="Path to checkpoint to restart from")
+    
     args = parser.parse_args()
 
     # Setup
@@ -43,21 +65,29 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Load Backbone (Frozen)
-    print(f"Loading backbone: {args.model_name}")
-    backbone = AutoModel.from_pretrained(args.model_name)
-    backbone.to(device)
-    backbone.eval()
-    for param in backbone.parameters():
-        param.requires_grad = False
-        
-    # Determine embedding dimension
-    if hasattr(backbone.config, "projection_dim"):
-        input_dim = backbone.config.projection_dim
-    elif hasattr(backbone.config, "hidden_size"):
-        input_dim = backbone.config.hidden_size
+    # 1. Load Backbone (Frozen) - ONLY if not using cached embeddings
+    backbone = None
+    input_dim = 768 # Default
+    
+    if not args.use_cached:
+        print(f"Loading backbone: {args.model_name}")
+        backbone = AutoModel.from_pretrained(args.model_name)
+        backbone.to(device)
+        backbone.eval()
+        for param in backbone.parameters():
+            param.requires_grad = False
+            
+        # Determine embedding dimension
+        if hasattr(backbone.config, "projection_dim"):
+            input_dim = backbone.config.projection_dim
+        elif hasattr(backbone.config, "hidden_size"):
+            input_dim = backbone.config.hidden_size
     else:
-        input_dim = 768
+        print("Using CACHED embeddings. Backbone will NOT be loaded.")
+        # If using cached, we assume 768 or try to infer if possible, 
+        # but usually it's 768 for StreetCLIP/CLIP-Vit-L/14
+        # You could also load a small subset of the pt file to check dim, but 768 is safe default for now.
+
     print(f"Embedding dimension: {input_dim}")
 
     # 2. Initialize SAE
@@ -69,17 +99,39 @@ def main():
     optimizer = Adam(sae.parameters(), lr=args.lr)
     
     # Dataset
-    print(f"Loading training dataset from {args.csv_path}")
-    train_dataset = SAEDataset(args.csv_path, model_name=args.model_name, is_training=True)
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, 
-                           num_workers=args.num_workers, pin_memory=True)
-    
-    val_loader = None
-    if args.val_csv_path:
-        print(f"Loading validation dataset from {args.val_csv_path}")
-        val_dataset = SAEDataset(args.val_csv_path, model_name=args.model_name, is_training=False)
-        val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, 
+    if args.use_cached:
+        if not args.cached_train_path:
+            raise ValueError("--cached-train-path must be provided when --use-cached is True")
+            
+        print(f"Loading CACHED training dataset from {args.cached_train_path}")
+        train_dataset = TensorDataset(args.cached_train_path)
+        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=True)
+        
+        val_loader = None
+        if args.cached_val_path:
+            print(f"Loading CACHED validation dataset from {args.cached_val_path}")
+            val_dataset = TensorDataset(args.cached_val_path)
+            val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True)
+            
+    else:
+        print(f"Loading standard training dataset from {args.csv_path}")
+        train_dataset = SAEDataset(args.csv_path, model_name=args.model_name, is_training=True)
+        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, 
                                num_workers=args.num_workers, pin_memory=True)
+        
+        val_loader = None
+        if args.val_csv_path:
+            print(f"Loading standard validation dataset from {args.val_csv_path}")
+            val_dataset = SAEDataset(args.val_csv_path, model_name=args.model_name, is_training=False)
+            val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, 
+                                   num_workers=args.num_workers, pin_memory=True)
+    
+    # Load checkpoint if provided (just the weights)
+    if args.checkpoint_path:
+        print(f"Loading weights from {args.checkpoint_path}")
+        checkpoint = torch.load(args.checkpoint_path, map_location=device)
+        sae.load_state_dict(checkpoint['model_state_dict'])
+        print("Loaded model weights from checkpoint")
     
     # Training State
     global_step = 0
@@ -101,23 +153,26 @@ def main():
         batches = 0
         
         pbar = tqdm(train_loader, desc=f"Epoch {epoch}/{args.epochs}")
-        for images in pbar:
-            images = images.to(device)
+        for batch_data in pbar:
+            batch_data = batch_data.to(device)
             
-            # Get embeddings (no grad)
-            with torch.no_grad():
-                # HuggingFace CLIP forward
-                vision_outputs = backbone.vision_model(pixel_values=images)
-                if hasattr(vision_outputs, 'pooler_output'):
-                    pooler_output = vision_outputs.pooler_output
-                else:
-                    pooler_output = vision_outputs[1]
-                
-                # Projection
-                if hasattr(backbone, 'visual_projection'):
-                    z = backbone.visual_projection(pooler_output)
-                else:
-                    z = pooler_output
+            if args.use_cached:
+                # Data IS the embedding
+                z = batch_data
+            else:
+                # Data IS images, run backbone
+                images = batch_data
+                with torch.no_grad():
+                    vision_outputs = backbone.vision_model(pixel_values=images)
+                    if hasattr(vision_outputs, 'pooler_output'):
+                        pooler_output = vision_outputs.pooler_output
+                    else:
+                        pooler_output = vision_outputs[1]
+                    
+                    if hasattr(backbone, 'visual_projection'):
+                        z = backbone.visual_projection(pooler_output)
+                    else:
+                        z = pooler_output
             
             # SAE Forward
             z_hat, acts, loss = sae(z)
@@ -151,20 +206,23 @@ def main():
             sae.eval()
             val_batches = 0
             with torch.no_grad():
-                for images in val_loader:
-                    images = images.to(device)
+                for batch_data in val_loader:
+                    batch_data = batch_data.to(device)
                     
-                    # Get embeddings
-                    vision_outputs = backbone.vision_model(pixel_values=images)
-                    if hasattr(vision_outputs, 'pooler_output'):
-                        pooler_output = vision_outputs.pooler_output
+                    if args.use_cached:
+                        z = batch_data
                     else:
-                        pooler_output = vision_outputs[1]
-                        
-                    if hasattr(backbone, 'visual_projection'):
-                        z = backbone.visual_projection(pooler_output)
-                    else:
-                        z = pooler_output
+                        images = batch_data
+                        vision_outputs = backbone.vision_model(pixel_values=images)
+                        if hasattr(vision_outputs, 'pooler_output'):
+                            pooler_output = vision_outputs.pooler_output
+                        else:
+                            pooler_output = vision_outputs[1]
+                            
+                        if hasattr(backbone, 'visual_projection'):
+                            z = backbone.visual_projection(pooler_output)
+                        else:
+                            z = pooler_output
                         
                     z_hat, acts, loss = sae(z)
                     val_loss += loss.item()
@@ -175,6 +233,19 @@ def main():
         else:
             avg_val_loss = avg_loss # Fallback if no val set
         
+        # Save Best Model (BEFORE resampling to avoid saving broken state)
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            save_path = output_dir / "best_sae.pth"
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': sae.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': avg_loss,
+                'val_loss': avg_val_loss
+            }, save_path)
+            print(f"Saved BEST checkpoint (Val Loss: {best_val_loss:.4f}) to {save_path}")
+        
         # Dead Neuron Resampling
         if epoch % args.resample_freq == 0:
             dead_mask = (neuron_activity == 0)
@@ -184,29 +255,35 @@ def main():
             if num_dead > 0:
                 print("Resampling dead neurons...")
                 with torch.no_grad():
-                    # Reset encoder weights for dead neurons to match random current inputs
-                    # We need a batch of data. Use the last batch 'z'.
-                    # If num_dead > batch_size, we reuse z multiple times or sample mostly from it
+                    # Resample logic...
+                    # We need 'z' from the last batch to pick random features
+                    # If batch size is small, we might need to be careful, but standard batches are fine.
                     
                     # Select random inputs from current batch to be new features
-                    indices = torch.randint(0, z.shape[0], (int(num_dead),))
-                    new_features = z[indices] # (num_dead, input_dim)
+                    # If batch is smaller than num_dead, we might crash. 
+                    # Safe approach: repeat z if needed
+                    if z.shape[0] < num_dead:
+                        repeats = int(num_dead // z.shape[0]) + 1
+                        z_pool = z.repeat(repeats, 1)
+                    else:
+                        z_pool = z
+                        
+                    indices = torch.randint(0, z_pool.shape[0], (int(num_dead),))
+                    new_features = z_pool[indices] # (num_dead, input_dim)
                     
                     # Normalize
                     new_features = F.normalize(new_features, p=2, dim=1)
                     
-                    # Reset Encoder Weights: set to match the input feature
+                    # Reset Encoder Weights
                     sae.encoder.weight.data[dead_mask] = new_features
-                    # Reset Encoder Bias: usually set to 0 or slightly negative to not fire immediately?
-                    # Setting to 0 is standard for resampling
                     sae.encoder.bias.data[dead_mask] = 0.0
                     
-                    # Reset Decoder Weights: match the same feature (transpose)
+                    # Reset Decoder Weights
                     sae.decoder.weight.data[:, dead_mask] = new_features.T
                     
-                    # Reset Optimizer state for these parameters (important!)
-                    # This is complex in PyTorch Adam, often skipped in simple implementations
-                    # But ideally should reset momentum buffers for these indices.
+                    # CRITICAL: Normalize decoder columns after resampling
+                    # This ensures unit norm constraint is maintained
+                    sae.normalize_decoder()
                     
                 # Reset activity counter
                 neuron_activity.zero_()
@@ -223,22 +300,8 @@ def main():
                 'val_loss': avg_val_loss
             }, save_path)
             print(f"Saved checkpoint to {save_path}")
-            
-        # Save Best Model
-        if avg_val_loss < best_val_loss:
-            best_val_loss = avg_val_loss
-            save_path = output_dir / "best_sae.pth"
-            torch.save({
-                'epoch': epoch,
-                'model_state_dict': sae.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'loss': avg_loss,
-                'val_loss': avg_val_loss
-            }, save_path)
-            print(f"Saved BEST checkpoint (Val Loss: {best_val_loss:.4f}) to {save_path}")
 
     print("Training finished.")
 
 if __name__ == "__main__":
     main()
-

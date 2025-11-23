@@ -1,0 +1,32 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=viz_saliency_occlusion
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=04:00:00
+#SBATCH --mem=32GB
+#SBATCH --output=jobs/outputs/viz_saliency_occlusion_%j.out
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd $HOME/Project_AI/
+source activate streetview
+
+# Parameters
+SAE_CHECKPOINT="checkpoints/sae_smallest/best_sae.pth"
+DATASET_CSV="data/6921d7831744c5356b098bf7_balanced/splits/dataset_val.csv"
+OUTPUT_DIR="visualizations/sae_saliency_occlusion_auto_pick"
+
+echo "Starting Occlusion Sensitivity Visualization with Auto-Pick..."
+
+python -u scripts/evaluation/visualize_saliency.py \
+    --sae-path "$SAE_CHECKPOINT" \
+    --csv-path "$DATASET_CSV" \
+    --output-dir "$OUTPUT_DIR" \
+    --auto-pick-concepts 5 \
+    --top-k-images 5
+
+echo "Visualization complete. Results in $OUTPUT_DIR"

@@ -1,0 +1,26 @@
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+ERROR: Could not find a version that satisfies the requirement cv2 (from versions: none)
+
+[notice] A new release of pip is available: 25.1.1 -> 25.3
+[notice] To update, run: pip install --upgrade pip
+ERROR: No matching distribution found for cv2
+Starting Saliency Visualization for Concepts: 71, 97, 615, 712, 795, 812, 1009, 1075, 1089, 1120, 1128, 1213, 1330, 1479, 1598, 1649, 1717, 1724, 1782, 1901, 2334, 2433, 2859, 2958
+OpenCV (cv2) not found. Using matplotlib for overlays.
+Loading models...
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Finding top 5 images for concepts: [71, 97, 615, 712, 795, 812, 1009, 1075, 1089, 1120, 1128, 1213, 1330, 1479, 1598, 1649, 1717, 1724, 1782, 1901, 2334, 2433, 2859, 2958]
+Scanning dataset:   0%|          | 0/133 [00:00<?, ?it/s]Scanning dataset:   1%|          | 1/133 [00:19<43:03, 19.57s/it]Scanning dataset:   2%|▏         | 2/133 [00:19<18:00,  8.25s/it]Scanning dataset:   2%|▏         | 3/133 [00:20<10:01,  4.62s/it]Scanning dataset:   3%|▎         | 4/133 [00:20<06:16,  2.92s/it]Scanning dataset:   4%|▍         | 5/133 [00:20<04:13,  1.98s/it]Scanning dataset:   5%|▍         | 6/133 [00:21<02:59,  1.41s/it]Scanning dataset:   5%|▌         | 7/133 [00:21<02:12,  1.05s/it]Scanning dataset:   6%|▌         | 8/133 [00:21<01:42,  1.22it/s][2025-11-23T22:26:21.618] error: *** JOB 16914405 ON gcn141 CANCELLED AT 2025-11-23T22:26:21 DUE to SIGNAL Terminated ***

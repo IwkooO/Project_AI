@@ -2,6 +2,7 @@
 """
 Visualize learned concepts from the Sparse Autoencoder.
 Generates grids of top-activating images and geographic heatmaps.
+Includes deduplication to prevent 'loud' images from dominating all concepts.
 """
 import argparse
 import torch
@@ -77,14 +78,13 @@ def main():
     backbone.to(device).eval()
     
     checkpoint = torch.load(args.sae_path, map_location=device)
-    # Infer dimensions from checkpoint if possible, else defaults
-    # Assuming standard config for now
+    
+    # Infer config
     if hasattr(backbone.config, "projection_dim"):
         input_dim = backbone.config.projection_dim
     else:
         input_dim = 768
         
-    # We need to know expansion factor. Check state dict shape.
     encoder_weight = checkpoint['model_state_dict']['encoder.weight']
     hidden_dim = encoder_weight.shape[0]
     expansion = hidden_dim // input_dim
@@ -97,44 +97,24 @@ def main():
     dataset = VizDataset(args.csv_path, args.model_name)
     dataloader = DataLoader(dataset, batch_size=128, num_workers=8, shuffle=False)
     
-    # Store top K activations for ALL neurons? 
-    # Too memory intensive for 4096 neurons * 46k images.
-    # Strategy: Keep a running buffer of top-K for each neuron.
-    
     print("Collecting activations...")
     # (values, indices) for top K images per neuron
     top_acts_values = torch.zeros(hidden_dim, args.top_k_images, device='cpu')
     top_acts_indices = torch.zeros(hidden_dim, args.top_k_images, dtype=torch.long, device='cpu') - 1
     
-    # Also track geographic coordinates for heatmaps
-    # But we can lookup coordinates later using indices if we save them
-    
     for images, indices in tqdm(dataloader):
         images = images.to(device)
         with torch.no_grad():
             vision_outputs = backbone.vision_model(pixel_values=images)
-            if hasattr(vision_outputs, 'pooler_output'):
-                pooler_output = vision_outputs.pooler_output
-            else:
-                pooler_output = vision_outputs[1]
-            
-            if hasattr(backbone, 'visual_projection'):
-                z = backbone.visual_projection(pooler_output)
-            else:
-                z = pooler_output
+            pooler_output = vision_outputs.pooler_output if hasattr(vision_outputs, 'pooler_output') else vision_outputs[1]
+            z = backbone.visual_projection(pooler_output) if hasattr(backbone, 'visual_projection') else pooler_output
                 
             _, acts, _ = sae(z) # (B, hidden_dim)
             
         # Update top K buffer
-        # This naive loop is slow. Optimized approach:
-        # Only update if max in batch > min in buffer
-        
-        # Moving to CPU to save GPU memory
         batch_acts = acts.cpu()
         batch_indices = indices.cpu()
         
-        # For each neuron, update top K
-        # To speed up, we can just check active neurons
         active_neurons = torch.where(batch_acts.sum(0) > 0)[0]
         
         for neuron_idx in active_neurons:
@@ -150,38 +130,73 @@ def main():
             current_vals = top_acts_values[neuron_idx]
             current_inds = top_acts_indices[neuron_idx]
             
-            combined_vals = torch.cat([current_vals, valid_acts])
-            combined_inds = torch.cat([current_inds, valid_img_indices])
+            # Filter out -1s from current
+            valid_current = current_inds != -1
+            
+            combined_vals = torch.cat([current_vals[valid_current], valid_acts])
+            combined_inds = torch.cat([current_inds[valid_current], valid_img_indices])
             
             # Sort descending
             sorted_vals, sort_idx = torch.sort(combined_vals, descending=True)
             
             # Keep top K
-            top_acts_values[neuron_idx] = sorted_vals[:args.top_k_images]
-            top_acts_indices[neuron_idx] = combined_inds[sort_idx][:args.top_k_images]
+            if len(sorted_vals) > args.top_k_images:
+                top_acts_values[neuron_idx] = sorted_vals[:args.top_k_images]
+                top_acts_indices[neuron_idx] = combined_inds[sort_idx][:args.top_k_images]
+            else:
+                # Pad with -1 if needed
+                pad_len = args.top_k_images - len(sorted_vals)
+                top_acts_values[neuron_idx] = torch.cat([sorted_vals, torch.zeros(pad_len)])
+                top_acts_indices[neuron_idx] = torch.cat([combined_inds[sort_idx], torch.zeros(pad_len, dtype=torch.long) - 1])
 
-    # 3. Select Interesting Concepts
-    # Metric: Highest max activation? Most frequently active?
-    # For now, sort by maximum activation value
+    # 3. Select Interesting Concepts (With Deduplication)
     max_activations = top_acts_values[:, 0]
-    top_concept_indices = torch.argsort(max_activations, descending=True)[:args.num_concepts]
+    # Sort all neurons by their peak activation
+    sorted_neurons = torch.argsort(max_activations, descending=True)
     
-    print(f"Generating visualizations for top {args.num_concepts} concepts...")
+    unique_neurons = []
+    seen_image_sets = []
+    
+    print("Deduplicating concepts...")
+    for neuron_idx in sorted_neurons:
+        if len(unique_neurons) >= args.num_concepts:
+            break
+            
+        neuron_idx = neuron_idx.item()
+        img_indices = top_acts_indices[neuron_idx]
+        
+        # Get valid indices
+        valid_mask = img_indices != -1
+        current_set = set(img_indices[valid_mask].tolist())
+        
+        if len(current_set) == 0:
+            continue
+            
+        # Check overlap with already selected neurons
+        is_duplicate = False
+        for seen_set in seen_image_sets:
+            # Jaccard Similarity
+            intersection = len(current_set.intersection(seen_set))
+            union = len(current_set.union(seen_set))
+            if union > 0 and (intersection / union) > 0.5: # 50% overlap threshold
+                is_duplicate = True
+                break
+        
+        if not is_duplicate:
+            unique_neurons.append(neuron_idx)
+            seen_image_sets.append(current_set)
+    
+    print(f"Found {len(unique_neurons)} unique concepts out of top candidates.")
     
     # 4. Generate Visualizations
-    for i, concept_idx in enumerate(top_concept_indices):
-        concept_idx = concept_idx.item()
+    for i, concept_idx in enumerate(unique_neurons):
         img_indices = top_acts_indices[concept_idx]
         act_values = top_acts_values[concept_idx]
         
-        # Filter out empty slots (-1)
         valid_mask = img_indices != -1
         img_indices = img_indices[valid_mask]
         act_values = act_values[valid_mask]
         
-        if len(img_indices) == 0:
-            continue
-            
         # Create Grid
         fig, axes = plt.subplots(3, 3, figsize=(12, 12))
         fig.suptitle(f"Concept {concept_idx} (Max Act: {act_values[0]:.2f})", fontsize=16)
@@ -206,8 +221,7 @@ def main():
         plt.savefig(out_dir / f"concept_{concept_idx}_top_images.png")
         plt.close()
         
-        # Geographic Plot (Simple Scatter)
-        # Get coords for all these top images
+        # Geographic Plot
         lats = []
         lngs = []
         for idx in img_indices:
@@ -218,7 +232,6 @@ def main():
                 
         if lats:
             plt.figure(figsize=(10, 6))
-            # World map background would be nice, but simple scatter for now
             plt.scatter(lngs, lats, c='red', s=50, alpha=0.7)
             plt.xlim(-180, 180)
             plt.ylim(-90, 90)
@@ -226,10 +239,6 @@ def main():
             plt.title(f"Geographic Distribution: Concept {concept_idx}")
             plt.xlabel("Longitude")
             plt.ylabel("Latitude")
-            
-            # Add background image if available or just borders
-            # Just basic scatter for speed/dependencies
-            
             plt.savefig(out_dir / f"concept_{concept_idx}_map.png")
             plt.close()
 
@@ -237,5 +246,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-

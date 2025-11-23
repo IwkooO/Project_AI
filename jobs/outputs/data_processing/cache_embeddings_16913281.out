@@ -1,0 +1,27 @@
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+----------------------------------------------------------------
+Job started at: Sun Nov 23 20:58:32 CET 2025
+Caching embeddings to: /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_embeddings_augmented
+----------------------------------------------------------------
+Using device: cuda
+Loading backbone: geolocal/StreetCLIP
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+/home/igodzwon/.conda/envs/streetview/lib/python3.11/site-packages/torch/utils/data/dataloader.py:627: UserWarning: This DataLoader will create 16 worker processes in total. Our suggested max number of worker in current system is 9, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
+  warnings.warn(
+Caching 20 augmented versions of training data...
+--- Augmentation Pass 1/20 ---
+Pass 1:   0%|          | 0/9 [00:00<?, ?it/s][2025-11-23T21:02:14.482] error: *** JOB 16913281 ON gcn2 CANCELLED AT 2025-11-23T21:02:14 DUE to SIGNAL Terminated ***

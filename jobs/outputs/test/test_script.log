@@ -1,0 +1,35 @@
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Using device: cuda
+Loading SAE from checkpoints/sae/best_sae.pth
+SAE Config: Input=768, Hidden=6144, K=32
+Loading backbone: geolocal/StreetCLIP
+Loading Test Set from data/6921d7831744c5356b098bf7_balanced/splits/dataset_test.csv
+Running evaluation...
+  0%|          | 0/17 [00:00<?, ?it/s]  6%|▌         | 1/17 [02:38<42:16, 158.52s/it] 12%|█▏        | 2/17 [02:40<16:39, 66.66s/it]  18%|█▊        | 3/17 [02:43<08:42, 37.30s/it] 24%|██▎       | 4/17 [02:45<05:05, 23.51s/it] 29%|██▉       | 5/17 [02:47<03:10, 15.89s/it] 35%|███▌      | 6/17 [02:50<02:04, 11.29s/it] 41%|████      | 7/17 [02:52<01:23,  8.37s/it] 47%|████▋     | 8/17 [02:55<00:58,  6.46s/it] 53%|█████▎    | 9/17 [05:12<06:19, 47.44s/it] 59%|█████▉    | 10/17 [05:15<03:54, 33.52s/it] 65%|██████▍   | 11/17 [05:17<02:23, 23.99s/it] 71%|███████   | 12/17 [05:19<01:27, 17.41s/it] 76%|███████▋  | 13/17 [05:22<00:51, 12.85s/it] 82%|████████▏ | 14/17 [05:24<00:29,  9.69s/it] 88%|████████▊ | 15/17 [05:26<00:14,  7.48s/it] 94%|█████████▍| 16/17 [05:29<00:05,  5.94s/it]100%|██████████| 17/17 [06:48<00:00, 27.97s/it]100%|██████████| 17/17 [06:48<00:00, 24.03s/it]
+
+========================================
+TEST SET RESULTS
+========================================
+Samples:            4254
+MSE Loss:           355.811570
+RMSE:               18.862968
+Explained Variance: -3468.8733 (Max 1.0)
+--------------------
+L0 Sparsity (Avg K): 32.00
+L1 Sparsity:        547.6577
+========================================

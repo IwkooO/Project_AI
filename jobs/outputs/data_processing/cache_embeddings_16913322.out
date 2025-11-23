@@ -1,0 +1,25 @@
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+----------------------------------------------------------------
+Job started at: Sun Nov 23 21:03:05 CET 2025
+Caching embeddings to: /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_embeddings_augmented
+----------------------------------------------------------------
+Using device: cuda
+Loading backbone: geolocal/StreetCLIP
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Caching 20 augmented versions of training data...
+--- Augmentation Pass 1/20 ---
+Pass 1:   0%|          | 0/9 [00:00<?, ?it/s][2025-11-23T21:07:05.385] error: *** JOB 16913322 ON gcn140 CANCELLED AT 2025-11-23T21:07:05 DUE to SIGNAL Terminated ***
