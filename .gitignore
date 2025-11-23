@@ -6,3 +6,4 @@ results/
 *.env
 .cursor/
 visualizations/
+visualzations/cbm
