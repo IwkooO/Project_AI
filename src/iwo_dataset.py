@@ -33,6 +33,7 @@ class CBMDataset(Dataset):
     def __init__(
         self,
         dataframe: pd.DataFrame,
+        country: Optional[str] = None,
         transform=None,
         encoder_model: Optional[str] = None,
         image_size: Optional[Tuple[int, int]] = None,
@@ -48,6 +49,12 @@ class CBMDataset(Dataset):
             use_normalized_coordinates: If True, returns coordinates normalized to [-1, 1]. If False, returns raw (lat, lng).
         """
         self.data = dataframe.reset_index(drop=True)
+        self.country = country
+        if country:
+            self.data = self.data[self.data['country'] == country]
+        else:
+            self.data = self.data.dropna(subset=['image_path', 'meta_name', 'country'])
+        print(f"Loaded {len(self.data)} samples")
         self.use_normalized_coordinates = use_normalized_coordinates
         self.encoder_model = encoder_model
         

@@ -405,15 +405,15 @@ def train(args):
     base_encoder = StreetCLIPEncoder(StreetCLIPConfig(model_name=args.encoder_model))
     transforms = get_transforms_from_processor(base_encoder.image_processor)
     
-    full_dataset = PanoramaCBMDataset(
-        transform=transforms,
-        require_coordinates=True,
-        country=args.country_filter,
-        use_normalized_coordinates=False,
-        geoguessr_id=args.geoguessr_id,
-        data_root=args.data_root
-    )
-    #full_dataset = CBMDataset(dataframe=pd.read_csv("/scratch-shared/pnair/Project_AI/data/sa-dataset.csv"))
+    # full_dataset = PanoramaCBMDataset(
+    #     transform=transforms,
+    #     require_coordinates=True,
+    #     country=args.country_filter,
+    #     use_normalized_coordinates=False,
+    #     geoguessr_id=args.geoguessr_id,
+    #     data_root=args.data_root
+    # )
+    full_dataset = CBMDataset(dataframe=pd.read_csv("/scratch-shared/pnair/Project_AI/data/dataset-43k.csv"), country=args.country_filter)
     
     # Diagnostic: Check concept distribution
     all_concepts = [s['meta_name'] for s in full_dataset.samples]
