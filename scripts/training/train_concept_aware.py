@@ -717,6 +717,42 @@ def train(args):
         full_dataset.samples, train_ratio=0.7, val_ratio=0.2, test_ratio=0.1
     )
 
+    # ---------- Compute Class Weights for Concept Imbalance ----------
+    def compute_concept_weights(train_samples, concept_to_idx, device):
+        """
+        Compute class weights using inverse frequency weighting.
+        Formula: weight[i] = total_samples / (num_concepts * count[i])
+        This gives rare concepts higher weight, common concepts lower weight.
+        
+        This function works for ANY distribution:
+        - If concept has 1 sample: weight = total_samples / num_concepts (highest)
+        - If concept has many samples: weight approaches 0 (lowest)
+        - Normalized so weights sum to num_concepts (maintains loss scale)
+        """
+        concept_counts = Counter(s['meta_name'] for s in train_samples)
+        num_concepts = len(concept_to_idx)
+        total_samples = len(train_samples)
+        
+        weights = torch.ones(num_concepts, device=device)
+        for concept_name, idx in concept_to_idx.items():
+            count = concept_counts.get(concept_name, 1)  # Avoid division by zero
+            weights[idx] = total_samples / (num_concepts * count)
+        
+        # Normalize so weights sum to num_concepts (keeps loss scale similar)
+        weights = weights * (num_concepts / weights.sum())
+        
+        return weights
+
+    # Compute concept weights if enabled
+    concept_weights = None
+    if args.use_class_weights:
+        concept_weights = compute_concept_weights(train_samples, full_dataset.concept_to_idx, device)
+        logger.info(f"Computed concept weights - Min: {concept_weights.min():.4f}, "
+                   f"Max: {concept_weights.max():.4f}, Mean: {concept_weights.mean():.4f}, "
+                   f"Std: {concept_weights.std():.4f}")
+    else:
+        logger.info("Class weights disabled - using uniform weighting")
+
     # Create subset datasets (need to implement wrapper or just list sampling)
     # Re-using the logic from dataset.py main block
     from src.dataset import SubsetDataset
@@ -1076,19 +1112,49 @@ def train(args):
     model.to(device)
 
     # ---------- Optimizer & Scheduler ----------
+    # Differential learning rates: Higher LR for concept head
+    concept_lr = args.lr * args.concept_lr_multiplier
+    other_lr = args.lr
+    
+    # Separate parameter groups
+    concept_params = []
+    other_params = []
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            if 'image_projector' in name:
+                concept_params.append(param)
+            else:
+                other_params.append(param)
+    
+    param_groups = [
+        {'params': concept_params, 'lr': concept_lr},
+        {'params': other_params, 'lr': other_lr}
+    ]
+    
     optimizer = torch.optim.AdamW(
-        model.parameters_to_optimize(), lr=args.lr, weight_decay=args.weight_decay
+        param_groups, weight_decay=args.weight_decay
     )
+    logger.info(f"Using differential learning rates: concept_head={concept_lr:.2e}, others={other_lr:.2e}")
 
     # Initialize AMP scaler
     scaler = torch.amp.GradScaler('cuda', enabled=args.use_amp)
     logger.info(f"AMP enabled: {args.use_amp}")
     logger.info(f"Gradient accumulation steps: {args.gradient_accumulation_steps}")
 
-    # Learning rate scheduler for better convergence
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.5, patience=3, verbose=True
+    # Learning rate scheduler: Warmup + Cosine Annealing
+    warmup_epochs = max(1, int(args.epochs * args.warmup_ratio))
+    from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
+    
+    warmup_scheduler = LinearLR(
+        optimizer, start_factor=0.1, end_factor=1.0, total_iters=warmup_epochs
     )
+    cosine_scheduler = CosineAnnealingLR(
+        optimizer, T_max=args.epochs - warmup_epochs, eta_min=args.lr * 0.01
+    )
+    scheduler = SequentialLR(
+        optimizer, schedulers=[warmup_scheduler, cosine_scheduler], milestones=[warmup_epochs]
+    )
+    logger.info(f"Using warmup ({warmup_epochs} epochs) + cosine annealing scheduler")
 
     # ---------- Training Loop ----------
     logger.info("Starting training...")
@@ -1157,7 +1223,9 @@ def train(args):
 
                 # 3. Concept Classification Loss
                 loss_concept = nn.functional.cross_entropy(
-                    z_img, concept_idx, label_smoothing=args.label_smoothing
+                    z_img, concept_idx, 
+                    weight=concept_weights if args.use_class_weights else None,
+                    label_smoothing=args.label_smoothing
                 )
 
                 # 4. Country Classification Loss (Auxiliary)
@@ -1331,11 +1399,11 @@ def train(args):
             )
 
         # Need to update validate function signature to accept cell info or handle it
-        val_metrics = validate(model, val_loader, device, args, cell_centers)
+        val_metrics = validate(model, val_loader, device, args, cell_centers, concept_weights)
         val_concept_acc = val_metrics["concept_acc"]
 
         # ---------- Learning Rate Scheduling & Early Stopping ----------
-        scheduler.step(val_metrics["loss"])
+        scheduler.step()  # Cosine scheduler doesn't need loss value
         if val_concept_acc > best_val_acc:
             best_val_acc = val_concept_acc
             patience_counter = 0
@@ -1421,7 +1489,7 @@ def train(args):
 
 # ---------- Validation Function ----------
 @torch.no_grad()
-def validate(model, val_loader, device, args, cell_centers):
+def validate(model, val_loader, device, args, cell_centers, concept_weights=None):
     model.eval()
     total_loss = 0
     total_concept_correct = 0
@@ -1508,7 +1576,9 @@ def validate(model, val_loader, device, args, cell_centers):
         # ... (Mirror training loss logic but no backward)
         # For brevity, just summing main components for monitoring 'loss'
         loss_concept = nn.functional.cross_entropy(
-            z_img, concept_idx, label_smoothing=args.label_smoothing
+            z_img, concept_idx, 
+            weight=concept_weights if args.use_class_weights else None,
+            label_smoothing=args.label_smoothing
         )
         loss_country = nn.functional.cross_entropy(
             country_logits, target_idx, label_smoothing=args.label_smoothing
@@ -1662,6 +1732,18 @@ if __name__ == "__main__":
         "--lr", type=float, default=1e-4, help="Learning rate for optimizer"
     )
     parser.add_argument(
+        "--concept_lr_multiplier",
+        type=float,
+        default=3.0,
+        help="Multiplier for concept head learning rate (default: 3.0)",
+    )
+    parser.add_argument(
+        "--warmup_ratio",
+        type=float,
+        default=0.1,
+        help="Fraction of epochs for learning rate warmup (default: 0.1)",
+    )
+    parser.add_argument(
         "--weight_decay", type=float, default=0.1, help="Weight decay for optimizer"
     )
     parser.add_argument(
@@ -1736,6 +1818,18 @@ if __name__ == "__main__":
         "--sigma", type=float, default=1.0, help="Sigma for concept divergence loss"
     )
     parser.add_argument("--label_smoothing", type=float, default=0.1)
+    parser.add_argument(
+        "--use_class_weights",
+        action="store_true",
+        help="Use class weights for concept loss to handle imbalance (default: True)",
+    )
+    parser.add_argument(
+        "--no_class_weights",
+        dest="use_class_weights",
+        action="store_false",
+        help="Disable class weights for concept loss",
+    )
+    parser.set_defaults(use_class_weights=True)
     parser.add_argument(
         "--coordinate_loss_type",
         type=str,

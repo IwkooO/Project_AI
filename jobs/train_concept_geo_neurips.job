@@ -2,8 +2,8 @@
 #SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
 #SBATCH --job-name=concept_geo_neurips
-#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/train_concept_geo_neurips_world.log
-#SBATCH --time=8:00:00
+#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/train_concept_geo_neurips_world_class_weights.log
+#SBATCH --time=7:00:00
 #SBATCH --cpus-per-task=9
 #SBATCH --mem=32G
 
@@ -20,7 +20,7 @@ export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
 # Run Training with NeurIPS configuration
 python scripts/training/train_concept_aware.py \
     --encoder_model "geolocal/StreetCLIP" \
-    --batch_size 64 \
+    --batch_size 128 \
     --epochs 20 \
     --lr 3e-4 \
     --weight_decay 0.1 \
@@ -36,6 +36,7 @@ python scripts/training/train_concept_aware.py \
     --save_interval 1 \
     --min_samples_per_cell 20 \
     --use_wandb \
+    --use_class_weights \
     --coordinate_loss_type "haversine" #\
     #--country_filter "India" \
     

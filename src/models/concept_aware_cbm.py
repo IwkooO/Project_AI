@@ -66,12 +66,17 @@ class ConceptAwareGeoModel(nn.Module):
         
         # Image Projector (f_img): Maps image embeddings to concept activations
         # Input: d_streetclip, Output: k (concepts)
-        # Increased capacity: 256 -> 512
+        # Increased capacity: 3-layer architecture (768→1024→512→446)
+        # Reduced dropout (0.15) for better learning of rare concepts
         self.image_projector = nn.Sequential(
-            nn.Linear(streetclip_dim, 512),
+            nn.Linear(streetclip_dim, 1024),
+            nn.LayerNorm(1024),
+            nn.GELU(),
+            nn.Dropout(0.15),
+            nn.Linear(1024, 512),
             nn.LayerNorm(512),
             nn.GELU(),
-            nn.Dropout(0.3),
+            nn.Dropout(0.15),
             nn.Linear(512, num_concepts)
         )
         
@@ -107,6 +112,17 @@ class ConceptAwareGeoModel(nn.Module):
         
         # Location Adapter: Maps LocationEncoder output (512) to StreetCLIP dimension
         self.location_adapter = nn.Linear(location_encoder_dim, streetclip_dim)
+        
+        # Initialize weights for better convergence
+        self._init_weights()
+    
+    def _init_weights(self):
+        """Initialize projection layers with Xavier uniform initialization."""
+        for module in self.image_projector:
+            if isinstance(module, nn.Linear):
+                nn.init.xavier_uniform_(module.weight)
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
         
     def get_concept_basis(self) -> torch.Tensor:
         """
