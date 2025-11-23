@@ -1,0 +1,42 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=cache_sae
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --time=8:00:00
+#SBATCH --mem=32GB
+#SBATCH --output=jobs/outputs/data_processing/cache_embeddings_%j.out
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd $HOME/Project_AI/
+source activate streetview
+
+# Parameters
+DATASET_DIR="$HOME/Project_AI/data/6921d7831744c5356b098bf7_balanced"
+TRAIN_CSV="$DATASET_DIR/splits/dataset_train.csv"
+VAL_CSV="$DATASET_DIR/splits/dataset_val.csv"
+OUTPUT_DIR="$DATASET_DIR/cached_embeddings_augmented"
+
+mkdir -p jobs/outputs/data_processing
+mkdir -p $OUTPUT_DIR
+
+echo "----------------------------------------------------------------"
+echo "Job started at: $(date)"
+echo "Caching embeddings to: $OUTPUT_DIR"
+echo "----------------------------------------------------------------"
+
+python -u scripts/data_processing/cache_embeddings.py \
+    --train-csv "$TRAIN_CSV" \
+    --val-csv "$VAL_CSV" \
+    --output-dir "$OUTPUT_DIR" \
+    --batch-size 2048 \
+    --num-workers 16 \
+    --num-augments 20
+
+echo "----------------------------------------------------------------"
+echo "Job finished at: $(date)"
+

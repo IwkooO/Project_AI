@@ -1,0 +1,34 @@
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+----------------------------------------------------------------
+Job started at: Sun Nov 23 21:21:37 CET 2025
+Train Dataset: /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/splits/dataset_train.csv
+Val Dataset: /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/splits/dataset_val.csv
+Output: checkpoints/sae_smaller
+----------------------------------------------------------------
+Starting Concept Visualization...
+Loading models...
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Collecting activations...
+  0%|          | 0/34 [00:00<?, ?it/s]  3%|▎         | 1/34 [01:16<42:20, 76.99s/it]  6%|▌         | 2/34 [01:18<17:17, 32.41s/it]  9%|▉         | 3/34 [01:19<09:23, 18.17s/it] 12%|█▏        | 4/34 [01:20<05:44, 11.48s/it] 15%|█▍        | 5/34 [01:21<03:45,  7.78s/it] 18%|█▊        | 6/34 [01:23<02:35,  5.55s/it] 21%|██        | 7/34 [01:24<01:51,  4.13s/it] 24%|██▎       | 8/34 [01:25<01:23,  3.21s/it] 26%|██▋       | 9/34 [02:32<09:41, 23.24s/it] 29%|██▉       | 10/34 [02:34<06:34, 16.44s/it] 32%|███▏      | 11/34 [02:35<04:31, 11.78s/it] 35%|███▌      | 12/34 [02:36<03:08,  8.57s/it] 38%|███▊      | 13/34 [02:37<02:13,  6.34s/it] 41%|████      | 14/34 [02:38<01:35,  4.79s/it] 44%|████▍     | 15/34 [02:40<01:10,  3.71s/it] 47%|████▋     | 16/34 [02:41<00:53,  2.96s/it] 50%|█████     | 17/34 [03:48<06:19, 22.33s/it] 53%|█████▎    | 18/34 [03:49<04:15, 15.99s/it] 56%|█████▌    | 19/34 [03:51<02:53, 11.55s/it] 59%|█████▉    | 20/34 [03:52<01:58,  8.45s/it] 62%|██████▏   | 21/34 [03:53<01:21,  6.28s/it] 65%|██████▍   | 22/34 [03:54<00:57,  4.76s/it] 68%|██████▊   | 23/34 [03:56<00:40,  3.70s/it] 71%|███████   | 24/34 [03:57<00:29,  2.95s/it] 74%|███████▎  | 25/34 [05:05<03:21, 22.41s/it] 76%|███████▋  | 26/34 [05:06<02:08, 16.05s/it] 79%|███████▉  | 27/34 [05:07<01:21, 11.60s/it] 82%|████████▏ | 28/34 [05:08<00:50,  8.48s/it] 85%|████████▌ | 29/34 [05:09<00:31,  6.30s/it] 88%|████████▊ | 30/34 [05:11<00:19,  4.77s/it] 91%|█████████ | 31/34 [05:12<00:11,  3.70s/it] 94%|█████████▍| 32/34 [05:13<00:05,  2.95s/it] 97%|█████████▋| 33/34 [06:20<00:22, 22.10s/it]100%|██████████| 34/34 [06:20<00:00, 15.57s/it]100%|██████████| 34/34 [06:20<00:00, 11.20s/it]
+Deduplicating concepts...
+Found 20 unique concepts out of top candidates.
+/gpfs/home4/igodzwon/Project_AI/scripts/evaluation/visualize_sae_concepts.py:220: UserWarning: Glyph 128247 (\N{CAMERA}) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/gpfs/home4/igodzwon/Project_AI/scripts/evaluation/visualize_sae_concepts.py:221: UserWarning: Glyph 128247 (\N{CAMERA}) missing from font(s) DejaVu Sans.
+  plt.savefig(out_dir / f"concept_{concept_idx}_top_images.png")
+Visualizations saved to visualizations/sae_smaller
+Job finished at: Sun Nov 23 21:34:32 CET 2025

@@ -1,17 +1,20 @@
 #!/bin/bash
-#SBATCH --partition=gpu_a100
+#SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
 #SBATCH --job-name=test
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=9
 #SBATCH --time=01:00:00
-#SBATCH --output=jobs/outputs/test_script.log
+#SBATCH --output=jobs/outputs/test/test_script_smaller.log
 
 module purge
 module load 2025
 module load Anaconda3/2025.06-1
 
-source activate streetview_pnair
-export PYTHONNOUSERSITE=1
-python scripts/tests/export_dataset_to_csv.py --output dataset_export_thailand.csv --country "Thailand" --require-coordinates 
-#python src/dataset.py
+cd $HOME/Project_AI/
+
+source activate streetview
+
+python scripts/evaluation/evaluate_test_set.py \
+    --sae-path "checkpoints/sae_smaller/best_sae.pth" \
+    --test-csv "data/6921d7831744c5356b098bf7_balanced/splits/dataset_test.csv"
