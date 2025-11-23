@@ -7,7 +7,7 @@
 #SBATCH --time=12:00:00
 #SBATCH --mem=32GB
 #SBATCH --output=jobs/outputs/preprocess_pano.log
-#SBATCH --dependency=afterok:16761856
+#SBATCH --dependency=afterok:16859997
 
 module purge
 module load 2025
@@ -17,8 +17,8 @@ cd $HOME/Project_AI/
 source activate streetview
 
 # Define paths
-PANORAMA_FOLDER="/home/igodzwon/Project_AI/data/691df1ee911f74393c53af8c/panorama"
-OUTPUT_FOLDER="/scratch-shared/igodzwon/Project_AI/data/691df1ee911f74393c53af8c/panorama_processed"
+PANORAMA_FOLDER="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/panorama"
+OUTPUT_FOLDER="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/panorama_processed"
 
 # Create output folder if it doesn't exist
 mkdir -p "$OUTPUT_FOLDER"

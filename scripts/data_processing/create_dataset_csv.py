@@ -106,15 +106,15 @@ def create_dataset_csv(panorama_processed_folder, metas_folder, output_csv, geog
 def main():
     parser = argparse.ArgumentParser(description='Create CSV dataset from processed images and metadata')
     parser.add_argument('--panorama-processed', type=str,
-                       default='/scratch-shared/igodzwon/Project_AI/data/691df1ee911f74393c53af8c/panorama_processed',
+                       default='/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/panorama_processed',
                        help='Path to folder with processed panorama images')
     parser.add_argument('--metas', type=str,
-                       default='/home/igodzwon/Project_AI/data/691df1ee911f74393c53af8c/metas',
+                       default='/home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/metas',
                        help='Path to folder with meta JSON files')
     parser.add_argument('--output', type=str,
-                       default='/home/igodzwon/Project_AI/data/691df1ee911f74393c53af8c/dataset.csv',
+                       default='/home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/dataset.csv',
                        help='Path to output CSV file')
-    parser.add_argument('--geoguessr-id', type=str, default='691df1ee911f74393c53af8c',
+    parser.add_argument('--geoguessr-id', type=str, default='6921d7831744c5356b098bf7',
                        help='GeoGuessr ID (optional, for reference)')
     
     args = parser.parse_args()

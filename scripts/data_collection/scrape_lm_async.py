@@ -11,7 +11,7 @@ sys.path.insert(0, str(project_root))
 import constants
 from tqdm import tqdm
 
-geoguessrId = "691df1ee911f74393c53af8c"
+geoguessrId = "6921d7831744c5356b098bf7"
 endpoint = f"https://learnablemeta.com/api/userscript/map/{geoguessrId}/"
 
 data_root = Path("data")

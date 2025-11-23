@@ -14,6 +14,6 @@ module load Anaconda3/2025.06-1
 cd $HOME/Project_AI/
 source activate streetview
 
-python scrape_lm_async.py
+python /home/igodzwon/Project_AI/scripts/data_collection/scrape_lm_async.py
 
 
