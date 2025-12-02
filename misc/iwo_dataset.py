@@ -1,5 +1,6 @@
 import pandas as pd
 import torch
+import re
 from torch.utils.data import Dataset
 from PIL import Image
 from pathlib import Path
@@ -15,6 +16,53 @@ from src.dataset import (
     create_splits_stratified,
     SubsetDataset
 )
+
+
+def clean_html_note(html_text: str) -> str:
+    """
+    Extract clean plain text from HTML content in note column.
+    Uses BeautifulSoup if available, falls back to regex.
+    
+    Args:
+        html_text: Raw HTML string from the note column
+        
+    Returns:
+        Clean plain text with HTML tags removed
+    """
+    if not html_text or pd.isna(html_text):
+        return ""
+    
+    html_text = str(html_text).strip()
+    if not html_text:
+        return ""
+    
+    # Try BeautifulSoup first
+    try:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html_text, 'html.parser')
+        # Get text and normalize whitespace
+        text = soup.get_text(separator=' ')
+        text = re.sub(r'\s+', ' ', text).strip()
+        return text
+    except ImportError:
+        pass
+    
+    # Fallback: regex-based HTML cleaning
+    # Remove script and style elements
+    text = re.sub(r'<script[^>]*>.*?</script>', '', html_text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL | re.IGNORECASE)
+    # Remove HTML tags
+    text = re.sub(r'<[^>]+>', ' ', text)
+    # Decode common HTML entities
+    text = text.replace('&nbsp;', ' ')
+    text = text.replace('&amp;', '&')
+    text = text.replace('&lt;', '<')
+    text = text.replace('&gt;', '>')
+    text = text.replace('&quot;', '"')
+    text = text.replace('&#39;', "'")
+    # Normalize whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
 
 
 class CBMDataset(Dataset):
@@ -99,6 +147,10 @@ class CBMDataset(Dataset):
                 # Skip if missing coordinates are critical
                 continue
             
+            # Clean HTML from note column
+            raw_note = row.get('note', '')
+            cleaned_note = clean_html_note(raw_note)
+            
             sample = {
                 'pano_id': str(row.get('pano_id', f'row_{idx}')),  # Use pano_id if available, else row index
                 'image_path': Path(row['image_path']),
@@ -106,7 +158,7 @@ class CBMDataset(Dataset):
                 'country': str(row['country']),
                 'lat': lat,
                 'lng': lng,
-                'note': str(row.get('note', '')),
+                'note': cleaned_note,  # Store cleaned plain text
                 'images': row.get('images', []) if isinstance(row.get('images'), list) else []
             }
             samples.append(sample)

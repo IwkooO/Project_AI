@@ -6,6 +6,8 @@ PyTorch Dataset for CBM baseline training on panorama images.
 import json
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
+import html
+import re
 
 import numpy as np
 import torch
@@ -19,10 +21,47 @@ import os
 import random
 from tqdm import tqdm
 import argparse
+import pandas as pd
+from bs4 import BeautifulSoup
 
 CLIP_IMAGE_MEAN = (0.48145466, 0.4578275, 0.40821073)
-CLIP_IMAGE_STD = (0.26862954, 0.26130258, 0.27577711) 
+CLIP_IMAGE_STD = (0.26862954, 0.26130258, 0.27577711)
 
+
+def parse_html_note(html_text: str) -> str:
+    """
+    Parse HTML note and extract plain text.
+    
+    Args:
+        html_text: HTML string (may be plain text if not HTML)
+        
+    Returns:
+        Plain text extracted from HTML, or original text if not HTML
+    """
+    if not html_text or not isinstance(html_text, str):
+        return ""
+    
+    # Strip whitespace
+    html_text = html_text.strip()
+    
+    if not html_text:
+        return ""
+    
+    # Check if it looks like HTML (contains tags)
+    if not re.search(r'<[^>]+>', html_text):
+        # Not HTML, just return decoded text
+        return html.unescape(html_text).strip()
+    
+    # Parse HTML
+    soup = BeautifulSoup(html_text, 'html.parser')
+    # Get text and clean up whitespace
+    text = soup.get_text(separator=' ', strip=True)
+    # Decode HTML entities
+    text = html.unescape(text)
+    # Normalize whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+    
 def extract_image_size(processor: Optional[AutoImageProcessor] = None, image_size: Optional[Tuple[int, int]] = None) -> Tuple[int, int]:
     """
     Extract image size from processor or use provided size.
@@ -147,7 +186,8 @@ class PanoramaCBMDataset(Dataset):
                  return_cartesian: bool = False,
                  use_normalized_coordinates: bool = False,
                  geoguessr_id: str = "6906237dc7731161a37282b2",
-                 data_root: Optional[Path] = None):
+                 data_root: Optional[Path] = None,
+                 csv_path: Optional[str] = None):
         """
         Args:
             transform: Optional torchvision transforms (overrides encoder_model preprocessing)
@@ -159,8 +199,10 @@ class PanoramaCBMDataset(Dataset):
                           If provided, will use AutoImageProcessor to get correct preprocessing
             return_cartesian: If True, returns 3D Cartesian coordinates on unit sphere instead of normalized 2D
             use_normalized_coordinates: If True, returns coordinates normalized to [-1, 1]. If False, returns raw (lat, lng).
-            geoguessr_id: GeoGuessr map ID
-            data_root: Root directory for data (defaults to "data")
+            geoguessr_id: GeoGuessr map ID (used only if csv_path is None)
+            data_root: Root directory for data (defaults to "data", used only if csv_path is None)
+            csv_path: Optional path to CSV file containing 'image_path', 'meta_name', 'country', 'lat', 'lng' columns.
+                     If provided, loads data from CSV instead of folder structure.
         """
         self.transform = transform
         self.max_samples = max_samples
@@ -170,18 +212,29 @@ class PanoramaCBMDataset(Dataset):
         self.return_cartesian = return_cartesian
         self.use_normalized_coordinates = use_normalized_coordinates
         self.geoguessr_id = geoguessr_id
+        self.csv_path = csv_path
         
-        if data_root is None:
-            data_root = Path("data")
-        self.data_root = Path(data_root)
-        self.folder = self.data_root / geoguessr_id
-        self.meta_folder = self.folder / "metas"
-        
-        # Check if panorama_processed folder exists, if not use panorama folder
-        if os.path.exists(self.folder / "panorama_processed"):
-            self.image_folder = self.folder / "panorama_processed"
+        # Set up folder structure (only used if csv_path is None)
+        if csv_path is None:
+            if data_root is None:
+                data_root = Path("data")
+            self.data_root = Path(data_root)
+            self.folder = self.data_root / geoguessr_id
+            self.meta_folder = self.folder / "metas"
+            
+            # Check if panorama_processed folder exists, if not use panorama folder
+            if os.path.exists(self.folder / "panorama_processed"):
+                self.image_folder = self.folder / "panorama_processed"
+            else:
+                self.image_folder = self.folder / "panorama"
         else:
-            self.image_folder = self.folder / "panorama"
+            # CSV mode: set minimal folder structure (may not be used)
+            if data_root is None:
+                data_root = Path("data")
+            self.data_root = Path(data_root)
+            self.folder = None
+            self.meta_folder = None
+            self.image_folder = None
 
         # Set up transforms based on encoder model or defaults
         if self.transform is None:
@@ -230,11 +283,105 @@ class PanoramaCBMDataset(Dataset):
         print(f"Countries: {len(self.country_to_idx)}")
 
     def _load_samples(self) -> List[Dict]:
+        """Load samples from CSV or folder structure."""
+        if self.csv_path is not None:
+            return self._load_samples_from_csv()
+        else:
+            return self._load_samples_from_folder()
+    
+    def _load_samples_from_csv(self) -> List[Dict]:
+        """Load samples from CSV file using fast vectorized pandas operations."""
+        # Load CSV
+        print(f"Loading CSV from {self.csv_path}...")
+        try:
+            df = pd.read_csv(self.csv_path, delimiter=";", encoding="latin1")
+        except Exception as e:
+            raise RuntimeError(f"Error loading CSV from {self.csv_path}: {e}")
+        
+        initial_count = len(df)
+        print(f"  Loaded {initial_count} rows")
+        
+        # ========== VECTORIZED FILTERING ==========
+        
+        # 1. Drop rows with missing required fields (image_path, meta_name, country)
+        df = df.dropna(subset=['image_path', 'meta_name', 'country'])
+        after_required = len(df)
+        
+        # 2. Drop rows with missing lat/lng
+        df = df.dropna(subset=['lat', 'lng'])
+        after_coords = len(df)
+        
+        # 3. Drop rows with empty note
+        df = df.dropna(subset=['note'])
+        df = df[df['note'].astype(str).str.strip() != '']
+        after_note = len(df)
+        
+        # 4. Country filter (if specified)
+        if self.country is not None:
+            target_country_norm = str(self.country).strip().lower()
+            df = df[df['country'].astype(str).str.strip().str.lower() == target_country_norm]
+        after_country = len(df)
+        
+        # 5. Parse coordinates (handle European comma decimals)
+        df['lat'] = df['lat'].astype(str).str.replace(',', '.').astype(float)
+        df['lng'] = df['lng'].astype(str).str.replace(',', '.').astype(float)
+        
+        # 6. Parse HTML from notes (vectorized with apply)
+        df['note'] = df['note'].astype(str).apply(parse_html_note)
+        df = df[df['note'].str.strip() != '']
+        after_html_parse = len(df)
+        
+        # 7. Apply max_samples limit
+        if self.max_samples:
+            df = df.head(self.max_samples)
+        
+        # 8. Check image existence (this is the only slow part, but necessary)
+        print(f"  Checking image files exist...")
+        df['image_exists'] = df['image_path'].apply(lambda x: Path(x).exists())
+        df = df[df['image_exists']]
+        df = df.drop(columns=['image_exists'])
+        final_count = len(df)
+        
+        # Print statistics
+        print(f"  Filtering stats:")
+        print(f"    - Initial: {initial_count}")
+        print(f"    - After required fields: {after_required} (dropped {initial_count - after_required})")
+        print(f"    - After coords: {after_coords} (dropped {after_required - after_coords})")
+        print(f"    - After note: {after_note} (dropped {after_coords - after_note})")
+        if self.country:
+            print(f"    - After country filter: {after_country} (dropped {after_note - after_country})")
+        print(f"    - After HTML parse: {after_html_parse} (dropped {after_country - after_html_parse})")
+        print(f"    - After image check: {final_count} (dropped {after_html_parse - final_count})")
+        
+        if final_count == 0:
+            raise RuntimeError(f"No samples found! Check your CSV file ('{self.csv_path}'), country filter ('{self.country}'), or data requirements.")
+        
+        # Convert to list of dicts
+        samples = []
+        for idx, row in df.iterrows():
+            sample = {
+                'pano_id': str(row.get('pano_id', f'row_{idx}')),
+                'image_path': Path(row['image_path']),
+                'meta_path': None,
+                'meta_name': str(row['meta_name']),
+                'country': str(row['country']),
+                'lat': float(row['lat']),
+                'lng': float(row['lng']),
+                'note': str(row['note']),
+                'images': []
+            }
+            samples.append(sample)
+        
+        print(f"  Final: {len(samples)} samples")
+        return samples
+    
+    def _load_samples_from_folder(self) -> List[Dict]:
         """Load meta files and filter to samples with existing images."""
         samples = []
         skipped_no_country_match = 0
         skipped_no_image = 0
         skipped_no_coords = 0
+        skipped_empty_note = 0
 
         # Pre-process country filter for O(1) comparison inside loop
         target_country_norm = None
@@ -273,19 +420,35 @@ class PanoramaCBMDataset(Dataset):
                         skipped_no_country_match += 1
                         continue
 
-                # Extract coordinates if available
+                # Extract coordinates - ALWAYS require coordinates
                 lat = meta.get('lat')
                 lng = meta.get('lng')
                 
-                if self.require_coordinates and (lat is None or lng is None):
+                if lat is None or lng is None:
+                    skipped_no_coords += 1
+                    continue
+                
+                try:
+                    lat = float(lat)
+                    lng = float(lng)
+                except (ValueError, TypeError):
                     skipped_no_coords += 1
                     continue
                     
-                # Extract note if available
-                note = meta.get('note', '')
-                if self.require_coordinates and not note:
-                     # In strict mode we might want to skip, but for now we pass empty notes
-                     pass 
+                # Extract and parse note
+                raw_note = meta.get('note', '')
+                if not raw_note:
+                    raw_note = ''
+                else:
+                    raw_note = str(raw_note)
+                
+                # Parse HTML note
+                note = parse_html_note(raw_note)
+                
+                # Drop rows with empty notes
+                if not note or len(note.strip()) == 0:
+                    skipped_empty_note += 1
+                    continue
 
                 sample = {
                     'pano_id': pano_id,
@@ -311,11 +474,16 @@ class PanoramaCBMDataset(Dataset):
             print(f"  - Loaded samples: {len(samples)}")
             print(f"  - Skipped (country mismatch): {skipped_no_country_match}")
             print(f"  - Skipped (no image): {skipped_no_image}")
-            if self.require_coordinates:
-                print(f"  - Skipped (no coordinates): {skipped_no_coords}")
+            print(f"  - Skipped (no coordinates): {skipped_no_coords}")
+            print(f"  - Skipped (empty note): {skipped_empty_note}")
+        else:
+            print(f"Loaded {len(samples)} samples from folder")
+            print(f"  - Skipped (no image): {skipped_no_image}")
+            print(f"  - Skipped (no coordinates): {skipped_no_coords}")
+            print(f"  - Skipped (empty note): {skipped_empty_note}")
         
         if len(samples) == 0:
-             raise RuntimeError(f"No samples found! Check your country filter ('{self.country}') or coordinate requirements.")
+             raise RuntimeError(f"No samples found! Check your country filter ('{self.country}') or coordinate/note requirements.")
 
         return samples
 
@@ -334,7 +502,10 @@ class PanoramaCBMDataset(Dataset):
         sample = self.samples[idx]
 
         # Load and process image
-        image = Image.open(sample['image_path']).convert('RGB')
+        image_path = sample['image_path']
+        if isinstance(image_path, str):
+            image_path = Path(image_path)
+        image = Image.open(image_path).convert('RGB')
 
         if self.transform:
             image = self.transform(image)
@@ -372,8 +543,26 @@ class PanoramaCBMDataset(Dataset):
             'note': sample['note'],
             'images': sample['images']
         }
+        
+        # Add cell label if available
+        if 'cell_label' in sample:
+            metadata['cell_label'] = sample['cell_label']
 
         return image, concept_idx, target_idx, coordinates, metadata
+
+    def set_cell_labels(self, sample_to_cell: torch.Tensor):
+        """
+        Assign geocell labels to all samples.
+        Args:
+            sample_to_cell: Tensor of shape [N_samples] with cell IDs.
+        """
+        if len(sample_to_cell) != len(self.samples):
+             raise ValueError(f"Mismatch: {len(sample_to_cell)} labels for {len(self.samples)} samples")
+             
+        for i, sample in enumerate(self.samples):
+            sample['cell_label'] = sample_to_cell[i].item()
+        print(f"Assigned geocell labels to {len(self.samples)} samples.")
+
 
 def get_concept_to_idx(samples: List[Dict]) -> Tuple[Dict[str, int], Dict[int, str]]:
     """Create mapping from metaName strings to indices."""
@@ -652,13 +841,16 @@ if __name__ == "__main__":
                         help="Root directory for data")
     parser.add_argument("--country", type=str, default="Australia",
                         help="Country filter")
+    parser.add_argument("--csv-path", type=str, default=None,
+                        help="Path to CSV file (optional, if provided loads from CSV instead of folder structure)")
     args = parser.parse_args()
     
     # Test the dataset
     dataset = PanoramaCBMDataset(
         country=args.country,
         geoguessr_id=args.geoguessr_id,
-        data_root=args.data_root
+        data_root=args.data_root,
+        csv_path=args.csv_path
     )  
 
     # Test statistics

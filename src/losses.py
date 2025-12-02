@@ -188,6 +188,109 @@ def concept_divergence_loss(
     return term1 + term2 + term3
 
 
+def clip_contrastive_loss(
+    emb_a: torch.Tensor,
+    emb_b: torch.Tensor,
+    temperature: float = 0.07
+) -> torch.Tensor:
+    """
+    Standard CLIP-style symmetric contrastive loss (InfoNCE).
+    
+    Used for:
+    - Concept-Text Alignment: concept_emb ↔ text_emb (note embeddings)
+    - Can also be used for Concept-GPS alignment in simple cases
+    
+    Args:
+        emb_a: First embedding [batch, dim] (e.g., concept embeddings)
+        emb_b: Second embedding [batch, dim] (e.g., text embeddings)
+        temperature: Temperature scaling factor
+        
+    Returns:
+        Scalar loss (symmetric cross-entropy)
+    """
+    # L2 normalize embeddings
+    emb_a_norm = F.normalize(emb_a, p=2, dim=1)
+    emb_b_norm = F.normalize(emb_b, p=2, dim=1)
+    
+    # Compute similarity matrix
+    logits = torch.matmul(emb_a_norm, emb_b_norm.t()) / temperature
+    
+    # Labels: diagonal entries are positive pairs
+    labels = torch.arange(len(emb_a), device=emb_a.device)
+    
+    # Symmetric loss
+    loss_a2b = F.cross_entropy(logits, labels)
+    loss_b2a = F.cross_entropy(logits.t(), labels)
+    
+    return (loss_a2b + loss_b2a) / 2.0
+
+
+def geocell_contrastive_loss(
+    concept_emb: torch.Tensor,
+    gps_emb: torch.Tensor,
+    cell_labels: torch.Tensor,
+    temperature: float = 0.07,
+    eps: float = 1e-8
+) -> torch.Tensor:
+    """
+    Geocell-aware contrastive loss for Concept-GPS alignment.
+    
+    Positive pairs: samples in the SAME geocell
+    Negative pairs: samples in DIFFERENT geocells
+    
+    This encourages concept embeddings to align with GPS embeddings
+    of nearby locations (same geocell), while pushing apart embeddings
+    from distant locations (different geocells).
+    
+    Args:
+        concept_emb: Concept embeddings [batch, dim]
+        gps_emb: GPS embeddings [batch, dim]
+        cell_labels: Geocell labels for each sample [batch]
+        temperature: Temperature scaling factor
+        eps: Small constant for numerical stability
+        
+    Returns:
+        Scalar loss
+    """
+    batch_size = concept_emb.size(0)
+    
+    # L2 normalize embeddings
+    concept_norm = F.normalize(concept_emb, p=2, dim=1)
+    gps_norm = F.normalize(gps_emb, p=2, dim=1)
+    
+    # Compute similarity matrix: [batch, batch]
+    sim = torch.matmul(concept_norm, gps_norm.t()) / temperature
+    
+    # Create positive mask: samples in the SAME geocell
+    # pos_mask[i, j] = 1 if cell_labels[i] == cell_labels[j]
+    pos_mask = (cell_labels.unsqueeze(0) == cell_labels.unsqueeze(1)).float()
+    
+    # For numerical stability, we use log-sum-exp trick
+    # For each row i, we want:
+    #   -log( sum_{j in positive} exp(sim[i,j]) / sum_{k} exp(sim[i,k]) )
+    
+    # Compute log partition function (log of sum over all)
+    log_sum_exp_all = torch.logsumexp(sim, dim=1)  # [batch]
+    
+    # Compute log of sum over positives
+    # Mask out negatives with large negative value before logsumexp
+    neg_inf_mask = (1 - pos_mask) * (-1e9)
+    sim_pos_only = sim + neg_inf_mask
+    log_sum_exp_pos = torch.logsumexp(sim_pos_only, dim=1)  # [batch]
+    
+    # Loss: -log(positive_sum / total_sum) = log_sum_exp_all - log_sum_exp_pos
+    loss_c2g = (log_sum_exp_all - log_sum_exp_pos).mean()
+    
+    # Symmetric: GPS to Concept direction
+    sim_t = sim.t()
+    log_sum_exp_all_t = torch.logsumexp(sim_t, dim=1)
+    sim_pos_only_t = sim_t + neg_inf_mask.t()
+    log_sum_exp_pos_t = torch.logsumexp(sim_pos_only_t, dim=1)
+    loss_g2c = (log_sum_exp_all_t - log_sum_exp_pos_t).mean()
+    
+    return (loss_c2g + loss_g2c) / 2.0
+
+
 def combined_loss(
     concept_logits: torch.Tensor,
     country_logits: torch.Tensor,

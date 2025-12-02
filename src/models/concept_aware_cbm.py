@@ -1,10 +1,13 @@
 """
 Concept-Aware Global Image-GPS Alignment Model.
+
+Strict Concept Bottleneck Model (CBM) architecture where ALL downstream tasks
+operate on concept embeddings, not raw image features.
 """
 
 from __future__ import annotations
 
-from typing import Optional, Iterable, Union, Tuple
+from typing import Optional, Iterable
 
 import torch
 from torch import nn
@@ -14,191 +17,201 @@ from geoclip import LocationEncoder
 
 class ConceptAwareGeoModel(nn.Module):
     """
-    Concept-Aware Global Image-GPS Alignment Model.
+    Concept-Aware Global Image-GPS Alignment Model with strict CBM architecture.
     
-    Components:
-    - Image Encoder: StreetCLIP
-    - Location Encoder: GeoCLIP's LocationEncoder
-    - Concept Alignment: Joint projection to concept space
+    Pipeline:
+        Image → Frozen StreetCLIP → Image Features (768d) → Concept Bottleneck → Concept Embeddings (512d)
+                                                                    ↓
+                                              ALL downstream heads (country, cell, offset)
+                                                                    ↓
+        GPS → LocationEncoder → GPS Embeddings (512d) ←── Contrastive Alignment
+        Text → StreetCLIP Text → Text Embeddings (512d) ←── Contrastive Alignment
+    
+    Key constraint: All downstream predictions use ONLY concept embeddings, not raw image features.
     """
 
     def __init__(
         self,
         image_encoder: nn.Module,
-        concept_features: torch.Tensor,
         num_concepts: int,
         num_countries: int,
         num_cells: int,
         streetclip_dim: int = 768,
-        location_encoder_dim: int = 512,
+        concept_emb_dim: int = 512,
         coord_output_dim: int = 2,
         text_encoder: Optional[nn.Module] = None,
     ):
         """
         Args:
-            image_encoder: Pretrained StreetCLIPEncoder
-            concept_features: Pre-computed concept text embeddings (E_concept) [k, d_streetclip]
-            num_concepts: Number of concepts (k)
+            image_encoder: Pretrained StreetCLIPEncoder (frozen)
+            num_concepts: Number of concepts (k) - used for auxiliary concept classification
             num_countries: Number of countries (c)
             num_cells: Number of semantic geocells
-            streetclip_dim: Output dimension of StreetCLIP encoder
-            location_encoder_dim: Output dimension of LocationEncoder (default 512)
+            streetclip_dim: Output dimension of StreetCLIP image encoder (768)
+            concept_emb_dim: Dimension of concept embedding space (512, matches text encoder)
             coord_output_dim: Output dimension for coordinate head (2 for lat/lng, 3 for sphere)
-            text_encoder: Frozen text encoder for semantic loss
+            text_encoder: Frozen text encoder for text embedding (used externally)
         """
         super().__init__()
         self.image_encoder = image_encoder
-        self.text_encoder = text_encoder # Should be frozen/handled externally but good to have ref
-        self.location_encoder = LocationEncoder()
+        self.text_encoder = text_encoder
         self.num_concepts = num_concepts
         self.num_countries = num_countries
         self.num_cells = num_cells
         self.streetclip_dim = streetclip_dim
+        self.concept_emb_dim = concept_emb_dim
         self.coord_output_dim = coord_output_dim
         
-        # Ensure concept features are float32 and on the correct device (handled in forward/to)
-        # We register E_concept as a buffer so it's saved with the model but not updated by optimizer
-        self.register_buffer("concept_basis_init", concept_features.clone().detach())
+        # Location Encoder (GeoCLIP style) - outputs 512d
+        self.location_encoder = LocationEncoder()
         
-        # Learnable offset delta (initialized to small random values or zeros)
-        # Shape matches concept_features: [k, d_streetclip]
-        self.delta = nn.Parameter(torch.zeros_like(concept_features))
-        
-        # Image Projector (f_img): Maps image embeddings to concept activations
-        # Input: d_streetclip, Output: k (concepts)
-        # Increased capacity: 3-layer architecture (768→1024→512→446)
-        # Reduced dropout (0.15) for better learning of rare concepts
-        self.image_projector = nn.Sequential(
+        # ========== Concept Bottleneck Layer ==========
+        # Maps image features (768d) → concept embeddings (512d)
+        # This is the ONLY path from images to downstream tasks
+        self.concept_bottleneck = nn.Sequential(
             nn.Linear(streetclip_dim, 1024),
             nn.LayerNorm(1024),
             nn.GELU(),
-            nn.Dropout(0.15),
-            nn.Linear(1024, 512),
-            nn.LayerNorm(512),
-            nn.GELU(),
-            nn.Dropout(0.15),
-            nn.Linear(512, num_concepts)
+            nn.Dropout(0.1),
+            nn.Linear(1024, concept_emb_dim),
+            nn.LayerNorm(concept_emb_dim),
         )
         
-        # Semantic Geocell Head (Coarse)
-        # Input: [Concepts, z_img] -> Fused Dimension
-        fused_dim = num_concepts + streetclip_dim
-        self.cell_head = nn.Sequential(
-            nn.Linear(fused_dim, 1024),
-            nn.LayerNorm(1024),
-            nn.GELU(),
-            nn.Dropout(0.3),
-            nn.Linear(1024, num_cells)
-        )
+        # ========== Downstream Heads (ALL operate on concept_emb ONLY) ==========
         
-        # Offset Head (Fine)
-        # Input: Fused Dimension -> 2 (lat, lng offset) or 3 (xyz)
-        self.offset_head = nn.Sequential(
-            nn.Linear(fused_dim, 512),
-            nn.LayerNorm(512),
-            nn.GELU(),
-            nn.Dropout(0.3),
-            nn.Linear(512, coord_output_dim)
-        )
-        
-        # Country Head: Maps Concept Activations to Country Logits (Auxiliary)
-        self.country_head = nn.Sequential(
-            nn.Linear(num_concepts, 256),
+        # Concept Classification Head (auxiliary, for interpretability)
+        # Input: concept_emb (512d) → concept logits
+        self.concept_head = nn.Sequential(
+            nn.Linear(concept_emb_dim, 256),
             nn.LayerNorm(256),
             nn.GELU(),
-            nn.Dropout(0.3),
+            nn.Dropout(0.2),
+            nn.Linear(256, num_concepts)
+        )
+        
+        # Country Classification Head
+        # Input: concept_emb (512d) → country logits
+        self.country_head = nn.Sequential(
+            nn.Linear(concept_emb_dim, 256),
+            nn.LayerNorm(256),
+            nn.GELU(),
+            nn.Dropout(0.2),
             nn.Linear(256, num_countries)
         )
         
-        # Location Adapter: Maps LocationEncoder output (512) to StreetCLIP dimension
-        self.location_adapter = nn.Linear(location_encoder_dim, streetclip_dim)
+        # Semantic Geocell Classification Head (Coarse Location)
+        # Input: concept_emb (512d) → cell logits
+        self.cell_head = nn.Sequential(
+            nn.Linear(concept_emb_dim, 512),
+            nn.LayerNorm(512),
+            nn.GELU(),
+            nn.Dropout(0.2),
+            nn.Linear(512, num_cells)
+        )
         
-        # Initialize weights for better convergence
+        # Offset Regression Head (Fine Location)
+        # Input: concept_emb (512d) → coordinate offsets
+        self.offset_head = nn.Sequential(
+            nn.Linear(concept_emb_dim, 256),
+            nn.LayerNorm(256),
+            nn.GELU(),
+            nn.Dropout(0.2),
+            nn.Linear(256, coord_output_dim)
+        )
+        
+        # Initialize weights
         self._init_weights()
     
     def _init_weights(self):
         """Initialize projection layers with Xavier uniform initialization."""
-        for module in self.image_projector:
-            if isinstance(module, nn.Linear):
-                nn.init.xavier_uniform_(module.weight)
-                if module.bias is not None:
-                    nn.init.zeros_(module.bias)
-        
-    def get_concept_basis(self) -> torch.Tensor:
-        """
-        Compute the current concept basis B = E_concept + Delta.
-        Returns B of shape [d_streetclip, k]
-        """
-        # E_concept is stored as [k, d], so we add delta [k, d] then transpose to get [d, k]
-        basis = self.concept_basis_init + self.delta
-        return basis.t()
+        for module in [self.concept_bottleneck, self.concept_head, 
+                       self.country_head, self.cell_head, self.offset_head]:
+            for layer in module:
+                if isinstance(layer, nn.Linear):
+                    nn.init.xavier_uniform_(layer.weight)
+                    if layer.bias is not None:
+                        nn.init.zeros_(layer.bias)
 
     def forward(self, images: torch.Tensor, gps_coords: Optional[torch.Tensor] = None):
         """
+        Forward pass through the CBM.
+        
         Args:
             images: Image tensor [batch, 3, H, W]
-            gps_coords: GPS coordinates [batch, 2] (lat, lon) - Optional for inference
+            gps_coords: GPS coordinates [batch, 2] (lat, lon) - for GPS embedding during training
             
         Returns:
-            z_img: Image concept activations [batch, k]
-            z_loc: Location concept activations [batch, k] (if gps provided)
-            country_logits: Country predictions [batch, c]
-            cell_logits: Geocell predictions [batch, num_cells]
-            pred_offsets: Predicted coordinate offsets [batch, coord_dim]
-            fused_features: [batch, fused_dim]
+            Dict containing:
+                - concept_emb: Concept embeddings [batch, 512] - the bottleneck representation
+                - concept_logits: Concept classification logits [batch, num_concepts]
+                - country_logits: Country predictions [batch, num_countries]
+                - cell_logits: Geocell predictions [batch, num_cells]
+                - pred_offsets: Predicted coordinate offsets [batch, coord_dim]
+                - gps_emb: GPS embeddings [batch, 512] (if gps_coords provided)
         """
-        # 1. Image Path (Always executed)
-        # x_img: [batch, d_streetclip]
-        x_img = self.image_encoder(images)
-        # z_img: [batch, k]
-        z_img = self.image_projector(x_img)
+        # 1. Image Encoder (frozen) → Image Features
+        x_img = self.image_encoder(images)  # [batch, 768]
         
-        # Fusion: [Concepts, StreetCLIP features]
-        fused_features = torch.cat([z_img, x_img], dim=1)
+        # 2. Concept Bottleneck → Concept Embeddings
+        # This is the CENTRAL representation for all downstream tasks
+        concept_emb = self.concept_bottleneck(x_img)  # [batch, 512]
         
-        # Hierarchical Heads
-        cell_logits = self.cell_head(fused_features)
-        pred_offsets = self.offset_head(fused_features)
-        
-        # Country from Concepts (Interpretability check)
-        country_logits = self.country_head(z_img)
+        # 3. All downstream heads operate ONLY on concept_emb
+        concept_logits = self.concept_head(concept_emb)  # [batch, num_concepts]
+        country_logits = self.country_head(concept_emb)  # [batch, num_countries]
+        cell_logits = self.cell_head(concept_emb)  # [batch, num_cells]
+        pred_offsets = self.offset_head(concept_emb)  # [batch, coord_dim]
         
         result = {
-            "z_img": z_img,
+            "concept_emb": concept_emb,
+            "concept_logits": concept_logits,
             "country_logits": country_logits,
             "cell_logits": cell_logits,
             "pred_offsets": pred_offsets,
-            "fused_features": fused_features
         }
 
+        # 4. GPS Encoding (for contrastive alignment during training)
         if gps_coords is not None:
-            # 2. Location Path (Training mode)
-            x_loc_raw = self.location_encoder(gps_coords)
-            x_loc = self.location_adapter(x_loc_raw)
-            B = self.get_concept_basis()
-            z_loc = torch.matmul(x_loc, B)
-            result["z_loc"] = z_loc
+            gps_emb = self.encode_gps(gps_coords)  # [batch, 512]
+            result["gps_emb"] = gps_emb
             
         return result
-        
-    def encode_location(self, gps_coords: torch.Tensor) -> torch.Tensor:
-        """
-        Encode GPS coordinates into concept space (for building gallery).
-        """
-        x_loc_raw = self.location_encoder(gps_coords)
-        x_loc = self.location_adapter(x_loc_raw)
-        B = self.get_concept_basis()
-        z_loc = torch.matmul(x_loc, B)
-        return z_loc
     
+    def encode_gps(self, gps_coords: torch.Tensor) -> torch.Tensor:
+        """
+        Encode GPS coordinates into the same embedding space as concepts.
+        
+        Args:
+            gps_coords: GPS coordinates [batch, 2] (lat, lon in degrees)
+            
+        Returns:
+            gps_emb: GPS embeddings [batch, 512]
+        """
+        # LocationEncoder outputs 512d by default
+        gps_emb = self.location_encoder(gps_coords)  # [batch, 512]
+        return gps_emb
+    
+    def get_concept_embedding(self, images: torch.Tensor) -> torch.Tensor:
+        """
+        Get concept embeddings for images (inference utility).
+        
+        Args:
+            images: Image tensor [batch, 3, H, W]
+            
+        Returns:
+            concept_emb: Concept embeddings [batch, 512]
+        """
+        x_img = self.image_encoder(images)
+        concept_emb = self.concept_bottleneck(x_img)
+        return concept_emb
+        
     def parameters_to_optimize(self) -> Iterable[nn.Parameter]:
-        """Return parameters that should be optimized."""
+        """Return parameters that should be optimized (excludes frozen image encoder)."""
         return (
-            list(self.image_projector.parameters()) + 
-            list(self.location_adapter.parameters()) + 
-            list(self.location_encoder.parameters()) + 
+            list(self.concept_bottleneck.parameters()) +
+            list(self.concept_head.parameters()) +
             list(self.country_head.parameters()) +
             list(self.cell_head.parameters()) +
             list(self.offset_head.parameters()) +
-            [self.delta]
+            list(self.location_encoder.parameters())
         )

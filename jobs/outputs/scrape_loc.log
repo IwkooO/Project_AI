@@ -1,18 +1,0 @@
-============================================================================================== 
-Warning! Mixing Conda and module environments may lead to corruption of the
-user environment. 
-We do not recommend users mixing those two environments unless absolutely
-necessary. Note that 
-SURF does not provide any support for Conda environment.
-For more information, please refer to our software policy page:
-https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
-
-Remember that many packages have already been installed on the system and can
-be loaded using 
-the 'module load <package__name>' command. If you are uncertain if a package is
-already available 
-on the system, please use 'module avail' or 'module spider' to search for it.
-============================================================================================== 
-Got 364 locations for map 6921aa8a2a5b3d4caa6fffa5
-  0%|          | 0/364 [00:00<?, ?it/s]  0%|          | 1/364 [00:00<00:37,  9.73it/s]  9%|▉         | 32/364 [00:00<00:01, 184.16it/s] 15%|█▌        | 56/364 [00:00<00:01, 208.13it/s] 26%|██▌       | 93/364 [00:00<00:01, 269.15it/s] 34%|███▍      | 125/364 [00:00<00:00, 284.44it/s] 44%|████▍     | 160/364 [00:00<00:00, 306.02it/s] 54%|█████▍    | 196/364 [00:00<00:00, 322.99it/s] 63%|██████▎   | 229/364 [00:00<00:00, 325.06it/s] 72%|███████▏  | 262/364 [00:00<00:00, 326.18it/s] 81%|████████  | 295/364 [00:01<00:00, 313.25it/s] 91%|█████████ | 331/364 [00:01<00:00, 320.08it/s]100%|██████████| 364/364 [00:01<00:00, 298.98it/s]
-Collected metas for 364 locations!
