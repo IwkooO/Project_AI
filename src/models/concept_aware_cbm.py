@@ -215,3 +215,46 @@ class ConceptAwareGeoModel(nn.Module):
             list(self.offset_head.parameters()) +
             list(self.location_encoder.parameters())
         )
+
+    # ========== Stage-Specific Parameter Methods ==========
+    
+    def get_stage1_params(self) -> Iterable[nn.Parameter]:
+        """
+        Return parameters trainable in Stage 1 (concept bottleneck + global alignment).
+        Includes: concept_bottleneck, concept_head, country_head, location_encoder
+        """
+        return (
+            list(self.concept_bottleneck.parameters()) +
+            list(self.concept_head.parameters()) +
+            list(self.country_head.parameters()) +
+            list(self.location_encoder.parameters())
+        )
+    
+    def get_stage2_params(self) -> Iterable[nn.Parameter]:
+        """
+        Return parameters trainable in Stage 2 (geolocation head training).
+        Includes: cell_head, offset_head
+        """
+        return (
+            list(self.cell_head.parameters()) +
+            list(self.offset_head.parameters())
+        )
+    
+    def freeze_stage1(self):
+        """Freeze all Stage 1 parameters after Stage 1 training."""
+        for p in self.get_stage1_params():
+            p.requires_grad = False
+    
+    def freeze_image_encoder(self):
+        """Freeze the image encoder (call after Stage 0)."""
+        self.image_encoder.freeze_encoder()
+    
+    def freeze_all_except_stage2(self):
+        """Freeze everything except Stage 2 heads."""
+        # Freeze image encoder
+        self.freeze_image_encoder()
+        # Freeze Stage 1
+        self.freeze_stage1()
+        # Ensure Stage 2 is unfrozen
+        for p in self.get_stage2_params():
+            p.requires_grad = True

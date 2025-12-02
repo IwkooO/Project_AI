@@ -47,6 +47,43 @@ class StreetCLIPEncoder(nn.Module):
         for param in self.model.parameters():
             param.requires_grad = True
 
+    def unfreeze_top_layers(self, num_layers: int = 2):
+        """
+        Unfreeze only the top N transformer layers of the vision encoder.
+        Used for Stage 0 domain contrastive pretraining.
+        
+        Args:
+            num_layers: Number of top layers to unfreeze (default: 2)
+        """
+        # Freeze everything first
+        self.freeze_encoder()
+        # Unfreeze top N layers of vision_model.encoder.layers
+        layers = self.model.vision_model.encoder.layers
+        for layer in layers[-num_layers:]:
+            for param in layer.parameters():
+                param.requires_grad = True
+        # Also unfreeze post_layernorm
+        for param in self.model.vision_model.post_layernorm.parameters():
+            param.requires_grad = True
+
+    def unfreeze_text_encoder(self):
+        """Unfreeze the text encoder for Stage 0 training."""
+        for param in self.model.text_model.parameters():
+            param.requires_grad = True
+        for param in self.model.text_projection.parameters():
+            param.requires_grad = True
+
+    def freeze_text_encoder(self):
+        """Freeze the text encoder after Stage 0."""
+        for param in self.model.text_model.parameters():
+            param.requires_grad = False
+        for param in self.model.text_projection.parameters():
+            param.requires_grad = False
+
+    def get_trainable_params(self):
+        """Return list of parameters with requires_grad=True."""
+        return [p for p in self.model.parameters() if p.requires_grad]
+
     def forward(self, pixel_values: torch.Tensor) -> torch.Tensor:
         """
         Args:
@@ -65,7 +102,7 @@ class StreetCLIPEncoder(nn.Module):
     @torch.no_grad()
     def get_text_features(self, text: Union[List[str], str]) -> torch.Tensor:
         """
-        Get text features for a list of strings or a single string.
+        Get text features for a list of strings or a single string (inference mode).
         
         Args:
             text: List of strings or single string to encode
@@ -73,6 +110,22 @@ class StreetCLIPEncoder(nn.Module):
         Returns:
             Text features tensor [batch_size, hidden_size]
         """
+        return self._encode_text(text)
+
+    def get_text_features_trainable(self, text: Union[List[str], str]) -> torch.Tensor:
+        """
+        Get text features with gradient tracking (for Stage 0 training).
+        
+        Args:
+            text: List of strings or single string to encode
+            
+        Returns:
+            Text features tensor [batch_size, hidden_size]
+        """
+        return self._encode_text(text)
+
+    def _encode_text(self, text: Union[List[str], str]) -> torch.Tensor:
+        """Internal text encoding (shared by inference and training modes)."""
         if isinstance(text, str):
             text = [text]
             
