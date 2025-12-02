@@ -36,6 +36,7 @@ python scripts/training/train_concept_aware.py \
     --save_interval 1 \
     --min_samples_per_cell 20 \
     --use_wandb \
+    --use_amp \
     --use_class_weights \
     --coordinate_loss_type "haversine" \
     --csv_path "/scratch-shared/pnair/Project_AI/data/dataset-43k-updated.csv" #\
