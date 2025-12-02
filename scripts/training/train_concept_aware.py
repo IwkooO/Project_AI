@@ -692,7 +692,7 @@ def train(args):
     #         data_root=args.data_root
     #     )
     full_dataset = CBMDataset(
-        dataframe=pd.read_csv("/scratch-shared/pnair/Project_AI/data/dataset-43k.csv"),
+        dataframe=pd.read_csv("/scratch-shared/pnair/Project_AI/data/dataset-43k-updated.csv"),
         transform=transforms,
         encoder_model=args.encoder_model,
         country=args.country_filter,
