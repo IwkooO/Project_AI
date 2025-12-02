@@ -734,6 +734,9 @@ def train(args):
     # Stage 1: Concept learning (concept_bottleneck, concept_head, country_head, location_encoder)
     # Stage 2: Location prediction (cell_head, offset_head) with frozen Stage 1 params
     
+    stage1_epochs = args.epochs // 2
+    stage2_epochs = args.epochs - stage1_epochs
+    
     stage1_param_names = ['concept_bottleneck', 'concept_head', 'country_head', 'location_encoder']
     stage2_param_names = ['cell_head', 'offset_head']
     
@@ -768,12 +771,12 @@ def train(args):
     
     # Stage 1 scheduler
     from torch.optim.lr_scheduler import CosineAnnealingLR
-    scheduler = CosineAnnealingLR(optimizer, T_max=args.stage1_epochs, eta_min=args.lr * 0.01)
+    scheduler = CosineAnnealingLR(optimizer, T_max=stage1_epochs, eta_min=args.lr * 0.01)
     
     current_stage = 1
     logger.info(f"=== STAGEWISE TRAINING ===")
-    logger.info(f"Stage 1 (epochs 1-{args.stage1_epochs}): Concept learning")
-    logger.info(f"Stage 2 (epochs {args.stage1_epochs+1}-{args.epochs}): Location prediction (frozen concepts)")
+    logger.info(f"Stage 1 (epochs 1-{stage1_epochs}): Concept learning")
+    logger.info(f"Stage 2 (epochs {stage1_epochs+1}-{args.epochs}): Location prediction (frozen concepts)")
 
     # ---------- Training Loop ----------
     logger.info("Starting training...")
@@ -782,14 +785,14 @@ def train(args):
     
     for epoch in range(args.epochs):
         # Check for stage transition
-        if epoch == args.stage1_epochs and current_stage == 1:
+        if epoch == stage1_epochs and current_stage == 1:
             logger.info(f"\n{'='*50}")
             logger.info(f"TRANSITIONING TO STAGE 2 at epoch {epoch+1}")
             logger.info(f"{'='*50}")
             freeze_stage1_params()
             stage2_params = get_stage2_params()
             optimizer = torch.optim.AdamW(stage2_params, lr=args.lr, weight_decay=args.weight_decay)
-            scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs - args.stage1_epochs, eta_min=args.lr * 0.01)
+            scheduler = CosineAnnealingLR(optimizer, T_max=stage2_epochs, eta_min=args.lr * 0.01)
             current_stage = 2
             logger.info(f"Stage 2 optimizer: {len(stage2_params)} params, lr={args.lr:.2e}")
             best_val_acc = 0.0  # Reset for Stage 2
@@ -917,10 +920,10 @@ def train(args):
         train_concept_acc = total_concept_correct / total_concept_count if total_concept_count > 0 else 0.0
         train_country_acc = total_country_correct / total_country_count if total_country_count > 0 else 0.0
 
-        logger.info(f"Epoch {epoch+1} [Stage {current_stage}] Train Loss: {avg_train_loss:.4f}, Concept Acc: {train_concept_acc:.4f}")
+        logger.info(f"Epoch {epoch+1} [Stage {current_stage}] Train Loss: {avg_train_loss:.4f}, Concept Acc: {train_concept_acc:.4f}, Country Acc: {train_country_acc:.4f}")
 
         if args.use_wandb:
-            wandb.log({"train_loss": avg_train_loss, "train_concept_accuracy": train_concept_acc, "epoch": epoch+1, "stage": current_stage})
+            wandb.log({"train_loss": avg_train_loss, "train_concept_accuracy": train_concept_acc, "train_country_accuracy": train_country_acc, "epoch": epoch+1, "stage": current_stage})
 
         val_metrics = validate(model, val_loader, device, args, cell_centers, concept_weights, current_stage)
         
@@ -942,7 +945,7 @@ def train(args):
         else:
             patience_counter += 1
             if args.early_stopping_patience > 0 and patience_counter >= args.early_stopping_patience:
-                if current_stage == 1 and epoch + 1 < args.stage1_epochs:
+                if current_stage == 1 and epoch + 1 < stage1_epochs:
                     logger.info(f"Stage 1 early stopping at epoch {epoch+1}. Advancing to Stage 2.")
                     # Force transition to stage 2
                     continue
@@ -1077,8 +1080,6 @@ def validate(model, val_loader, device, args, cell_centers, concept_weights=None
             # Prediction is in 3D Cartesian space
             pred_cart = pred_cell_centers + pred_offsets
             # Convert to Lat/Lng for haversine
-            # Normalize first to be on sphere? Or just assume noisy offset?
-            # Ideally normalize.
             pred_cart = torch.nn.functional.normalize(pred_cart, p=2, dim=1)
             pred_latlng_deg = sphere_to_latlng(pred_cart)  # [B, 2]
             pred_coords = pred_latlng_deg
@@ -1102,32 +1103,57 @@ def validate(model, val_loader, device, args, cell_centers, concept_weights=None
         if batch_distances.numel() > 0:
             all_distances.append(batch_distances.cpu())
 
-        # Compute Loss (Validation) - CBM Architecture
-        loss_concept_text = clip_contrastive_loss(
-            concept_emb, note_embs, temperature=args.temperature
-        )
-        loss_concept_gps = geocell_contrastive_loss(
-            concept_emb, gps_emb, cell_labels, temperature=args.temperature
-        )
-        loss_concept = nn.functional.cross_entropy(
-            concept_logits, concept_idx, 
-            weight=concept_weights if args.use_class_weights else None,
-            label_smoothing=args.label_smoothing
-        )
-        loss_country = nn.functional.cross_entropy(
-            country_logits, target_idx, label_smoothing=args.label_smoothing
-        )
-        loss_cell = nn.functional.cross_entropy(
-            cell_logits, cell_labels, label_smoothing=args.label_smoothing
-        )
-
-        loss = (
-            args.lambda_concept_text * loss_concept_text
-            + args.lambda_concept_gps * loss_concept_gps
-            + args.lambda_concept * loss_concept
-            + args.lambda_country * loss_country
-            + args.lambda_cell * loss_cell
-        )
+        # Compute Loss (Validation) - Stage-aware
+        if current_stage == 1:
+            # Stage 1: Concept learning losses
+            loss_concept_text = clip_contrastive_loss(concept_emb, note_embs, temperature=args.temperature)
+            loss_concept_gps = geocell_contrastive_loss(concept_emb, gps_emb, cell_labels, temperature=args.temperature)
+            loss_concept = nn.functional.cross_entropy(
+                concept_logits, concept_idx, 
+                weight=concept_weights if args.use_class_weights else None,
+                label_smoothing=args.label_smoothing
+            )
+            loss_country = nn.functional.cross_entropy(country_logits, target_idx, label_smoothing=args.label_smoothing)
+            loss = (
+                args.lambda_concept_text * loss_concept_text
+                + args.lambda_concept_gps * loss_concept_gps
+                + args.lambda_concept * loss_concept
+                + args.lambda_country * loss_country
+            )
+            loss_cell = torch.tensor(0.0, device=device)
+            loss_offset = torch.tensor(0.0, device=device)
+        else:
+            # Stage 2: Location prediction losses
+            loss_cell = nn.functional.cross_entropy(cell_logits, cell_labels, label_smoothing=args.label_smoothing)
+            
+            batch_cell_centers = cell_centers[cell_labels]
+            if model.coord_output_dim == 3:
+                lat_rad = torch.deg2rad(coords[:, 0])
+                lng_rad = torch.deg2rad(coords[:, 1])
+                x = torch.cos(lat_rad) * torch.cos(lng_rad)
+                y = torch.cos(lat_rad) * torch.sin(lng_rad)
+                z = torch.sin(lat_rad)
+                true_cart = torch.stack([x, y, z], dim=1)
+                target_offsets = true_cart - batch_cell_centers
+                loss_offset = nn.functional.mse_loss(pred_offsets, target_offsets)
+            else:
+                c_x, c_y, c_z = batch_cell_centers[:, 0], batch_cell_centers[:, 1], batch_cell_centers[:, 2]
+                c_lat = torch.rad2deg(torch.asin(c_z))
+                c_lng = torch.rad2deg(torch.atan2(c_y, c_x))
+                batch_cell_latlng = torch.stack([c_lat, c_lng], dim=1)
+                if args.coordinate_loss_type == "haversine":
+                    pred_latlng = batch_cell_latlng + pred_offsets
+                    loss_offset = coordinate_loss(pred_latlng, coords, loss_type="haversine")
+                else:
+                    target_offsets = coords - batch_cell_latlng
+                    target_offsets[:, 1] = (target_offsets[:, 1] + 180) % 360 - 180
+                    loss_offset = nn.functional.mse_loss(pred_offsets, target_offsets)
+            
+            loss = args.lambda_cell * loss_cell + args.lambda_offset * loss_offset
+            loss_concept_text = torch.tensor(0.0, device=device)
+            loss_concept_gps = torch.tensor(0.0, device=device)
+            loss_concept = torch.tensor(0.0, device=device)
+            loss_country = torch.tensor(0.0, device=device)
 
         total_loss += loss.item()
 
@@ -1241,10 +1267,7 @@ if __name__ == "__main__":
         "--batch_size", type=int, default=32, help="Batch size for training"
     )
     parser.add_argument(
-        "--epochs", type=int, default=20, help="Total number of epochs to train"
-    )
-    parser.add_argument(
-        "--stage1_epochs", type=int, default=10, help="Epochs for Stage 1 (concept learning). Stage 2 starts after this."
+        "--epochs", type=int, default=20, help="Total number of epochs to train (split equally between Stage 1 and Stage 2)"
     )
     parser.add_argument(
         "--lr", type=float, default=1e-4, help="Learning rate for optimizer"
