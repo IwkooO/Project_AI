@@ -1120,8 +1120,9 @@ def train(args):
         # Validation for Stage 0
         model.eval()
         val_loss = 0
+        val_pbar = tqdm(val_loader, desc=f"Epoch {epoch+1}/{args.stage0_epochs} [Stage 0] Validation")  
         with torch.no_grad():
-            for batch in val_loader:
+            for batch in val_pbar:
                 images, _, _, _, metadata, _ = batch
                 images = images.to(device)
                 notes = [m["note"] for m in metadata]
@@ -1219,7 +1220,7 @@ def train(args):
                 total_country_correct += country_correct
                 total_country_count += len(target_idx)
                 
-                # Stage 1 losses: Concept + Country + Concept-GPS 
+                # STAGE 1 LOSSES: Concept + Country + Concept-GPS 
                 loss_concept_gps = geocell_contrastive_loss(concept_emb, gps_emb, cell_labels, temperature=args.temperature)
                 loss_concept = nn.functional.cross_entropy(
                     concept_logits, concept_idx,
@@ -1268,6 +1269,7 @@ def train(args):
         if args.use_wandb:
             wandb.log({"train_loss": avg_train_loss, "train_concept_accuracy": train_concept_acc, "train_country_accuracy": train_country_acc, "epoch": global_epoch + 1, "stage": 1})
         
+        logger.info(f"Validating Stage 1...")
         val_metrics = validate(model, val_loader, device, args, cell_centers, concept_weights, current_stage=1)
         
         scheduler.step()
@@ -1341,10 +1343,11 @@ def train(args):
                 cell_logits = outputs["cell_logits"]
                 pred_offsets = outputs["pred_offsets"]
                 
-                # Stage 2 losses: Cell classification + Offset regression
+                # STAGE 2 LOSSES: Cell classification + Offset regression
                 loss_cell = nn.functional.cross_entropy(cell_logits, cell_labels, label_smoothing=args.label_smoothing)
                 
                 batch_cell_centers = cell_centers[cell_labels]
+                # Coordinate Loss: Cartesian or Spherical
                 if model.coord_output_dim == 3:
                     lat_rad = torch.deg2rad(coords[:, 0])
                     lng_rad = torch.deg2rad(coords[:, 1])
@@ -1359,6 +1362,7 @@ def train(args):
                     c_lat = torch.rad2deg(torch.asin(c_z))
                     c_lng = torch.rad2deg(torch.atan2(c_y, c_x))
                     batch_cell_latlng = torch.stack([c_lat, c_lng], dim=1)
+                    # Coordinate Loss: Haversine or MSE
                     if args.coordinate_loss_type == "haversine":
                         pred_latlng = batch_cell_latlng + pred_offsets
                         loss_offset = coordinate_loss(pred_latlng, coords, loss_type="haversine")
@@ -1393,6 +1397,7 @@ def train(args):
         if args.use_wandb:
             wandb.log({"train_loss": avg_train_loss, "epoch": global_epoch + 1, "stage": 2})
         
+        logger.info(f"Validating Stage 2...")
         val_metrics = validate(model, val_loader, device, args, cell_centers, concept_weights, current_stage=2)
         
         scheduler.step()
@@ -1430,7 +1435,7 @@ def train(args):
         global_epoch += 1
 
     # ---------- Final Test Evaluation ----------
-    logger.info(f"\n{'='*60}")
+    logger.info(f"\n{'='*74}")
     logger.info("FINAL TEST EVALUATION")
     logger.info(f"{'='*60}")
     
