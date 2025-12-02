@@ -49,6 +49,158 @@ ENCODER_MODEL_TO_NAME = {
     "facebook/dinov2-base": "dinov2",
 }
 
+# Visualization and formatting constants
+CLIP_MEAN = np.array([0.48145466, 0.4578275, 0.40821073])
+CLIP_STD = np.array([0.26862954, 0.26130258, 0.27577711])
+VIZ_DPI = 150
+VIZ_FIGSIZE = (16, 12)
+VIZ_TOP_K = 5
+THRESHOLD_ACCURACIES = {
+    "street": 1.0,
+    "city": 25.0,
+    "region": 200.0,
+    "country": 750.0,
+    "continent": 2500.0,
+}
+
+
+# ---------- Helper Functions ----------
+def save_checkpoint(
+    model,
+    checkpoint_path: Path,
+    cell_centers: torch.Tensor,
+    concept_names: List[str],
+    country_to_idx: Dict[str, int],
+    idx_to_country: Dict[int, str],
+    encoder_model: str,
+    extra_info: Optional[Dict] = None,
+):
+    """
+    Save model checkpoint with all metadata needed for inference.
+    
+    Args:
+        model: The trained ConceptAwareGeoModel
+        checkpoint_path: Path to save the checkpoint
+        cell_centers: Tensor of geocell center coordinates [num_cells, 3]
+        concept_names: List of concept names
+        country_to_idx: Dict mapping country name to index
+        idx_to_country: Dict mapping index to country name
+        encoder_model: Name of the encoder model used
+        extra_info: Optional dict with additional info (e.g., metrics)
+    """
+    checkpoint = {
+        "model_state_dict": model.state_dict(),
+        "cell_centers": cell_centers.cpu(),
+        "num_cells": len(cell_centers),
+        "concept_names": concept_names,
+        "num_concepts": len(concept_names),
+        "country_to_idx": country_to_idx,
+        "idx_to_country": idx_to_country,
+        "num_countries": len(country_to_idx),
+        "coord_output_dim": model.coord_output_dim,
+        "encoder_model": encoder_model,
+    }
+    if extra_info:
+        checkpoint.update(extra_info)
+    torch.save(checkpoint, checkpoint_path)
+
+
+def load_checkpoint(checkpoint_path: Path, device: torch.device = None):
+    """
+    Load model checkpoint with all metadata.
+    
+    Args:
+        checkpoint_path: Path to the checkpoint file
+        device: Device to load tensors to
+        
+    Returns:
+        Dict containing model_state_dict, cell_centers, and all metadata
+    """
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    if device is not None and "cell_centers" in checkpoint:
+        checkpoint["cell_centers"] = checkpoint["cell_centers"].to(device)
+    return checkpoint
+
+
+def format_coordinate(lat: float, lng: float, precision: int = 3) -> str:
+    """Format coordinates for display."""
+    return f"({lat:.{precision}f}, {lng:.{precision}f})"
+
+
+def format_distance(km: float, precision: int = 1) -> str:
+    """Format distance for display."""
+    if km < 1:
+        return f"{km*1000:.0f}m"
+    elif km < 1000:
+        return f"{km:.{precision}f}km"
+    else:
+        return f"{km/1000:.2f}Mm"
+
+
+def get_stage_summary(stage: int, epoch: int, total_epochs: int) -> str:
+    """Get formatted stage summary string."""
+    return f"[Stage {stage}] Epoch {epoch}/{total_epochs}"
+
+
+def log_metrics(metrics: Dict[str, float], prefix: str = "", stage: int = None):
+    """Log metrics in a structured format."""
+    stage_str = f"[Stage {stage}] " if stage is not None else ""
+    prefix_str = f"{prefix}_" if prefix else ""
+    
+    # Format main metrics
+    main_metrics = []
+    if "loss" in metrics:
+        main_metrics.append(f"Loss: {metrics['loss']:.4f}")
+    if "concept_acc" in metrics:
+        main_metrics.append(f"Concept Acc: {metrics['concept_acc']:.3f}")
+    if "country_acc" in metrics:
+        main_metrics.append(f"Country Acc: {metrics['country_acc']:.3f}")
+    if "cell_acc" in metrics:
+        main_metrics.append(f"Cell Acc: {metrics['cell_acc']:.3f}")
+    if "median_error_km" in metrics:
+        main_metrics.append(f"Median Error: {format_distance(metrics['median_error_km'])}")
+    
+    if main_metrics:
+        logger.info(f"{stage_str}{prefix_str}{' | '.join(main_metrics)}")
+    
+    # Log threshold accuracies if present
+    if any(k.startswith("acc_") for k in metrics.keys()):
+        thresholds = []
+        for level in ["street", "city", "region", "country", "continent"]:
+            key = f"acc_{level}"
+            if key in metrics:
+                thresholds.append(f"{level.capitalize()}: {metrics[key]:.3f}")
+        if thresholds:
+            logger.info(f"  Thresholds: {' | '.join(thresholds)}")
+
+
+def log_training_progress(
+    epoch: int, 
+    total_epochs: int, 
+    stage: int,
+    train_loss: float,
+    val_metrics: Dict[str, float],
+    best_metric: float = None,
+    patience: int = None,
+    early_stopping_patience: int = None
+):
+    """Log training progress with consistent formatting."""
+    progress = f"Epoch {epoch}/{total_epochs} [Stage {stage}]"
+    logger.info(f"\n{'='*60}")
+    logger.info(f"{progress}")
+    logger.info(f"{'='*60}")
+    logger.info(f"Train Loss: {train_loss:.4f}")
+    
+    log_metrics(val_metrics, prefix="Val", stage=stage)
+    
+    if best_metric is not None:
+        if isinstance(best_metric, float) and best_metric < 1000:  # Likely distance
+            logger.info(f"Best Metric: {format_distance(best_metric)}")
+        else:
+            logger.info(f"Best Metric: {best_metric:.4f}")
+    if patience is not None and early_stopping_patience is not None:
+        logger.info(f"Patience: {patience}/{early_stopping_patience}")
+
 
 def generate_semantic_geocells(dataset, min_samples_per_cell=500, output_dir=None):
     """Generate semantic geocells using per-country K-Means clustering."""
@@ -134,7 +286,7 @@ def generate_semantic_geocells(dataset, min_samples_per_cell=500, output_dir=Non
         ax.set_ylabel('Latitude')
         ax.set_title(f'Semantic Geocells (K={len(cell_centers)})')
         ax.add_patch(Rectangle((-180, -90), 360, 180, fill=False, edgecolor='black', linewidth=1.5))
-        plt.savefig(str(png_path), dpi=150, bbox_inches='tight')
+        plt.savefig(str(png_path), dpi=VIZ_DPI, bbox_inches='tight')
         plt.close()
         logger.info(f"Saved geocell visualization to {png_path}")
 
@@ -152,15 +304,27 @@ def collate_batch(batch):
 
 
 @torch.no_grad()
-def visualize_predictions(model, val_loader, concept_names, idx_to_country, device, args, checkpoint_dir, epoch, cell_centers, num_samples=4):
-    """Visualize top predicted concepts and location predictions."""
+def visualize_predictions(
+    model, 
+    val_loader, 
+    concept_names, 
+    idx_to_country, 
+    device, 
+    args, 
+    checkpoint_dir, 
+    epoch, 
+    cell_centers, 
+    num_samples=4,
+    stage: int = None
+):
+    """Enhanced visualization with better layout and information."""
     model.eval()
     viz_dir = checkpoint_dir / "visualizations" / f"epoch_{epoch}"
     viz_dir.mkdir(parents=True, exist_ok=True)
     wandb_images = []
 
     for batch in val_loader:
-        images, concept_indices, _, coords, metadata, cell_labels, note_embs = batch
+        images, concept_indices, _, coords, metadata, cell_labels = batch
         images = images.to(device)
         coords = coords.to(device)
         concept_indices = concept_indices.to(device)
@@ -170,6 +334,8 @@ def visualize_predictions(model, val_loader, concept_names, idx_to_country, devi
         country_logits = outputs["country_logits"]
         cell_logits = outputs["cell_logits"]
         pred_offsets = outputs["pred_offsets"]
+        concept_probs = torch.softmax(concept_logits, dim=1)
+        country_probs = torch.softmax(country_logits, dim=1)
 
         pred_cells = cell_logits.argmax(dim=1)
         batch_cell_centers = cell_centers[pred_cells]
@@ -187,63 +353,230 @@ def visualize_predictions(model, val_loader, concept_names, idx_to_country, devi
         n_display = min(len(images), num_samples)
 
         for i in range(n_display):
-            fig, axes = plt.subplots(2, 1, figsize=(10, 8))
-            ax_img, ax_bar = axes[0], axes[1]
-
-            probs = concept_logits[i]
-            top_scores, top_indices = torch.topk(probs, k=5)
-
+            # Create figure with better layout: 2x2 grid
+            fig = plt.figure(figsize=VIZ_FIGSIZE)
+            gs = fig.add_gridspec(2, 2, hspace=0.3, wspace=0.3)
+            
+            # Top-left: Image with predictions
+            ax_img = fig.add_subplot(gs[0, 0])
             img_cpu = images[i].cpu().permute(1, 2, 0).numpy()
-            mean, std = np.array([0.48145466, 0.4578275, 0.40821073]), np.array([0.26862954, 0.26130258, 0.27577711])
-            img_disp = np.clip(std * img_cpu + mean, 0, 1)
+            img_disp = np.clip(CLIP_STD * img_cpu + CLIP_MEAN, 0, 1)
             ax_img.imshow(img_disp)
             ax_img.axis("off")
-
-            gt_lat, gt_lng, gt_country = metadata[i]["lat"], metadata[i]["lng"], metadata[i]["country"]
-            pred_coords_raw = pred_coords[i].detach().cpu()
             
-            if pred_coords_raw.shape[0] == 3:
-                pred_coords_deg = sphere_to_latlng(pred_coords_raw.unsqueeze(0)).squeeze(0)
-                pred_lat, pred_lng = pred_coords_deg[0].item(), pred_coords_deg[1].item()
-            else:
-                pred_lat, pred_lng = pred_coords_raw.numpy()
-
+            # Get ground truth and predictions
+            gt_lat, gt_lng, gt_country = metadata[i]["lat"], metadata[i]["lng"], metadata[i]["country"]
+            pred_lat, pred_lng = pred_coords[i, 0].item(), pred_coords[i, 1].item()
+            
             gt_coord_tensor = coords[i].unsqueeze(0)
-            pred_coord_tensor = torch.tensor([pred_lat, pred_lng], device=device).unsqueeze(0) if pred_coords_raw.shape[0] == 3 else pred_coords[i].unsqueeze(0)
+            pred_coord_tensor = pred_coords[i].unsqueeze(0)
             distance_km = haversine_distance(pred_coord_tensor, gt_coord_tensor).item()
-
+            
             pred_country_idx = country_logits[i].argmax().item()
-            pred_country_cls = idx_to_country[pred_country_idx]
+            pred_country = idx_to_country[pred_country_idx]
+            country_confidence = country_probs[i, pred_country_idx].item()
+            
             gt_concept_idx = concept_indices[i].item()
             gt_concept_name = concept_names[gt_concept_idx]
-            top_concept_name = concept_names[top_indices[0].item()]
-
-            title = f"Epoch {epoch} | ID: {metadata[i]['pano_id']}\n"
-            title += f"Country: {pred_country_cls} | True: {gt_country}\n"
-            title += f"Coords: ({pred_lat:.3f}, {pred_lng:.3f}) | True: ({gt_lat:.3f}, {gt_lng:.3f})\n"
-            title += f"Concept: {top_concept_name} | True: {gt_concept_name} | Error: {distance_km:.1f}km"
-            ax_img.set_title(title, fontsize=10)
-
+            top_concept_idx = concept_probs[i].argmax().item()
+            top_concept_name = concept_names[top_concept_idx]
+            concept_confidence = concept_probs[i, top_concept_idx].item()
+            
+            # Enhanced title with more information
+            title_parts = [
+                f"Epoch {epoch} | Stage {stage}" if stage is not None else f"Epoch {epoch}",
+                f"ID: {metadata[i].get('pano_id', 'N/A')}",
+                "",
+                f"📍 Location:",
+                f"  Pred: {format_coordinate(pred_lat, pred_lng)} ({format_distance(distance_km)})",
+                f"  True: {format_coordinate(gt_lat, gt_lng)}",
+                "",
+                f"🌍 Country:",
+                f"  Pred: {pred_country} ({country_confidence:.2%})",
+                f"  True: {gt_country}",
+                "",
+                f"🏷️  Concept:",
+                f"  Pred: {top_concept_name} ({concept_confidence:.2%})",
+                f"  True: {gt_concept_name}",
+            ]
+            ax_img.set_title("\n".join(title_parts), fontsize=9, family='monospace')
+            
+            # Top-right: Concept probabilities (horizontal bar chart)
+            ax_concept = fig.add_subplot(gs[0, 1])
+            top_k = min(VIZ_TOP_K, len(concept_names))
+            top_scores, top_indices = torch.topk(concept_probs[i], k=top_k)
             top_indices_cpu = top_indices.cpu().numpy()
-            bar_colors = ["orange" if idx == gt_concept_idx else "steelblue" for idx in top_indices_cpu]
-            ax_bar.barh(np.arange(5), top_scores.cpu().numpy(), color=bar_colors)
-            ax_bar.set_yticks(np.arange(5))
-            ax_bar.set_yticklabels([concept_names[idx.item()] for idx in top_indices])
-            ax_bar.invert_yaxis()
-            ax_bar.set_xlabel("Activation Score")
-            ax_bar.set_title("Top 5 Concepts" + ("" if gt_concept_idx in top_indices_cpu else f" | GT: {gt_concept_name}"))
-
-            plt.tight_layout()
-            save_path = viz_dir / f"sample_{i}.png"
-            plt.savefig(save_path, dpi=150, bbox_inches="tight")
+            bar_colors = ["#FF6B6B" if idx == gt_concept_idx else "#4ECDC4" for idx in top_indices_cpu]
+            
+            y_pos = np.arange(top_k)
+            ax_concept.barh(y_pos, top_scores.cpu().numpy(), color=bar_colors, alpha=0.7)
+            ax_concept.set_yticks(y_pos)
+            ax_concept.set_yticklabels([concept_names[idx.item()] for idx in top_indices], fontsize=8)
+            ax_concept.invert_yaxis()
+            ax_concept.set_xlabel("Probability", fontsize=9)
+            ax_concept.set_title(f"Top {top_k} Concepts", fontsize=10, fontweight='bold')
+            ax_concept.grid(axis='x', alpha=0.3, linestyle='--')
+            
+            # Add confidence annotation
+            if gt_concept_idx in top_indices_cpu:
+                rank = np.where(top_indices_cpu == gt_concept_idx)[0][0]
+                ax_concept.text(0.02, rank, "✓", fontsize=14, color='green', 
+                              verticalalignment='center', fontweight='bold')
+            
+            # Bottom-left: Country probabilities
+            ax_country = fig.add_subplot(gs[1, 0])
+            top_countries = min(5, len(idx_to_country))
+            top_country_scores, top_country_indices = torch.topk(country_probs[i], k=top_countries)
+            top_country_indices_cpu = top_country_indices.cpu().numpy()
+            
+            # Find true country index if available
+            true_country_idx = None
+            for idx, country in idx_to_country.items():
+                if country == gt_country:
+                    true_country_idx = idx
+                    break
+            
+            country_colors = ["#FF6B6B" if idx == true_country_idx else "#95E1D3" 
+                            for idx in top_country_indices_cpu]
+            
+            y_pos_country = np.arange(top_countries)
+            ax_country.barh(y_pos_country, top_country_scores.cpu().numpy(), 
+                          color=country_colors, alpha=0.7)
+            ax_country.set_yticks(y_pos_country)
+            ax_country.set_yticklabels([idx_to_country[idx.item()] for idx in top_country_indices], 
+                                     fontsize=8)
+            ax_country.invert_yaxis()
+            ax_country.set_xlabel("Probability", fontsize=9)
+            ax_country.set_title("Top Countries", fontsize=10, fontweight='bold')
+            ax_country.grid(axis='x', alpha=0.3, linestyle='--')
+            
+            # Bottom-right: Error analysis
+            ax_error = fig.add_subplot(gs[1, 1])
+            ax_error.axis('off')
+            
+            # Calculate error components
+            lat_error = abs(pred_lat - gt_lat)
+            lng_error = abs(pred_lng - gt_lng)
+            
+            error_text = [
+                "📊 Error Analysis",
+                "",
+                f"Total Distance: {format_distance(distance_km)}",
+                f"Latitude Error: {lat_error:.3f}°",
+                f"Longitude Error: {lng_error:.3f}°",
+                "",
+                "🎯 Accuracy Thresholds:",
+            ]
+            
+            # Add threshold accuracy indicators
+            thresholds = THRESHOLD_ACCURACIES
+            for level, threshold in thresholds.items():
+                within = distance_km <= threshold
+                indicator = "✓" if within else "✗"
+                error_text.append(f"  {indicator} {level.capitalize()} ({threshold}km)")
+            
+            # Add cell prediction info
+            pred_cell = pred_cells[i].item()
+            gt_cell = cell_labels[i].item()
+            cell_correct = "✓" if pred_cell == gt_cell else "✗"
+            error_text.extend([
+                "",
+                f"🗺️  Geocell: {cell_correct}",
+                f"  Pred: {pred_cell}",
+                f"  True: {gt_cell}",
+            ])
+            
+            ax_error.text(0.1, 0.5, "\n".join(error_text), fontsize=9, 
+                         family='monospace', verticalalignment='center',
+                         bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.3))
+            
+            plt.suptitle(f"Sample {i+1}/{n_display} - Prediction Analysis", 
+                        fontsize=12, fontweight='bold', y=0.98)
+            
+            plt.tight_layout(rect=[0, 0, 1, 0.97])
+            save_path = viz_dir / f"sample_{i}_epoch_{epoch}.png"
+            plt.savefig(save_path, dpi=VIZ_DPI, bbox_inches="tight")
+            
             if args.use_wandb:
-                wandb_images.append(wandb.Image(str(save_path), caption=f"Epoch {epoch} Sample {i}"))
+                caption = (f"Epoch {epoch} | Stage {stage} | Sample {i} | "
+                          f"Error: {format_distance(distance_km)}")
+                wandb_images.append(wandb.Image(str(save_path), caption=caption))
+            
             plt.close(fig)
 
         break
 
     if args.use_wandb and wandb_images:
-        wandb.log({f"predictions/epoch_{epoch}": wandb_images})
+        wandb_key = f"predictions/epoch_{epoch}_stage_{stage}" if stage is not None else f"predictions/epoch_{epoch}"
+        wandb.log({wandb_key: wandb_images}, step=epoch)
+    
+    logger.info(f"Saved {n_display} visualization(s) to {viz_dir}")
+
+
+@torch.no_grad()
+def plot_error_distribution(
+    model, 
+    dataloader, 
+    device, 
+    cell_centers, 
+    output_path: Path,
+    stage: int = None
+):
+    """Plot error distribution histogram."""
+    model.eval()
+    all_distances = []
+    
+    for batch in dataloader:
+        images, _, _, coords, _, _, _ = batch
+        images = images.to(device)
+        coords = coords.to(device)
+        
+        outputs = model(images, coords)
+        cell_logits = outputs["cell_logits"]
+        pred_offsets = outputs["pred_offsets"]
+        
+        pred_cells = cell_logits.argmax(dim=1)
+        batch_cell_centers = cell_centers[pred_cells]
+        
+        if model.coord_output_dim == 3:
+            pred_cart = batch_cell_centers + pred_offsets
+            pred_cart = torch.nn.functional.normalize(pred_cart, p=2, dim=1)
+            pred_coords = sphere_to_latlng(pred_cart)
+        else:
+            c_x, c_y, c_z = batch_cell_centers[:, 0], batch_cell_centers[:, 1], batch_cell_centers[:, 2]
+            c_lat = torch.rad2deg(torch.asin(c_z))
+            c_lng = torch.rad2deg(torch.atan2(c_y, c_x))
+            pred_coords = torch.stack([c_lat, c_lng], dim=1) + pred_offsets
+        
+        distances = haversine_distance(pred_coords, coords)
+        all_distances.extend(distances.cpu().tolist())
+    
+    if not all_distances:
+        logger.warning("No distances collected for error distribution plot")
+        return
+    
+    fig, ax = plt.subplots(figsize=(10, 6))
+    all_distances_array = np.array(all_distances)
+    ax.hist(all_distances_array, bins=50, edgecolor='black', alpha=0.7)
+    median_dist = np.median(all_distances_array)
+    mean_dist = np.mean(all_distances_array)
+    ax.axvline(median_dist, color='red', linestyle='--', 
+               label=f'Median: {format_distance(median_dist)}')
+    ax.axvline(mean_dist, color='green', linestyle='--', 
+               label=f'Mean: {format_distance(mean_dist)}')
+    ax.set_xlabel('Distance Error (km)', fontsize=11)
+    ax.set_ylabel('Frequency', fontsize=11)
+    title = f'Error Distribution'
+    if stage is not None:
+        title += f" - Stage {stage}"
+    ax.set_title(title, fontsize=12, fontweight='bold')
+    ax.legend()
+    ax.grid(alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=VIZ_DPI, bbox_inches="tight")
+    plt.close()
+    
+    logger.info(f"Saved error distribution to {output_path}")
 
 
 @torch.no_grad()
@@ -257,7 +590,7 @@ def dump_diagnostics(model, dataloader, device, output_path: Path, concept_names
         if len(rows) >= max_samples:
             break
 
-        images, concept_idx, target_idx, coords, metadata, cell_labels, note_embs = batch
+        images, concept_idx, target_idx, coords, metadata, cell_labels = batch
         images, coords = images.to(device), coords.to(device)
         concept_idx, target_idx = concept_idx.to(device), target_idx.to(device)
 
@@ -386,6 +719,8 @@ def train(args):
 
     # Use StreetCLIP transforms
     base_encoder = StreetCLIPEncoder(StreetCLIPConfig(model_name=args.encoder_model))
+    base_encoder.model.to(device)
+    base_encoder = base_encoder.to(device) 
     transforms = get_transforms_from_processor(base_encoder.image_processor)
 
     # Dataset to use - PanoramaCBMDataset with optional CSV path
@@ -503,84 +838,6 @@ def train(args):
         f"Train set: {len(train_concepts)} samples across {len(train_concept_counts)} concepts"
     )
 
-    # Precompute Note Embeddings for Training
-    logger.info("Pre-computing Note Embeddings for Semantic Alignment...")
-    all_notes = [s["note"] for s in full_dataset.samples]
-
-    note_embeddings_list = []
-    with torch.no_grad():
-        for i in range(0, len(all_notes), 32):
-            batch_notes = all_notes[i : i + 32]
-            # Replace empty notes with " " to avoid tokenizer errors
-            batch_notes = [n if n and n.strip() else " " for n in batch_notes]
-            feats = base_encoder.get_text_features(text=batch_notes)
-            note_embeddings_list.append(feats.cpu())
-    all_note_embeddings = torch.cat(note_embeddings_list, dim=0)
-
-    # Inject into samples
-    for i, sample in enumerate(full_dataset.samples):
-        sample["note_embedding"] = all_note_embeddings[i]
-
-    # Re-define collate to handle cells and note embeddings
-    def collate_batch_v2(batch):
-        images = torch.stack([item[0] for item in batch])
-        concept_indices = torch.tensor([item[1] for item in batch], dtype=torch.long)
-        target_indices = torch.tensor([item[2] for item in batch], dtype=torch.long)
-        coordinates = torch.stack([item[3] for item in batch])
-        metadata = [item[4] for item in batch]
-
-        cell_labels = []
-        note_embs = []
-
-        for m in metadata:
-            pid = m["pano_id"]
-            cell_labels.append(pano_to_cell[pid])
-            note_embs.append(pano_to_note_emb[pid])
-
-        cell_labels = torch.tensor(cell_labels, dtype=torch.long)
-        note_embs = torch.stack(note_embs)
-
-        return (
-            images,
-            concept_indices,
-            target_indices,
-            coordinates,
-            metadata,
-            cell_labels,
-            note_embs,
-        )
-
-    # Build lookup maps
-    pano_to_note_emb = {s["pano_id"]: s["note_embedding"] for s in full_dataset.samples}
-    # pano_to_cell already built
-
-    # Update DataLoaders to use v2 collate
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=args.batch_size,
-        shuffle=True,
-        num_workers=4,
-        pin_memory=True,
-        drop_last=True,
-        collate_fn=collate_batch_v2,
-    )
-
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=args.batch_size,
-        shuffle=False,
-        num_workers=4,
-        collate_fn=collate_batch_v2,
-    )
-
-    test_loader = DataLoader(
-        test_dataset,
-        batch_size=args.batch_size,
-        shuffle=False,
-        num_workers=4,
-        collate_fn=collate_batch_v2,
-    )
-
     logger.info(
         f"  Samples per concept - Min: {min(train_concept_counts.values())}, Max: {max(train_concept_counts.values())}, Avg: {len(train_concepts)/len(train_concept_counts):.1f}"
     )
@@ -620,8 +877,7 @@ def train(args):
         tags = [
             args.encoder_model,
             args.country_filter if args.country_filter else "global",
-            "finetuned" if args.finetune_encoder else "frozen",
-            "concept_aware",
+            "three-stage",
             args.coordinate_loss_type,
             args.csv_path if args.csv_path else args.geoguessr_id,
         ]
@@ -664,6 +920,58 @@ def train(args):
 
     pano_to_cell = {s["pano_id"]: s["cell_label"] for s in full_dataset.samples}
 
+    # Re-define collate to handle cells (now that pano_to_cell exists)
+    def collate_batch_v2(batch):
+        images = torch.stack([item[0] for item in batch])
+        concept_indices = torch.tensor([item[1] for item in batch], dtype=torch.long)
+        target_indices = torch.tensor([item[2] for item in batch], dtype=torch.long)
+        coordinates = torch.stack([item[3] for item in batch])
+        metadata = [item[4] for item in batch]
+
+        cell_labels = []
+
+        for m in metadata:
+            pid = m["pano_id"]
+            cell_labels.append(pano_to_cell[pid])
+
+        cell_labels = torch.tensor(cell_labels, dtype=torch.long)
+
+        return (
+            images,
+            concept_indices,
+            target_indices,
+            coordinates,
+            metadata,
+            cell_labels,
+        )
+
+    # Update DataLoaders to use v2 collate (must happen after pano_to_cell is defined)
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=args.batch_size,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True,
+        drop_last=True,
+        collate_fn=collate_batch_v2,
+    )
+
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=4,
+        collate_fn=collate_batch_v2,
+    )
+
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=4,
+        collate_fn=collate_batch_v2,
+    )
+
     # ---------- Concept Extraction & Encoding ----------
     logger.info("Extracting and encoding concepts...")
     # We need concepts from the ENTIRE dataset to build the basis, not just training set
@@ -690,9 +998,7 @@ def train(args):
     logger.info("Concept alignment verified.")
 
     # Encode concepts to get E_concept
-    # Move encoder to device for inference - ensure model is explicitly moved
-    base_encoder.model.to(device)
-    base_encoder = base_encoder.to(device)  # Also move any other components
+    
     # Verify model is on the correct device (compare device types, not exact strings)
     model_device = next(base_encoder.model.parameters()).device
     if model_device.type != device.type:
@@ -750,7 +1056,7 @@ def train(args):
     # ========================================================================
     # STAGE 0: Domain Contrastive Pretraining (Image-Text Alignment)
     # ========================================================================
-    logger.info(f"\n{'='*60}")
+    logger.info(f"\n{'='*74}")
     logger.info(f"STAGE 0: Domain Contrastive Pretraining")
     logger.info(f"{'='*60}")
     
@@ -760,9 +1066,10 @@ def train(args):
     
     # Get trainable parameters for Stage 0
     stage0_params = model.image_encoder.get_trainable_params()
+    num_trainable = sum(p.numel() for p in stage0_params)
     optimizer = torch.optim.AdamW(stage0_params, lr=args.stage0_lr, weight_decay=args.stage0_weight_decay)
     scheduler = CosineAnnealingLR(optimizer, T_max=args.stage0_epochs, eta_min=args.stage0_lr * 0.01)
-    logger.info(f"Stage 0 optimizer: {len(stage0_params)} params, lr={args.stage0_lr:.2e}")
+    logger.info(f"Stage 0 optimizer: {num_trainable:,} params ({len(stage0_params)} tensors), lr={args.stage0_lr:.2e}")
     
     best_val_loss = float('inf')
     patience_counter = 0
@@ -773,8 +1080,9 @@ def train(args):
         total_loss = 0
         pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{args.stage0_epochs} [Stage 0]")
         
+        # Contrastive Loss: Image-Text (note) Alignment
         for batch in pbar:
-            images, concept_idx, target_idx, coords, metadata, cell_labels, note_embs = batch
+            images, concept_idx, target_idx, coords, metadata, cell_labels = batch
             images = images.to(device)
             
             # Get raw notes from metadata for dynamic text encoding
@@ -814,7 +1122,7 @@ def train(args):
         val_loss = 0
         with torch.no_grad():
             for batch in val_loader:
-                images, _, _, _, metadata, _, _ = batch
+                images, _, _, _, metadata, _ = batch
                 images = images.to(device)
                 notes = [m["note"] for m in metadata]
                 
@@ -835,7 +1143,16 @@ def train(args):
             best_val_loss = val_loss
             patience_counter = 0
             best_model_path = checkpoint_dir / "checkpoints" / "best_model_stage0.pt"
-            torch.save(model.state_dict(), best_model_path)
+            save_checkpoint(
+                model=model,
+                checkpoint_path=best_model_path,
+                cell_centers=cell_centers,
+                concept_names=concept_names,
+                country_to_idx=full_dataset.country_to_idx,
+                idx_to_country=full_dataset.idx_to_country,
+                encoder_model=args.encoder_model,
+                extra_info={"stage": 0, "val_loss": val_loss},
+            )
             logger.info(f"Saved best Stage 0 model (Val Loss: {val_loss:.4f})")
         else:
             patience_counter += 1
@@ -853,15 +1170,16 @@ def train(args):
     # ========================================================================
     # STAGE 1: Concept Bottleneck + Global Alignment Training
     # ========================================================================
-    logger.info(f"\n{'='*60}")
+    logger.info(f"\n{'='*74}")
     logger.info(f"STAGE 1: Concept Bottleneck + Global Alignment Training")
     logger.info(f"{'='*60}")
     
     # Get Stage 1 parameters
     stage1_params = model.get_stage1_params()
+    stage1_num_trainable = sum(p.numel() for p in stage1_params)
     optimizer = torch.optim.AdamW(stage1_params, lr=args.stage1_lr, weight_decay=args.stage1_weight_decay)
     scheduler = CosineAnnealingLR(optimizer, T_max=args.stage1_epochs, eta_min=args.stage1_lr * 0.01)
-    logger.info(f"Stage 1 optimizer: {len(stage1_params)} params, lr={args.stage1_lr:.2e}")
+    logger.info(f"Stage 1 optimizer: {stage1_num_trainable:,} params ({len(stage1_params)} tensors), lr={args.stage1_lr:.2e}")
     
     best_val_acc = 0.0
     patience_counter = 0
@@ -876,7 +1194,7 @@ def train(args):
         pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{args.stage1_epochs} [Stage 1]")
         
         for batch in pbar:
-            images, concept_idx, target_idx, coords, _, cell_labels, note_embs = batch
+            images, concept_idx, target_idx, coords, _, cell_labels = batch
             images = images.to(device)
             coords = coords.to(device)
             concept_idx = concept_idx.to(device)
@@ -901,7 +1219,7 @@ def train(args):
                 total_country_correct += country_correct
                 total_country_count += len(target_idx)
                 
-                # Stage 1 losses: Concept + Country + C-GPS (NO text!)
+                # Stage 1 losses: Concept + Country + Concept-GPS 
                 loss_concept_gps = geocell_contrastive_loss(concept_emb, gps_emb, cell_labels, temperature=args.temperature)
                 loss_concept = nn.functional.cross_entropy(
                     concept_logits, concept_idx,
@@ -911,7 +1229,6 @@ def train(args):
                 loss_country = nn.functional.cross_entropy(country_logits, target_idx, label_smoothing=args.label_smoothing)
                 
                 loss = (
-                    # TODO: Location Encoder is frozen. Should we unfreeze it?
                     args.lambda_concept_gps * loss_concept_gps
                     + args.lambda_concept * loss_concept
                     + args.lambda_country * loss_country
@@ -941,7 +1258,12 @@ def train(args):
         train_concept_acc = total_concept_correct / total_concept_count if total_concept_count > 0 else 0.0
         train_country_acc = total_country_correct / total_country_count if total_country_count > 0 else 0.0
         
-        logger.info(f"Epoch {epoch+1} [Stage 1] Train Loss: {avg_train_loss:.4f}, Concept Acc: {train_concept_acc:.4f}, Country Acc: {train_country_acc:.4f}")
+        train_metrics = {
+            "loss": avg_train_loss,
+            "concept_acc": train_concept_acc,
+            "country_acc": train_country_acc,
+        }
+        log_metrics(train_metrics, prefix="Train", stage=1)
         
         if args.use_wandb:
             wandb.log({"train_loss": avg_train_loss, "train_concept_accuracy": train_concept_acc, "train_country_accuracy": train_country_acc, "epoch": global_epoch + 1, "stage": 1})
@@ -955,7 +1277,16 @@ def train(args):
             best_val_acc = val_metric
             patience_counter = 0
             best_model_path = checkpoint_dir / "checkpoints" / "best_model_stage1.pt"
-            torch.save(model.state_dict(), best_model_path)
+            save_checkpoint(
+                model=model,
+                checkpoint_path=best_model_path,
+                cell_centers=cell_centers,
+                concept_names=concept_names,
+                country_to_idx=full_dataset.country_to_idx,
+                idx_to_country=full_dataset.idx_to_country,
+                encoder_model=args.encoder_model,
+                extra_info={"stage": 1, "concept_acc": val_metric},
+            )
             logger.info(f"Saved best Stage 1 model (Concept Acc: {val_metric:.4f})")
         else:
             patience_counter += 1
@@ -965,9 +1296,11 @@ def train(args):
         
         # Visualization & Diagnostics
         if (epoch + 1) % args.save_interval == 0:
-            visualize_predictions(model, val_loader, concept_names, full_dataset.idx_to_country, device, args, checkpoint_dir, global_epoch + 1, cell_centers=cell_centers)
+            visualize_predictions(model, val_loader, concept_names, full_dataset.idx_to_country, device, args, checkpoint_dir, global_epoch + 1, cell_centers=cell_centers, stage=1)
             diag_path = checkpoint_dir / "diagnostics" / f"stage1_epoch_{epoch+1}.csv"
             dump_diagnostics(model, val_loader, device, diag_path, concept_names, full_dataset.idx_to_country, cell_centers=cell_centers, log_to_wandb=args.use_wandb, wandb_step=global_epoch + 1)
+            error_dist_path = checkpoint_dir / "visualizations" / f"error_dist_stage1_epoch_{epoch+1}.png"
+            plot_error_distribution(model, val_loader, device, cell_centers, error_dist_path, stage=1)
         
         global_epoch += 1
     
@@ -978,15 +1311,16 @@ def train(args):
     # ========================================================================
     # STAGE 2: Geolocation Head Training
     # ========================================================================
-    logger.info(f"\n{'='*60}")
+    logger.info(f"\n{'='*74}")
     logger.info(f"STAGE 2: Geolocation Head Training")
     logger.info(f"{'='*60}")
     
     # Get Stage 2 parameters
     stage2_params = model.get_stage2_params()
+    stage2_num_trainable = sum(p.numel() for p in stage2_params)
     optimizer = torch.optim.AdamW(stage2_params, lr=args.stage2_lr, weight_decay=args.stage2_weight_decay)
     scheduler = CosineAnnealingLR(optimizer, T_max=args.stage2_epochs, eta_min=args.stage2_lr * 0.01)
-    logger.info(f"Stage 2 optimizer: {len(stage2_params)} params, lr={args.stage2_lr:.2e}")
+    logger.info(f"Stage 2 optimizer: {stage2_num_trainable:,} params ({len(stage2_params)} tensors), lr={args.stage2_lr:.2e}")
     
     best_val_metric = float('inf')  # Lower median error is better
     patience_counter = 0
@@ -997,7 +1331,7 @@ def train(args):
         pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{args.stage2_epochs} [Stage 2]")
         
         for batch in pbar:
-            images, concept_idx, target_idx, coords, _, cell_labels, note_embs = batch
+            images, concept_idx, target_idx, coords, _, cell_labels = batch
             images = images.to(device)
             coords = coords.to(device)
             cell_labels = cell_labels.to(device)
@@ -1053,7 +1387,8 @@ def train(args):
                 })
         
         avg_train_loss = total_loss / len(train_loader)
-        logger.info(f"Epoch {epoch+1} [Stage 2] Train Loss: {avg_train_loss:.4f}")
+        train_metrics = {"loss": avg_train_loss}
+        log_metrics(train_metrics, prefix="Train", stage=2)
         
         if args.use_wandb:
             wandb.log({"train_loss": avg_train_loss, "epoch": global_epoch + 1, "stage": 2})
@@ -1067,7 +1402,16 @@ def train(args):
             best_val_metric = val_metric
             patience_counter = 0
             best_model_path = checkpoint_dir / "checkpoints" / "best_model_stage2.pt"
-            torch.save(model.state_dict(), best_model_path)
+            save_checkpoint(
+                model=model,
+                checkpoint_path=best_model_path,
+                cell_centers=cell_centers,
+                concept_names=concept_names,
+                country_to_idx=full_dataset.country_to_idx,
+                idx_to_country=full_dataset.idx_to_country,
+                encoder_model=args.encoder_model,
+                extra_info={"stage": 2, "median_error_km": val_metric},
+            )
             logger.info(f"Saved best Stage 2 model (Median Error: {val_metric:.1f}km)")
         else:
             patience_counter += 1
@@ -1077,9 +1421,11 @@ def train(args):
         
         # Visualization & Diagnostics
         if (epoch + 1) % args.save_interval == 0:
-            visualize_predictions(model, val_loader, concept_names, full_dataset.idx_to_country, device, args, checkpoint_dir, global_epoch + 1, cell_centers=cell_centers)
+            visualize_predictions(model, val_loader, concept_names, full_dataset.idx_to_country, device, args, checkpoint_dir, global_epoch + 1, cell_centers=cell_centers, stage=2)
             diag_path = checkpoint_dir / "diagnostics" / f"stage2_epoch_{epoch+1}.csv"
             dump_diagnostics(model, val_loader, device, diag_path, concept_names, full_dataset.idx_to_country, cell_centers=cell_centers, log_to_wandb=args.use_wandb, wandb_step=global_epoch + 1)
+            error_dist_path = checkpoint_dir / "visualizations" / f"error_dist_stage2_epoch_{epoch+1}.png"
+            plot_error_distribution(model, val_loader, device, cell_centers, error_dist_path, stage=2)
         
         global_epoch += 1
 
@@ -1091,7 +1437,8 @@ def train(args):
     # Load best Stage 2 model if saved
     best_model_path = checkpoint_dir / "checkpoints" / "best_model_stage2.pt"
     if best_model_path.exists():
-        model.load_state_dict(torch.load(best_model_path))
+        checkpoint = load_checkpoint(best_model_path, device=device)
+        model.load_state_dict(checkpoint["model_state_dict"])
         logger.info("Loaded best Stage 2 model for testing.")
     else:
         logger.warning("No best Stage 2 model found, using current model state.")
@@ -1134,13 +1481,12 @@ def validate(model, val_loader, device, args, cell_centers, concept_weights=None
     all_distances = []
 
     for batch in val_loader:
-        images, concept_idx, target_idx, coords, _, cell_labels, note_embs = batch
+        images, concept_idx, target_idx, coords, _, cell_labels = batch
         images = images.to(device)
         coords = coords.to(device)
         concept_idx = concept_idx.to(device)
         target_idx = target_idx.to(device)
         cell_labels = cell_labels.to(device)
-        note_embs = note_embs.to(device)
 
         # CBM Architecture outputs
         outputs = model(images, coords)
@@ -1257,14 +1603,7 @@ def validate(model, val_loader, device, args, cell_centers, concept_weights=None
     threshold_accuracies = {}
     if all_distances:
         all_distances_tensor = torch.cat(all_distances)
-        thresholds = {
-            "street": 1.0,  # 1 km
-            "city": 25.0,  # 25 km
-            "region": 200.0,  # 200 km
-            "country": 750.0,  # 750 km
-            "continent": 2500.0,  # 2500 km
-        }
-        for level, threshold_km in thresholds.items():
+        for level, threshold_km in THRESHOLD_ACCURACIES.items():
             acc = accuracy_within_threshold(all_distances_tensor, threshold_km)
             threshold_accuracies[f"acc_{level}"] = acc
 
@@ -1291,13 +1630,15 @@ def validate(model, val_loader, device, args, cell_centers, concept_weights=None
         total_cell_correct / total_concept_count if total_concept_count > 0 else 0.0
     )  # Denom same as batch size
 
-    # Log threshold accuracies
-    log_msg = f"Validation Loss: {avg_loss:.4f}, Val Concept Acc: {val_concept_acc:.4f}, Val Country Acc: {val_country_acc:.4f}, Val Cell Acc: {val_cell_acc:.4f}"
-    log_msg += f", Median Error: {threshold_accuracies['median_error_km']:.1f}km"
-    logger.info(log_msg)
-    logger.info(
-        f"Thresholds: Street={threshold_accuracies['acc_street']:.3f}, City={threshold_accuracies['acc_city']:.3f}, Region={threshold_accuracies['acc_region']:.3f}"
-    )
+    # Use structured logging
+    val_metrics = {
+        "loss": avg_loss,
+        "concept_acc": val_concept_acc,
+        "country_acc": val_country_acc,
+        "cell_acc": val_cell_acc,
+        **threshold_accuracies,
+    }
+    log_metrics(val_metrics, prefix="Val", stage=current_stage)
 
     if args.use_wandb:
         wandb.log(
@@ -1315,13 +1656,7 @@ def validate(model, val_loader, device, args, cell_centers, concept_weights=None
             }
         )
 
-    return {
-        "loss": avg_loss,
-        "concept_acc": val_concept_acc,
-        "country_acc": val_country_acc,
-        "cell_acc": val_cell_acc,
-        **threshold_accuracies,
-    }
+    return val_metrics
 
 
 # ---------- Main Entry Point ----------

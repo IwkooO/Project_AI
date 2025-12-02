@@ -17,6 +17,8 @@ source activate streetview_pnair
 export PYTHONNOUSERSITE=1
 export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
 
+N_EPOCHS=2
+
 # Run Training with Three-Stage Concept-Aware Pipeline
 # Stage 0: Domain Contrastive Pretraining (Image-Text)
 # Stage 1: Concept Bottleneck + Global Alignment
@@ -24,14 +26,14 @@ export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
 python scripts/training/train_concept_aware.py \
     --encoder_model "geolocal/StreetCLIP" \
     --batch_size 256 \
-    --stage0_epochs 5 \
+    --stage0_epochs ${N_EPOCHS} \
     --stage0_lr 3e-5 \
     --stage0_weight_decay 0.05 \
     --unfreeze_layers 2 \
-    --stage1_epochs 15 \
+    --stage1_epochs ${N_EPOCHS} \
     --stage1_lr 1e-4 \
     --stage1_weight_decay 0.01 \
-    --stage2_epochs 15 \
+    --stage2_epochs ${N_EPOCHS} \
     --stage2_lr 3e-4 \
     --stage2_weight_decay 0.01 \
     --temperature 0.07 \
@@ -48,6 +50,5 @@ python scripts/training/train_concept_aware.py \
     --use_amp \
     --use_class_weights \
     --coordinate_loss_type "haversine" \
-    --csv_path "/scratch-shared/pnair/Project_AI/data/dataset-43k-updated.csv" #\
-    #--country_filter "India" \
-    
+    --csv_path "/scratch-shared/pnair/Project_AI/data/dataset-43k-updated.csv" 
+    # --country_filter "India" \

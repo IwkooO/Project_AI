@@ -3,6 +3,7 @@
 PyTorch Dataset for CBM baseline training on panorama images.
 """
 
+from functools import lru_cache
 import json
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
@@ -27,7 +28,7 @@ from bs4 import BeautifulSoup
 CLIP_IMAGE_MEAN = (0.48145466, 0.4578275, 0.40821073)
 CLIP_IMAGE_STD = (0.26862954, 0.26130258, 0.27577711)
 
-
+@lru_cache(maxsize=10000)
 def parse_html_note(html_text: str) -> str:
     """
     Parse HTML note and extract plain text.
@@ -294,7 +295,7 @@ class PanoramaCBMDataset(Dataset):
         # Load CSV
         print(f"Loading CSV from {self.csv_path}...")
         try:
-            df = pd.read_csv(self.csv_path, delimiter=";", encoding="latin1")
+            df = pd.read_csv(self.csv_path)
         except Exception as e:
             raise RuntimeError(f"Error loading CSV from {self.csv_path}: {e}")
         
@@ -327,7 +328,13 @@ class PanoramaCBMDataset(Dataset):
         df['lng'] = df['lng'].astype(str).str.replace(',', '.').astype(float)
         
         # 6. Parse HTML from notes (vectorized with apply)
-        df['note'] = df['note'].astype(str).apply(parse_html_note)
+        # Use multiprocessing for large datasets to speed up HTML parsing
+        if len(df) > 10000:
+            from multiprocessing import Pool, cpu_count
+            with Pool(min(cpu_count(), 8)) as pool:
+                df['note'] = pool.map(parse_html_note, df['note'].astype(str).tolist())
+        else:
+            df['note'] = df['note'].astype(str).apply(parse_html_note)
         df = df[df['note'].str.strip() != '']
         after_html_parse = len(df)
         
@@ -336,10 +343,10 @@ class PanoramaCBMDataset(Dataset):
             df = df.head(self.max_samples)
         
         # 8. Check image existence (this is the only slow part, but necessary)
-        print(f"  Checking image files exist...")
-        df['image_exists'] = df['image_path'].apply(lambda x: Path(x).exists())
-        df = df[df['image_exists']]
-        df = df.drop(columns=['image_exists'])
+        # print(f"  Checking image files exist...")
+        # df['image_exists'] = df['image_path'].apply(lambda x: Path(x).exists())
+        # df = df[df['image_exists']]
+        # df = df.drop(columns=['image_exists'])
         final_count = len(df)
         
         # Print statistics
@@ -356,10 +363,10 @@ class PanoramaCBMDataset(Dataset):
         if final_count == 0:
             raise RuntimeError(f"No samples found! Check your CSV file ('{self.csv_path}'), country filter ('{self.country}'), or data requirements.")
         
-        # Convert to list of dicts
-        samples = []
-        for idx, row in df.iterrows():
-            sample = {
+        # Convert to list of dicts (vectorized - much faster than iterrows)
+        samples = df.to_dict('records')
+        samples = [
+            {
                 'pano_id': str(row.get('pano_id', f'row_{idx}')),
                 'image_path': Path(row['image_path']),
                 'meta_path': None,
@@ -370,7 +377,8 @@ class PanoramaCBMDataset(Dataset):
                 'note': str(row['note']),
                 'images': []
             }
-            samples.append(sample)
+            for idx, row in enumerate(samples)
+        ]
         
         print(f"  Final: {len(samples)} samples")
         return samples
@@ -503,7 +511,8 @@ class PanoramaCBMDataset(Dataset):
 
         # Load and process image
         image_path = sample['image_path']
-        if isinstance(image_path, str):
+        # Avoid repeated Path() conversion if already a Path object
+        if not isinstance(image_path, Path):
             image_path = Path(image_path)
         image = Image.open(image_path).convert('RGB')
 

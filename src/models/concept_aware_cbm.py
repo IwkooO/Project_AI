@@ -258,3 +258,94 @@ class ConceptAwareGeoModel(nn.Module):
         # Ensure Stage 2 is unfrozen
         for p in self.get_stage2_params():
             p.requires_grad = True
+
+    # ========== Inference Methods ==========
+    
+    @torch.no_grad()
+    def predict_location(
+        self,
+        images: torch.Tensor,
+        cell_centers: torch.Tensor,
+    ) -> dict:
+        """
+        Predict location from images only (for GeoGuessr inference).
+        
+        This is the main inference method - no GPS coordinates needed.
+        
+        Args:
+            images: Image tensor [batch, 3, H, W]
+            cell_centers: Geocell center coordinates [num_cells, 3] in Cartesian (x, y, z)
+            
+        Returns:
+            Dict containing:
+                - pred_lat: Predicted latitudes [batch]
+                - pred_lng: Predicted longitudes [batch]
+                - pred_coords: Predicted coordinates [batch, 2] as (lat, lng)
+                - pred_cell: Predicted cell indices [batch]
+                - cell_probs: Cell classification probabilities [batch, num_cells]
+                - country_probs: Country classification probabilities [batch, num_countries]
+                - concept_probs: Concept classification probabilities [batch, num_concepts]
+        """
+        self.eval()
+        
+        # Run forward pass (no GPS coords for inference)
+        outputs = self.forward(images, gps_coords=None)
+        
+        cell_logits = outputs["cell_logits"]
+        pred_offsets = outputs["pred_offsets"]
+        concept_logits = outputs["concept_logits"]
+        country_logits = outputs["country_logits"]
+        
+        # Get predicted cell
+        cell_probs = F.softmax(cell_logits, dim=1)
+        pred_cells = cell_logits.argmax(dim=1)
+        
+        # Get cell centers for predicted cells
+        pred_cell_centers = cell_centers[pred_cells]  # [batch, 3]
+        
+        # Compute final coordinates
+        if self.coord_output_dim == 3:
+            # 3D Cartesian output: add offset and normalize to unit sphere
+            pred_cart = pred_cell_centers + pred_offsets
+            pred_cart = F.normalize(pred_cart, p=2, dim=1)
+            # Convert to lat/lng
+            pred_lat, pred_lng = self._cartesian_to_latlng(pred_cart)
+        else:
+            # 2D lat/lng offset output
+            # Convert cell center from Cartesian to lat/lng
+            c_x, c_y, c_z = pred_cell_centers[:, 0], pred_cell_centers[:, 1], pred_cell_centers[:, 2]
+            c_lat = torch.rad2deg(torch.asin(torch.clamp(c_z, -1.0, 1.0)))
+            c_lng = torch.rad2deg(torch.atan2(c_y, c_x))
+            # Add offset
+            pred_lat = c_lat + pred_offsets[:, 0]
+            pred_lng = c_lng + pred_offsets[:, 1]
+            # Normalize longitude to [-180, 180]
+            pred_lng = ((pred_lng + 180) % 360) - 180
+        
+        pred_coords = torch.stack([pred_lat, pred_lng], dim=1)
+        
+        return {
+            "pred_lat": pred_lat,
+            "pred_lng": pred_lng,
+            "pred_coords": pred_coords,
+            "pred_cell": pred_cells,
+            "cell_probs": cell_probs,
+            "country_probs": F.softmax(country_logits, dim=1),
+            "concept_probs": F.softmax(concept_logits, dim=1),
+        }
+    
+    @staticmethod
+    def _cartesian_to_latlng(cart: torch.Tensor) -> tuple:
+        """
+        Convert Cartesian coordinates on unit sphere to lat/lng.
+        
+        Args:
+            cart: Cartesian coordinates [batch, 3] (x, y, z)
+            
+        Returns:
+            Tuple of (lat, lng) tensors in degrees
+        """
+        x, y, z = cart[:, 0], cart[:, 1], cart[:, 2]
+        lat = torch.rad2deg(torch.asin(torch.clamp(z, -1.0, 1.0)))
+        lng = torch.rad2deg(torch.atan2(y, x))
+        return lat, lng

@@ -1,0 +1,80 @@
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+INFO:__main__:Using device: cuda
+INFO:__main__:Initializing Dataset...
+Loading CSV from /scratch-shared/pnair/Project_AI/data/dataset-43k-updated.csv...
+  Loaded 42536 rows
+INFO:__main__:Total samples: 42308, Concepts: 6476
+INFO:__main__:Samples per concept - Min: 1, Max: 371, Avg: 6.5
+INFO:__main__:Concept distribution (Top 10):
+INFO:__main__:  Roadlines: 371
+INFO:__main__:  Bollard: 236
+INFO:__main__:  95: 219
+INFO:__main__:  Vibes: 218
+INFO:__main__:  RN14: 217
+INFO:__main__:  Bollards: 192
+INFO:__main__:  Unique car: 183
+INFO:__main__:  RP55 & RN148: 173
+INFO:__main__:  __: 170
+INFO:__main__:  Chilo Island: 146
+INFO:__main__:Computed concept weights - Min: 0.0079, Max: 2.0437, Mean: 1.0000, Std: 0.7220
+INFO:__main__:Split sizes: Train=29922, Val=8512, Test=3874
+INFO:__main__:Batches per epoch: Train=116, Val=34, Test=16
+INFO:__main__:Train set: 29922 samples across 6476 concepts
+INFO:__main__:  Samples per concept - Min: 1, Max: 260, Avg: 4.6
+INFO:__main__:Checkpoint directory: results/concept-aware/streetclip/global/haversine/2025-12-02_19-53-03
+INFO:__main__:Logging to results/concept-aware/streetclip/global/haversine/2025-12-02_19-53-03/logs/training.log
+wandb: Currently logged in as: pradyut-nair (project-ai-geoguessr) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run leyh6qb8
+wandb: Tracking run with wandb version 0.23.0
+wandb: Run data is saved locally in results/concept-aware/streetclip/global/haversine/2025-12-02_19-53-03/wandb/run-20251202_195303-leyh6qb8
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run concept-aware-geolocation-global-20251202-195303
+wandb: ⭐️ View project at https://wandb.ai/project-ai-geoguessr/concept-aware-geolocation
+wandb: 🚀 View run at https://wandb.ai/project-ai-geoguessr/concept-aware-geolocation/runs/leyh6qb8
+INFO:__main__:Generating Semantic Geocells...
+  Filtering stats:
+    - Initial: 42536
+    - After required fields: 42536 (dropped 0)
+    - After coords: 42536 (dropped 0)
+    - After note: 42309 (dropped 227)
+    - After HTML parse: 42308 (dropped 1)
+    - After image check: 42308 (dropped 0)
+  Final: 42308 samples
+Loaded 42308 samples
+Concepts: 6476
+Countries: 139
+Clustering Countries:   0%|          | 0/139 [00:00<?, ?it/s]Clustering Countries:   1%|          | 1/139 [00:00<00:21,  6.53it/s]Clustering Countries:   4%|▎         | 5/139 [00:00<00:17,  7.47it/s]Clustering Countries:   7%|▋         | 10/139 [00:00<00:08, 15.30it/s]Clustering Countries:  13%|█▎        | 18/139 [00:00<00:04, 25.59it/s]Clustering Countries:  17%|█▋        | 23/139 [00:01<00:04, 23.60it/s]Clustering Countries:  19%|█▉        | 27/139 [00:01<00:04, 25.46it/s]Clustering Countries:  27%|██▋       | 38/139 [00:01<00:02, 42.60it/s]Clustering Countries:  32%|███▏      | 45/139 [00:01<00:01, 47.40it/s]Clustering Countries:  42%|████▏     | 58/139 [00:01<00:01, 40.76it/s]Clustering Countries:  46%|████▌     | 64/139 [00:02<00:01, 42.80it/s]Clustering Countries:  50%|█████     | 70/139 [00:02<00:01, 42.60it/s]Clustering Countries:  59%|█████▉    | 82/139 [00:02<00:01, 54.64it/s]Clustering Countries:  68%|██████▊   | 95/139 [00:02<00:00, 70.46it/s]Clustering Countries:  75%|███████▍  | 104/139 [00:02<00:00, 50.68it/s]Clustering Countries:  85%|████████▍ | 118/139 [00:02<00:00, 66.47it/s]Clustering Countries:  92%|█████████▏| 128/139 [00:02<00:00, 72.55it/s]Clustering Countries:  99%|█████████▊| 137/139 [00:03<00:00, 61.96it/s]Clustering Countries: 100%|██████████| 139/139 [00:03<00:00, 44.76it/s]
+INFO:__main__:Generated 2090 Semantic Geocells.
+INFO:__main__:Saved geocell visualization to results/concept-aware/streetclip/global/haversine/2025-12-02_19-53-03/visualizations/geocells_map.png
+INFO:__main__:Extracting and encoding concepts...
+INFO:__main__:Found 6476 unique concepts.
+INFO:__main__:Concept alignment verified.
+INFO:__main__:Base encoder device: cuda:0
+INFO:__main__:Initializing ConceptAwareGeoModel (Strict CBM Architecture)...
+INFO:__main__:StreetCLIP vision encoder dimension: 768
+INFO:__main__:Coordinate output dimension: 2
+INFO:__main__:=== THREE-STAGE TRAINING PIPELINE ===
+INFO:__main__:Stage 0: 2 epochs - Domain Contrastive Pretraining (Image-Text)
+INFO:__main__:Stage 1: 2 epochs - Concept Bottleneck + Global Alignment
+INFO:__main__:Stage 2: 2 epochs - Geolocation Head Training
+INFO:__main__:Total epochs: 6
+INFO:__main__:
+==========================================================================
+INFO:__main__:STAGE 0: Domain Contrastive Pretraining
+INFO:__main__:============================================================
+INFO:__main__:Stage 0 optimizer: 149,631,232 params (232 tensors), lr=3.00e-05
+Epoch 1/2 [Stage 0]:   0%|          | 0/116 [00:00<?, ?it/s]Epoch 1/2 [Stage 0]:   0%|          | 0/116 [01:48<?, ?it/s, loss=4.4034]Epoch 1/2 [Stage 0]:   1%|          | 1/116 [01:48<3:28:03, 108.55s/it, loss=4.4034]Epoch 1/2 [Stage 0]:   1%|          | 1/116 [01:49<3:28:03, 108.55s/it, loss=3.7738]Epoch 1/2 [Stage 0]:   2%|▏         | 2/116 [01:49<1:25:29, 45.00s/it, loss=3.7738] Epoch 1/2 [Stage 0]:   2%|▏         | 2/116 [01:49<1:25:29, 45.00s/it, loss=3.3606]Epoch 1/2 [Stage 0]:   3%|▎         | 3/116 [01:49<46:29, 24.69s/it, loss=3.3606]  Epoch 1/2 [Stage 0]:   3%|▎         | 3/116 [01:50<46:29, 24.69s/it, loss=3.1942]Epoch 1/2 [Stage 0]:   3%|▎         | 4/116 [01:50<28:15, 15.14s/it, loss=3.1942][2025-12-02T19:56:19.815] error: *** JOB 17059064 ON gcn115 CANCELLED AT 2025-12-02T19:56:19 DUE to SIGNAL Terminated ***

@@ -37,7 +37,10 @@ class StreetCLIPEncoder(nn.Module):
         if self.config.device is not None:
             self.model.to(self.config.device)
 
-        self.feature_dim = self.model.vision_model.config.hidden_size
+        # Use projection dim (shared embedding space) for contrastive learning
+        self.feature_dim = self.model.config.projection_dim
+        # Also store raw hidden size for CBM heads that may need it
+        self.hidden_size = self.model.vision_model.config.hidden_size
 
     def freeze_encoder(self):
         for param in self.model.parameters():
@@ -49,7 +52,7 @@ class StreetCLIPEncoder(nn.Module):
 
     def unfreeze_top_layers(self, num_layers: int = 2):
         """
-        Unfreeze only the top N transformer layers of the vision encoder.
+        Unfreeze only the top N transformer layers of the vision encoder + projection.
         Used for Stage 0 domain contrastive pretraining.
         
         Args:
@@ -62,8 +65,10 @@ class StreetCLIPEncoder(nn.Module):
         for layer in layers[-num_layers:]:
             for param in layer.parameters():
                 param.requires_grad = True
-        # Also unfreeze post_layernorm
+        # Also unfreeze post_layernorm and visual_projection
         for param in self.model.vision_model.post_layernorm.parameters():
+            param.requires_grad = True
+        for param in self.model.visual_projection.parameters():
             param.requires_grad = True
 
     def unfreeze_text_encoder(self):
@@ -89,11 +94,22 @@ class StreetCLIPEncoder(nn.Module):
         Args:
             pixel_values: Preprocessed CLIP pixel values [batch, 3, 336, 336]
         Returns:
-            CLS token features [batch, hidden_size]
+            Projected image features [batch, projection_dim] (768 for CLIP ViT-L)
+        """
+        # Use get_image_features to get projected embeddings (same space as text)
+        return self.model.get_image_features(pixel_values=pixel_values)
+
+    def get_unprojected_features(self, pixel_values: torch.Tensor) -> torch.Tensor:
+        """
+        Get raw CLS token features before projection (for CBM heads).
+        
+        Args:
+            pixel_values: Preprocessed CLIP pixel values [batch, 3, 336, 336]
+        Returns:
+            Raw CLS token features [batch, hidden_size] (1024 for CLIP ViT-L)
         """
         outputs = self.model.vision_model(pixel_values=pixel_values)
-        cls_embeddings = outputs.last_hidden_state[:, 0]
-        return cls_embeddings
+        return outputs.last_hidden_state[:, 0]
 
     @torch.no_grad()
     def get_image_features(self, pixel_values: torch.Tensor) -> torch.Tensor:
