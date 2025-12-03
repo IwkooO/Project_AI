@@ -1,37 +1,0 @@
-============================================================================================== 
-Warning! Mixing Conda and module environments may lead to corruption of the
-user environment. 
-We do not recommend users mixing those two environments unless absolutely
-necessary. Note that 
-SURF does not provide any support for Conda environment.
-For more information, please refer to our software policy page:
-https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
-
-Remember that many packages have already been installed on the system and can
-be loaded using 
-the 'module load <package__name>' command. If you are uncertain if a package is
-already available 
-on the system, please use 'module avail' or 'module spider' to search for it.
-============================================================================================== 
-----------------------------------------------------------------
-Job started at: Sun Nov 23 18:06:56 CET 2025
-Train Dataset: /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/splits/dataset_train.csv
-Val Dataset: /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/splits/dataset_val.csv
-Output: checkpoints/sae_smaller
-----------------------------------------------------------------
-Starting SAE Training...
-Using device: cuda
-Loading backbone: geolocal/StreetCLIP
-Embedding dimension: 768
-Initializing SAE (Expansion: 4x, K: 32)
-Loading standard training dataset from /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/splits/dataset_train.csv
-Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
-Loading standard validation dataset from /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/splits/dataset_val.csv
-Loading weights from checkpoints/sae_smaller/best_sae.pth
-Loaded model weights from checkpoint
-Starting training...
-Trainable parameters: 4721664
-Size of training dataset: 34028
-Size of validation dataset: 4254
-Epoch 1/25:   0%|          | 0/133 [00:00<?, ?it/s][2025-11-23T18:07:39.095] error: *** JOB 16906203 ON gcn125 CANCELLED AT 2025-11-23T18:07:39 DUE to SIGNAL Terminated ***
-Epoch 4/30:  12%|█▏        | 16/133 [07:09<10:55,  5.60s/it, Loss=0.0761]Epoch 4/30:  13%|█▎        | 17/133 [07:09<1:20:25, 41.60s/it, Loss=0.0761]Epoch 4/30:  13%|█▎        | 17/133 [07:11<1:20:25, 41.60s/it, Loss=0.0747]Epoch 4/30:  14%|█▎        | 18/133 [07:11<57:06, 29.80s/it, Loss=0.0747]  Epoch 4/30:  14%|█▎        | 18/133 [07:13<57:06, 29.80s/it, Loss=0.0763]Epoch 4/30:  14%|█▍        | 19/133 [07:13<40:56, 21.55s/it, Loss=0.0763]Epoch 4/30:  14%|█▍        | 19/133 [07:16<40:56, 21.55s/it, Loss=0.0765]Epoch 4/30:  15%|█▌        | 20/133 [07:16<29:42, 15.78s/it, Loss=0.0765]Epoch 4/30:  15%|█▌        | 20/133 [07:18<29:42, 15.78s/it, Loss=0.0753]Epoch 4/30:  16%|█▌        | 21/133 [07:18<21:54, 11.74s/it, Loss=0.0753]Epoch 4/30:  16%|█▌        | 21/133 [07:20<21:54, 11.74s/it, Loss=0.0748]Epoch 4/30:  17%|█▋        | 22/133 [07:20<16:29,  8.91s/it, Loss=0.0748]Epoch 4/30:  17%|█▋        | 22/133 [07:23<16:29,  8.91s/it, Loss=0.0759]Epoch 4/30:  17%|█▋        | 23/133 [07:23<12:43,  6.94s/it, Loss=0.0759]Epoch 4/30:  17%|█▋        | 23/133 [07:25<12:43,  6.94s/it, Loss=0.0749]Epoch 4/30:  18%|█▊        | 24/133 [07:25<10:05,  5.55s/it, Loss=0.0749][2025-11-23T18:10:29.725] error: *** JOB 16898495 ON gcn104 CANCELLED AT 2025-11-23T18:10:29 DUE to SIGNAL Terminated ***
