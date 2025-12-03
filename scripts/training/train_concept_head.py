@@ -361,9 +361,24 @@ def main():
     print(f"\nCreating model (mode: {args.mode})...")
     device = torch.device(args.device)
     
+    # Auto-detect embedding dimension from concept embeddings
+    embedding_dim = embeddings.shape[1]
+    print(f"Detected embedding dimension: {embedding_dim}")
+    
+    # Verify dataset embeddings match concept embeddings dimension
+    sample_pooled = train_dataset[0][0]  # Get first pooled embedding
+    if sample_pooled.shape[0] != embedding_dim:
+        raise ValueError(
+            f"Dimension mismatch: Concept embeddings ({embedding_dim}D) != "
+            f"Pooled embeddings ({sample_pooled.shape[0]}D). "
+            f"Please ensure precomputation used the same model."
+        )
+    print(f"Verified: Dataset embeddings match concept embeddings ({embedding_dim}D)")
+    
     model = ConceptHead(
         concept_embeddings=embeddings,
         mode=args.mode,
+        hidden_dim=embedding_dim,  # Use detected dimension
         temperature=args.temperature,
         trainable_attention=args.trainable_attention
     ).to(device)
@@ -452,7 +467,8 @@ def main():
                 epoch=epoch,
                 split="val",
                 num_samples=args.num_vis_samples,
-                device=device
+                device=device,
+                mode=args.mode
             )
             
             if test_dataset is not None:
@@ -464,7 +480,8 @@ def main():
                     epoch=epoch,
                     split="test",
                     num_samples=args.num_vis_samples,
-                    device=device
+                    device=device,
+                    mode=args.mode
                 )
         
         # Save checkpoint

@@ -1,0 +1,229 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=concept_head
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --time=12:00:00
+#SBATCH --mem=64GB
+#SBATCH --output=jobs/outputs/concept_head/train_%j.out
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd $HOME/Project_AI/
+source activate streetview
+
+# Use persistent HuggingFace cache to avoid re-downloading models
+export HF_HOME="$HOME/.cache/huggingface"
+export TRANSFORMERS_CACHE="$HF_HOME"
+export HF_DATASETS_CACHE="$HF_HOME/datasets"
+mkdir -p "$HF_HOME"
+
+# These prevent Python libraries from fighting over CPU cores
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
+# Data is on scratch-shared, only CSVs are in home
+DATA_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced"
+HOME_DATA_DIR="$HOME/Project_AI/data/6921d7831744c5356b098bf7_balanced"
+
+DATASET_CSV="$HOME_DATA_DIR/dataset.csv"
+SPLITS_DIR="$HOME_DATA_DIR/splits"
+CACHED_DIR="$DATA_DIR/cached_streetclip"
+CONCEPT_DIR="$DATA_DIR/concept_data"
+CHECKPOINT_DIR="$HOME/Project_AI/checkpoints/concept_head"
+
+# Training parameters
+MODE="global"           # "global" (default, faster) or "spatial" (with attention maps)
+EPOCHS=50
+BATCH_SIZE=256
+LR=5e-3  # Increased from 1e-3 - LaBo initialization may need higher LR to escape local minimum
+LAMBDA_DRIFT=0.00001
+NUM_VIS_SAMPLES=5
+
+# ============================================================================
+# SETUP
+# ============================================================================
+mkdir -p jobs/outputs/concept_head
+mkdir -p "$SPLITS_DIR"
+mkdir -p "$CACHED_DIR"
+mkdir -p "$CONCEPT_DIR"
+mkdir -p "$CHECKPOINT_DIR"
+
+echo "============================================================"
+echo "Concept Head Training Pipeline"
+echo "============================================================"
+echo "Job started at: $(date)"
+echo "CSV data: $HOME_DATA_DIR"
+echo "Cached data: $DATA_DIR"
+echo "Mode: $MODE"
+echo "============================================================"
+
+# ============================================================================
+# STEP 1: Create Train/Val/Test Splits (if not exist)
+# ============================================================================
+if [ ! -f "$SPLITS_DIR/dataset_train.csv" ]; then
+    echo ""
+    echo "============================================================"
+    echo "STEP 1: Creating train/val/test splits..."
+    echo "============================================================"
+    
+    python -u scripts/data_processing/create_splits.py \
+        --csv-path "$DATASET_CSV" \
+        --output-dir "$SPLITS_DIR" \
+        --seed 42
+    
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to create splits"
+        exit 1
+    fi
+else
+    echo ""
+    echo "STEP 1: Splits already exist, skipping..."
+fi
+
+# ============================================================================
+# STEP 2: Precompute StreetCLIP Embeddings
+# ============================================================================
+if [ ! -f "$CACHED_DIR/train_pooled_embeddings.pt" ]; then
+    echo ""
+    echo "============================================================"
+    echo "STEP 2: Precomputing StreetCLIP embeddings..."
+    echo "============================================================"
+    
+    # Add --save-patch-tokens if using spatial mode
+    PATCH_TOKEN_FLAG=""
+    if [ "$MODE" == "spatial" ]; then
+        PATCH_TOKEN_FLAG="--save-patch-tokens"
+    fi
+    
+    python -u scripts/data_processing/precompute_streetclip_embeddings.py \
+        --train-csv "$SPLITS_DIR/dataset_train.csv" \
+        --val-csv "$SPLITS_DIR/dataset_val.csv" \
+        --test-csv "$SPLITS_DIR/dataset_test.csv" \
+        --output-dir "$CACHED_DIR" \
+        --batch-size 128 \
+        --num-workers 8 \
+        --device cuda \
+        $PATCH_TOKEN_FLAG
+    
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to precompute embeddings"
+        exit 1
+    fi
+else
+    echo ""
+    echo "STEP 2: Cached embeddings already exist, skipping..."
+fi
+
+# ============================================================================
+# STEP 3: Compute Concept Embeddings & Class Priors
+# ============================================================================
+if [ ! -f "$CONCEPT_DIR/concept_vocabulary.json" ]; then
+    echo ""
+    echo "============================================================"
+    echo "STEP 3: Computing concept embeddings and priors..."
+    echo "============================================================"
+    
+    # Process train split (this creates concept vocabulary and embeddings)
+    # The script extracts concepts from the full dataset CSV but processes embeddings for a specific split
+    python -u scripts/data_processing/compute_concept_embeddings.py \
+        --dataset-csv "$DATASET_CSV" \
+        --cached-embeddings-dir "$CACHED_DIR" \
+        --output-dir "$CONCEPT_DIR" \
+        --split train \
+        --mode "$MODE" \
+        --clip-percentile 100 \
+        --device cuda
+    
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to compute concept embeddings for train split"
+        exit 1
+    fi
+    
+    # Optionally compute zero-shot scores for val and test splits
+    # (concept vocabulary and embeddings are already created above)
+    if [ -f "$CACHED_DIR/val_patch_tokens.pt" ] || [ -f "$CACHED_DIR/val_pooled_embeddings.pt" ]; then
+        echo ""
+        echo "Computing zero-shot scores for val split..."
+        python -u scripts/data_processing/compute_concept_embeddings.py \
+            --dataset-csv "$DATASET_CSV" \
+            --cached-embeddings-dir "$CACHED_DIR" \
+            --output-dir "$CONCEPT_DIR" \
+            --split val \
+            --mode "$MODE" \
+            --device cuda \
+            --clip-percentile 100
+
+    fi
+    
+    if [ -f "$CACHED_DIR/test_patch_tokens.pt" ] || [ -f "$CACHED_DIR/test_pooled_embeddings.pt" ]; then
+        echo ""
+        echo "Computing zero-shot scores for test split..."
+        python -u scripts/data_processing/compute_concept_embeddings.py \
+            --dataset-csv "$DATASET_CSV" \
+            --cached-embeddings-dir "$CACHED_DIR" \
+            --output-dir "$CONCEPT_DIR" \
+            --split test \
+            --mode "$MODE" \
+            --device cuda \
+            --clip-percentile 100
+
+    fi
+else
+    echo ""
+    echo "STEP 3: Concept data already exists, skipping..."
+fi
+
+# ============================================================================
+# STEP 4: Train Concept Head
+# ============================================================================
+echo ""
+echo "============================================================"
+echo "STEP 4: Training concept head..."
+echo "============================================================"
+echo "Mode: $MODE"
+echo "Epochs: $EPOCHS"
+echo "Batch size: $BATCH_SIZE"
+echo "Learning rate: $LR"
+echo "Lambda drift: $LAMBDA_DRIFT"
+echo "============================================================"
+
+python -u scripts/training/train_concept_head.py \
+    --train-csv "$SPLITS_DIR/dataset_train.csv" \
+    --val-csv "$SPLITS_DIR/dataset_val.csv" \
+    --test-csv "$SPLITS_DIR/dataset_test.csv" \
+    --cached-embeddings-dir "$CACHED_DIR" \
+    --concept-data-dir "$CONCEPT_DIR" \
+    --output-dir "$CHECKPOINT_DIR" \
+    --mode "$MODE" \
+    --epochs $EPOCHS \
+    --batch-size $BATCH_SIZE \
+    --lr $LR \
+    --lambda-drift $LAMBDA_DRIFT \
+    --num-vis-samples $NUM_VIS_SAMPLES \
+    --num-workers 16 \
+    --device cuda
+
+if [ $? -ne 0 ]; then
+    echo "ERROR: Training failed"
+    exit 1
+fi
+
+# ============================================================================
+# DONE
+# ============================================================================
+echo ""
+echo "============================================================"
+echo "Pipeline complete!"
+echo "============================================================"
+echo "Job finished at: $(date)"
+echo "Checkpoints saved to: $CHECKPOINT_DIR"
+echo "Best model: $CHECKPOINT_DIR/best_concept_head.pth"
+echo "Visualizations: $CHECKPOINT_DIR/visualizations/"
+echo "============================================================"
+

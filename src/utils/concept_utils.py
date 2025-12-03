@@ -1,387 +1,200 @@
 """
-Utility functions for concept head training.
-
-Includes:
-    - Loading concept vocabulary and embeddings
-    - Loading class priors and zero-shot scores
-    - Visualization helpers for attention heatmaps
+Utility functions for concept head training and evaluation.
 """
 
-import json
 import torch
 import numpy as np
+import json
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, Tuple
 import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-
-
-def load_concept_vocabulary(vocab_path: str) -> Dict:
-    """
-    Load concept vocabulary from JSON file.
-    
-    Args:
-        vocab_path: Path to concept_vocabulary.json
-    
-    Returns:
-        Dictionary containing:
-            - concepts: List of concept names
-            - concept_to_idx: Mapping from name to index
-            - idx_to_concept: Mapping from index to name
-            - num_concepts: Number of concepts K
-            - concept_texts: Formatted text descriptions
-    """
-    with open(vocab_path, 'r') as f:
-        vocab = json.load(f)
-    
-    # Convert idx_to_concept keys to integers
-    vocab['idx_to_concept'] = {int(k): v for k, v in vocab['idx_to_concept'].items()}
-    
-    return vocab
-
-
-def load_concept_embeddings(embeddings_path: str) -> torch.Tensor:
-    """
-    Load concept text embeddings.
-    
-    Args:
-        embeddings_path: Path to concept_text_embeddings.pt
-    
-    Returns:
-        Text embeddings V ∈ R^(K×768)
-    """
-    return torch.load(embeddings_path)
-
-
-def load_class_priors(priors_path: str) -> Dict:
-    """
-    Load class priors from JSON file.
-    
-    Args:
-        priors_path: Path to class_priors.json
-    
-    Returns:
-        Dictionary containing:
-            - priors: Final class priors π_k
-            - priors_annotated: Annotated frequency priors
-            - priors_clip: CLIP-based priors
-            - clip_percentile: Threshold percentile used
-    """
-    with open(priors_path, 'r') as f:
-        priors = json.load(f)
-    
-    # Convert to numpy arrays
-    priors['priors'] = np.array(priors['priors'])
-    priors['priors_annotated'] = np.array(priors['priors_annotated'])
-    priors['priors_clip'] = np.array(priors['priors_clip'])
-    
-    return priors
-
-
-def load_zero_shot_scores(scores_path: str) -> np.ndarray:
-    """
-    Load zero-shot similarity scores.
-    
-    Args:
-        scores_path: Path to {split}_zero_shot_scores.npy
-    
-    Returns:
-        Zero-shot scores z_k(x) ∈ R^(N×K)
-    """
-    return np.load(scores_path)
+from matplotlib.gridspec import GridSpec
+from PIL import Image
+import pandas as pd
 
 
 def load_all_concept_data(concept_data_dir: str, split: str = "train") -> Dict:
     """
-    Load all concept data from a directory.
+    Load all concept-related data from disk.
     
     Args:
         concept_data_dir: Directory containing concept data files
-        split: Split name for zero-shot scores
+        split: Split name ('train', 'val', 'test')
     
     Returns:
-        Dictionary with all concept data
+        Dictionary with keys:
+            - 'vocabulary': dict with concept vocabulary info
+            - 'embeddings': torch.Tensor [K, 768] concept text embeddings
+            - 'priors': dict with class priors
+            - 'zero_shot_scores': np.ndarray [N, K] zero-shot scores
     """
-    data_dir = Path(concept_data_dir)
+    concept_dir = Path(concept_data_dir)
     
-    vocab = load_concept_vocabulary(data_dir / "concept_vocabulary.json")
-    embeddings = load_concept_embeddings(data_dir / "concept_text_embeddings.pt")
-    priors = load_class_priors(data_dir / "class_priors.json")
+    # Load vocabulary
+    vocab_path = concept_dir / "concept_vocabulary.json"
+    if not vocab_path.exists():
+        raise FileNotFoundError(f"Concept vocabulary not found: {vocab_path}")
     
-    # Load zero-shot scores if available
-    scores_path = data_dir / f"{split}_zero_shot_scores.npy"
-    zero_shot_scores = None
-    if scores_path.exists():
-        zero_shot_scores = load_zero_shot_scores(scores_path)
+    with open(vocab_path, 'r') as f:
+        vocab_data = json.load(f)
+    
+    # JSON converts integer keys to strings, so convert idx_to_concept keys back to int
+    idx_to_concept_raw = vocab_data.get('idx_to_concept', {})
+    vocabulary = vocab_data.copy()
+    vocabulary['idx_to_concept'] = {int(k): v for k, v in idx_to_concept_raw.items()}
+    
+    # Load text embeddings
+    embeddings_path = concept_dir / "concept_text_embeddings.pt"
+    if not embeddings_path.exists():
+        raise FileNotFoundError(f"Concept embeddings not found: {embeddings_path}")
+    
+    embeddings = torch.load(embeddings_path)
+    
+    # Load priors
+    priors_path = concept_dir / "class_priors.json"
+    if not priors_path.exists():
+        raise FileNotFoundError(f"Class priors not found: {priors_path}")
+    
+    with open(priors_path, 'r') as f:
+        priors_data = json.load(f)
+    
+    # Convert priors lists to numpy arrays (keep structure but convert values)
+    priors_dict = {
+        'priors': np.array(priors_data['priors']),
+        'priors_annotated': np.array(priors_data.get('priors_annotated', [])),
+        'priors_clip': np.array(priors_data.get('priors_clip', [])),
+        'clip_percentile': priors_data.get('clip_percentile', 98.0)
+    }
+    
+    # Load zero-shot scores for the specified split
+    scores_path = concept_dir / f"{split}_zero_shot_scores.npy"
+    if not scores_path.exists():
+        raise FileNotFoundError(f"Zero-shot scores not found: {scores_path}")
+    
+    zero_shot_scores = np.load(scores_path)
     
     return {
-        'vocabulary': vocab,
+        'vocabulary': vocabulary,
         'embeddings': embeddings,
-        'priors': priors,
+        'priors': priors_dict,
         'zero_shot_scores': zero_shot_scores
     }
 
 
-def visualize_attention_heatmap(
-    heatmap: np.ndarray,
-    concept_name: str,
-    image: Optional[np.ndarray] = None,
-    save_path: Optional[str] = None,
-    figsize: Tuple[int, int] = (10, 5)
-):
-    """
-    Visualize attention heatmap for a concept.
-    
-    Args:
-        heatmap: Attention weights ∈ R^(H×W)
-        concept_name: Name of the concept
-        image: (optional) Original image to overlay
-        save_path: (optional) Path to save figure
-        figsize: Figure size
-    """
-    fig, axes = plt.subplots(1, 2 if image is not None else 1, figsize=figsize)
-    
-    if image is not None:
-        axes = axes if isinstance(axes, np.ndarray) else [axes]
-        
-        # Show original image
-        axes[0].imshow(image)
-        axes[0].set_title("Original Image")
-        axes[0].axis('off')
-        
-        # Show heatmap
-        im = axes[1].imshow(heatmap, cmap='hot', interpolation='bilinear')
-        axes[1].set_title(f"Attention: {concept_name}")
-        axes[1].axis('off')
-        plt.colorbar(im, ax=axes[1])
-    else:
-        ax = axes if not isinstance(axes, np.ndarray) else axes[0]
-        im = ax.imshow(heatmap, cmap='hot', interpolation='bilinear')
-        ax.set_title(f"Attention: {concept_name}")
-        ax.axis('off')
-        plt.colorbar(im, ax=ax)
-    
-    plt.tight_layout()
-    
-    if save_path:
-        plt.savefig(save_path, dpi=150, bbox_inches='tight')
-        plt.close()
-    else:
-        plt.show()
-
-
-def visualize_top_concepts(
-    probs: np.ndarray,
-    idx_to_concept: Dict[int, str],
-    top_k: int = 10,
-    save_path: Optional[str] = None
-):
-    """
-    Visualize top predicted concepts for an image.
-    
-    Args:
-        probs: Concept probabilities ∈ R^K
-        idx_to_concept: Mapping from index to concept name
-        top_k: Number of top concepts to show
-        save_path: (optional) Path to save figure
-    """
-    # Get top k indices
-    top_indices = np.argsort(probs)[::-1][:top_k]
-    top_probs = probs[top_indices]
-    top_names = [idx_to_concept[idx] for idx in top_indices]
-    
-    # Plot
-    fig, ax = plt.subplots(figsize=(10, 6))
-    y_pos = np.arange(len(top_names))
-    
-    ax.barh(y_pos, top_probs, align='center')
-    ax.set_yticks(y_pos)
-    ax.set_yticklabels(top_names)
-    ax.invert_yaxis()
-    ax.set_xlabel('Probability')
-    ax.set_title(f'Top {top_k} Predicted Concepts')
-    ax.set_xlim(0, 1)
-    
-    plt.tight_layout()
-    
-    if save_path:
-        plt.savefig(save_path, dpi=150, bbox_inches='tight')
-        plt.close()
-    else:
-        plt.show()
-
-
-def compute_accuracy(
-    probs: torch.Tensor,
-    labels: torch.Tensor
-) -> float:
+def compute_accuracy(probs: torch.Tensor, labels: torch.Tensor) -> float:
     """
     Compute top-1 accuracy for concept prediction.
     
     Args:
-        probs: Predicted probabilities ∈ R^(N×K)
-        labels: Ground truth labels ∈ R^N (single positive per sample)
+        probs: Concept probabilities [N, K]
+        labels: Ground truth concept indices [N]
     
     Returns:
-        accuracy: Top-1 accuracy
+        Accuracy (0-1)
     """
-    probs_np = probs.detach().cpu().numpy()
-    labels_np = labels.detach().cpu().numpy()
+    # Get predicted concept (highest probability)
+    preds = probs.argmax(dim=1)  # [N]
     
-    predictions = np.argmax(probs_np, axis=1)
-    accuracy = np.mean(predictions == labels_np)
+    # Compare with ground truth
+    correct = (preds == labels).float()
+    accuracy = correct.mean().item()
     
     return accuracy
 
 
-def visualize_sample_predictions(
-    image_path: str,
-    probs: np.ndarray,
-    gt_label: int,
-    idx_to_concept: Dict[int, str],
-    attention_heatmap: Optional[np.ndarray] = None,
-    save_path: Optional[str] = None,
-    top_k: int = 5
+def save_checkpoint(
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    epoch: int,
+    loss: float,
+    metrics: Dict,
+    filepath: str
 ):
     """
-    Visualize sample prediction with image, top-5 concepts, and attention map.
-    
-    Shows the original image alongside top-5 predicted concepts with their scores.
-    The ground truth concept is highlighted in green if it's in top-5.
+    Save model checkpoint.
     
     Args:
-        image_path: Path to the original image
-        probs: Concept probabilities ∈ R^K
-        gt_label: Ground truth concept index
-        idx_to_concept: Mapping from index to concept name
-        attention_heatmap: (optional) Attention map for top concept ∈ R^(H×W)
-        save_path: (optional) Path to save figure
-        top_k: Number of top concepts to show (default 5)
+        model: Model to save
+        optimizer: Optimizer state
+        epoch: Current epoch
+        loss: Current loss value
+        metrics: Dictionary of metrics
+        filepath: Path to save checkpoint
     """
-    from PIL import Image
+    checkpoint = {
+        'epoch': epoch,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'loss': loss,
+        'metrics': metrics
+    }
+    torch.save(checkpoint, filepath)
+
+
+def load_checkpoint(
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    filepath: str,
+    device: torch.device
+) -> Tuple[int, Dict]:
+    """
+    Load model checkpoint.
     
-    # Load image
-    try:
-        img = Image.open(image_path).convert('RGB')
-        img_np = np.array(img)
-    except Exception as e:
-        print(f"Could not load image {image_path}: {e}")
-        img_np = np.zeros((224, 224, 3), dtype=np.uint8)
+    Args:
+        model: Model to load state into
+        optimizer: Optimizer to load state into
+        filepath: Path to checkpoint file
+        device: Device to load on
     
-    # Get top-k indices and probabilities
-    top_indices = np.argsort(probs)[::-1][:top_k]
-    top_probs = probs[top_indices]
-    top_names = [idx_to_concept.get(int(idx), f"Concept_{idx}") for idx in top_indices]
+    Returns:
+        Tuple of (epoch, metrics)
+    """
+    checkpoint = torch.load(filepath, map_location=device)
     
-    # Get GT concept name
-    gt_name = idx_to_concept.get(gt_label, f"Concept_{gt_label}")
-    gt_prob = probs[gt_label]
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     
-    # Check if GT is in top-k
-    gt_in_topk = gt_label in top_indices
-    gt_rank = np.where(top_indices == gt_label)[0][0] if gt_in_topk else -1
+    epoch = checkpoint.get('epoch', 0)
+    metrics = checkpoint.get('metrics', {})
     
-    # Create figure
-    n_cols = 3 if attention_heatmap is not None else 2
-    fig, axes = plt.subplots(1, n_cols, figsize=(5 * n_cols, 5))
-    
-    # Panel 1: Original image
-    axes[0].imshow(img_np)
-    axes[0].set_title(f"GT: {gt_name[:40]}..." if len(gt_name) > 40 else f"GT: {gt_name}")
-    axes[0].axis('off')
-    
-    # Panel 2: Top-5 concepts bar chart
-    ax = axes[1]
-    y_pos = np.arange(top_k)
-    colors = []
-    for i, idx in enumerate(top_indices):
-        if idx == gt_label:
-            colors.append('#2ecc71')  # Green for GT
-        else:
-            colors.append('#3498db')  # Blue for others
-    
-    bars = ax.barh(y_pos, top_probs, color=colors, edgecolor='black', linewidth=1)
-    ax.set_yticks(y_pos)
-    
-    # Truncate long names
-    display_names = []
-    for name in top_names:
-        if len(name) > 30:
-            display_names.append(name[:27] + "...")
-        else:
-            display_names.append(name)
-    
-    ax.set_yticklabels(display_names, fontsize=9)
-    ax.invert_yaxis()
-    ax.set_xlabel('Probability')
-    ax.set_xlim(0, 1)
-    
-    # Add probability values on bars
-    for i, (bar, prob) in enumerate(zip(bars, top_probs)):
-        ax.text(prob + 0.02, bar.get_y() + bar.get_height()/2, 
-                f'{prob:.3f}', va='center', fontsize=9)
-    
-    # Title with match indicator
-    if gt_in_topk:
-        ax.set_title(f'Top {top_k} Predictions (✓ GT @ rank {gt_rank + 1})', color='green')
-    else:
-        ax.set_title(f'Top {top_k} Predictions (✗ GT prob: {gt_prob:.3f})', color='red')
-    
-    # Panel 3: Attention heatmap (if provided)
-    if attention_heatmap is not None:
-        ax = axes[2]
-        im = ax.imshow(attention_heatmap, cmap='hot', interpolation='bilinear')
-        ax.set_title(f'Attention: {display_names[0]}')
-        ax.axis('off')
-        plt.colorbar(im, ax=ax, fraction=0.046)
-    
-    plt.tight_layout()
-    
-    if save_path:
-        plt.savefig(save_path, dpi=150, bbox_inches='tight')
-        plt.close()
-    else:
-        plt.show()
+    return epoch, metrics
 
 
 def visualize_epoch_samples(
-    model,
+    model: torch.nn.Module,
     dataset,
     idx_to_concept: Dict[int, str],
     output_dir: Path,
     epoch: int,
-    split: str = "val",
-    num_samples: int = 5,
-    device: torch.device = torch.device('cpu')
+    split: str,
+    num_samples: int,
+    device: torch.device,
+    mode: str = "global"
 ):
     """
-    Visualize sample predictions at the end of an epoch.
-    
-    Supports both global and spatial modes.
+    Visualize sample predictions at end of epoch.
     
     Args:
-        model: Concept head model (ConceptHead with .mode attribute)
-        dataset: Dataset to sample from (returns pooled, patch_tokens, label, coords)
-        idx_to_concept: Mapping from index to concept name
+        model: Trained concept head model
+        dataset: ConceptDataset instance
+        idx_to_concept: Mapping from concept index to name
         output_dir: Directory to save visualizations
         epoch: Current epoch number
         split: Split name ('val' or 'test')
         num_samples: Number of samples to visualize
-        device: Device to use
+        device: Device to run inference on
+        mode: Model mode ('global' or 'spatial')
     """
     model.eval()
-    mode = getattr(model, 'mode', 'global')
-    
-    # Create epoch directory
-    epoch_dir = output_dir / f"epoch_{epoch:03d}" / split
-    epoch_dir.mkdir(parents=True, exist_ok=True)
     
     # Sample random indices
     indices = np.random.choice(len(dataset), size=min(num_samples, len(dataset)), replace=False)
     
+    vis_dir = output_dir / f"epoch_{epoch:03d}" / split
+    vis_dir.mkdir(parents=True, exist_ok=True)
+    
     with torch.no_grad():
-        for i, idx in enumerate(indices):
-            # Dataset returns: pooled, patch_tokens, label, coords
+        for idx in indices:
             pooled, patch_tokens, label, coords = dataset[idx]
             pooled = pooled.unsqueeze(0).to(device)
             
@@ -391,90 +204,89 @@ def visualize_epoch_samples(
                 patch_tokens = None
             
             # Get predictions
-            probs, _ = model(pooled, patch_tokens, return_attention=True)
-            probs_np = probs[0].cpu().numpy()
-            label_int = label.item()
+            probs, attention = model(pooled, patch_tokens, return_attention=(mode == "spatial"))
+            probs = probs[0].cpu().numpy()  # [K]
             
-            # Get attention heatmap for spatial mode only
-            attention_heatmap = None
-            if mode == "spatial" and patch_tokens is not None:
-                try:
-                    heatmaps = model.get_attention_heatmaps(patch_tokens)  # [1, K, H, W]
-                    top_idx = probs_np.argmax()
-                    attention_heatmap = heatmaps[0, top_idx].cpu().numpy()
-                except Exception as e:
-                    print(f"Warning: Could not get attention heatmap: {e}")
+            # Verify probs shape matches vocabulary
+            if len(probs) != len(idx_to_concept):
+                raise ValueError(
+                    f"Model output dimension ({len(probs)}) != vocabulary size ({len(idx_to_concept)}). "
+                    f"Model and vocabulary are out of sync."
+                )
             
-            # Get image path from dataset
-            image_path = dataset.df.iloc[idx]['image_path']
+            # Get top-5 concepts
+            top5_indices = np.argsort(probs)[::-1][:5]
+            top5_probs = probs[top5_indices]
             
-            # Visualize
-            save_path = epoch_dir / f"sample_{i:02d}.png"
-            visualize_sample_predictions(
-                image_path=image_path,
-                probs=probs_np,
-                gt_label=label_int,
-                idx_to_concept=idx_to_concept,
-                attention_heatmap=attention_heatmap,
-                save_path=str(save_path),
-                top_k=5
-            )
+            # Verify indices are valid
+            for i in top5_indices:
+                if int(i) not in idx_to_concept:
+                    raise KeyError(
+                        f"Concept index {int(i)} not found in vocabulary. "
+                        f"Vocabulary has {len(idx_to_concept)} concepts (indices 0-{len(idx_to_concept)-1}). "
+                        f"Model may have wrong number of output concepts."
+                    )
+            
+            top5_concepts = [idx_to_concept[int(i)] for i in top5_indices]
+            
+            # Ground truth
+            gt_idx = int(label.item())
+            if gt_idx not in idx_to_concept:
+                raise KeyError(
+                    f"Ground truth concept index {gt_idx} not found in vocabulary. "
+                    f"Vocabulary has {len(idx_to_concept)} concepts (indices 0-{len(idx_to_concept)-1}). "
+                    f"Dataset and vocabulary may be out of sync."
+                )
+            gt_concept = idx_to_concept[gt_idx]
+            gt_idx_in_top5 = None
+            if gt_concept in top5_concepts:
+                gt_idx_in_top5 = top5_concepts.index(gt_concept)
+            
+            # Load image from dataset
+            row = dataset.df.iloc[idx]
+            image_path = row['image_path']
+            try:
+                image = Image.open(image_path).convert('RGB')
+            except Exception as e:
+                print(f"Warning: Could not load image {image_path}: {e}")
+                image = None
+            
+            # Create visualization with image and bar chart
+            fig = plt.figure(figsize=(14, 8))
+            gs = GridSpec(1, 2, figure=fig, width_ratios=[1, 1.2])
+            
+            # Left: Image
+            ax_img = fig.add_subplot(gs[0])
+            if image is not None:
+                ax_img.imshow(image)
+                ax_img.axis('off')
+                ax_img.set_title(f'Sample {idx}\nGT: {gt_concept}', fontsize=10)
+            else:
+                ax_img.text(0.5, 0.5, f'Image not found\n{image_path}', 
+                           ha='center', va='center', transform=ax_img.transAxes)
+                ax_img.axis('off')
+            
+            # Right: Bar chart
+            ax_bar = fig.add_subplot(gs[1])
+            colors = ['green' if i == gt_idx_in_top5 else 'blue' for i in range(len(top5_concepts))]
+            bars = ax_bar.barh(range(len(top5_concepts)), top5_probs, color=colors)
+            
+            # Labels
+            ax_bar.set_yticks(range(len(top5_concepts)))
+            ax_bar.set_yticklabels([f"{name[:40]}..." if len(name) > 40 else name for name in top5_concepts], fontsize=9)
+            ax_bar.set_xlabel('Probability', fontsize=10)
+            ax_bar.set_title(f'Epoch {epoch} - {split.upper()} - Top 5 Concepts', fontsize=11)
+            ax_bar.set_xlim(0, 1)
+            
+            # Add probability values and match indicator
+            for i, (bar, prob, concept) in enumerate(zip(bars, top5_probs, top5_concepts)):
+                ax_bar.text(prob + 0.01, i, f'{prob:.3f}', va='center', fontsize=9)
+                if concept == gt_concept:
+                    ax_bar.text(-0.02, i, '✓', va='center', ha='right', fontsize=12, color='green', weight='bold')
+            
+            plt.tight_layout()
+            plt.savefig(vis_dir / f"sample_{idx}.png", dpi=150, bbox_inches='tight')
+            plt.close()
     
-    print(f"  Saved {num_samples} {split} visualizations to {epoch_dir}")
-
-
-def save_checkpoint(
-    model,
-    optimizer,
-    epoch: int,
-    loss: float,
-    metrics: Dict,
-    save_path: str
-):
-    """
-    Save training checkpoint.
-    
-    Args:
-        model: Model to save
-        optimizer: Optimizer state
-        epoch: Current epoch
-        loss: Current loss
-        metrics: Current metrics
-        save_path: Path to save checkpoint
-    """
-    checkpoint = {
-        'epoch': epoch,
-        'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'loss': loss,
-        'metrics': metrics
-    }
-    torch.save(checkpoint, save_path)
-    print(f"Saved checkpoint to {save_path}")
-
-
-def load_checkpoint(
-    model,
-    optimizer,
-    checkpoint_path: str,
-    device: torch.device
-) -> Tuple[int, float]:
-    """
-    Load training checkpoint.
-    
-    Args:
-        model: Model to load into
-        optimizer: Optimizer to load into
-        checkpoint_path: Path to checkpoint
-        device: Device to load to
-    
-    Returns:
-        epoch: Epoch to resume from
-        loss: Loss at checkpoint
-    """
-    checkpoint = torch.load(checkpoint_path, map_location=device)
-    model.load_state_dict(checkpoint['model_state_dict'])
-    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    
-    return checkpoint['epoch'], checkpoint['loss']
+    print(f"  Saved {len(indices)} visualizations to {vis_dir}")
 

@@ -1,228 +1,244 @@
 #!/usr/bin/env python3
 """
-Precompute and cache StreetCLIP image embeddings for all images in the dataset.
+FAST Precompute script for StreetCLIP embeddings.
+Optimized for HPC clusters (Snellius) to prevent deadlocks and CPU bottlenecks.
 
-This script:
-1. Loads StreetCLIP image encoder (frozen)
-2. Processes all images from train/val/test CSVs
-3. Extracts and caches:
-   - Pooled embeddings z(x) ∈ R^768 (always saved, for global mode)
-   - Patch tokens T(x) ∈ R^(P×768) for each image (optional, for spatial mode)
-4. Saves as PyTorch tensors for efficient loading
-
-Output: {dataset_dir}/cached_embeddings/ with train/val/test splits
+Key Fixes:
+1. Import torch BEFORE pandas to prevent OpenMP deadlocks.
+2. Use List[Dict] instead of DataFrame.iloc for O(1) data access.
+3. Use torchvision transforms (C++) instead of AutoImageProcessor (Python).
 """
 
-import argparse
-import pandas as pd
+# --- CRITICAL: IMPORT TORCH FIRST ---
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
+
+import argparse
+import pandas as pd
 from PIL import Image
 from pathlib import Path
 from tqdm import tqdm
-import numpy as np
-from transformers import AutoImageProcessor, AutoModel
 import json
+import os
+import numpy as np
 
+# --- FAST TRANSFORMS ---
+from torchvision import transforms
+from torchvision.transforms import InterpolationMode
+from transformers import AutoModel, AutoConfig
 
-class ImageDataset(Dataset):
-    """Simple dataset for loading images from CSV."""
-    def __init__(self, csv_path: str, model_name: str = "geolocal/StreetCLIP"):
-        self.df = pd.read_csv(csv_path)
-        # Filter for valid images
-        self.df = self.df.dropna(subset=['image_path'])
+# Standard OpenAI CLIP normalization constants (Hardcoded for speed)
+CLIP_MEAN = (0.48145466, 0.4578275, 0.40821073)
+CLIP_STD = (0.26862954, 0.26130258, 0.27577711)
+
+class FastImageDataset(Dataset):
+    """
+    Optimized dataset using List storage and Torchvision transforms.
+    """
+    def __init__(self, csv_path: str, image_size=336):
+        print(f"Loading metadata from {csv_path}...")
+        try:
+            df = pd.read_csv(csv_path)
+        except Exception as e:
+            raise RuntimeError(f"Failed to read CSV: {e}")
+            
+        # Filter valid rows
+        df = df.dropna(subset=['image_path'])
         
-        # Get model-specific transform
-        self.processor = AutoImageProcessor.from_pretrained(model_name)
+        # --- THE SPEED FIX: Convert Pandas to List of Dicts ---
+        # This makes access inside __getitem__ instant (O(1)).
+        # .iloc is O(N) overhead and creates heavy Series objects.
+        self.samples = df.to_dict('records')
+        print(f"Loaded {len(self.samples)} samples into memory.")
+        
+        self.image_size = image_size
+        
+        # --- THE SPEED FIX: Use Torchvision C++ Transforms ---
+        # This pipeline releases the GIL and allows multi-worker loading
+        self.transform = transforms.Compose([
+            transforms.Resize((image_size, image_size), interpolation=InterpolationMode.BICUBIC),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=CLIP_MEAN, std=CLIP_STD)
+        ])
     
     def __len__(self):
-        return len(self.df)
+        return len(self.samples)
     
     def __getitem__(self, idx):
-        row = self.df.iloc[idx]
-        image_path = row['image_path']
-        pano_id = row.get('pano_id', f'img_{idx}')
+        # FAST ACCESS: Direct list lookup
+        item = self.samples[idx]
+        image_path = item['image_path']
+        pano_id = item.get('pano_id', f'img_{idx}')
         
         try:
+            # We use .convert('RGB') to ensure 3 channels
             image = Image.open(image_path).convert('RGB')
-            # Process image using StreetCLIP processor
-            inputs = self.processor(images=image, return_tensors="pt")
-            # Remove batch dimension for single image
-            pixel_values = inputs['pixel_values'].squeeze(0)
+            pixel_values = self.transform(image)
             return pixel_values, pano_id, idx
         except Exception as e:
             print(f"Error loading image {image_path}: {e}")
-            # Return a black image as fallback
-            size = (336, 336) if not hasattr(self.processor, 'size') else self.processor.size
-            if isinstance(size, dict):
-                size = (size['height'], size['width'])
-            return torch.zeros((3, size[0], size[1])), pano_id, idx
+            # Return black image as fallback to prevent crash
+            return torch.zeros((3, self.image_size, self.image_size)), pano_id, idx
 
-
-def extract_patch_tokens(model, pixel_values, device):
+@torch.no_grad()
+def extract_embeddings_batch(model, pixel_values, save_patch_tokens=False):
     """
-    Extract patch tokens from StreetCLIP ViT.
-    
-    Args:
-        model: StreetCLIP model
-        pixel_values: Preprocessed image tensor [C, H, W]
-        device: Device to run on
-    
-    Returns:
-        patch_tokens: T(x) ∈ R^(P×768) where P is number of patches
-        pooled_embedding: z(x) ∈ R^768 (optional, if available)
+    Run inference on a batch of images.
+    Returns projected embeddings (in shared space with text) and optionally raw patch tokens.
     """
-    # Add batch dimension
-    pixel_values = pixel_values.unsqueeze(0).to(device)
+    # Use model's built-in method (handles projection automatically)
+    if not hasattr(model, 'get_image_features'):
+        raise AttributeError(
+            "Model does not have 'get_image_features' method. "
+            "StreetCLIP model structure not recognized. Expected HuggingFace CLIP-style model."
+        )
     
-    with torch.no_grad():
-        # Forward through vision encoder
-        outputs = model.vision_model(pixel_values=pixel_values)
+    try:
+        pooled_embeddings = model.get_image_features(pixel_values=pixel_values)
+    except Exception as e:
+        raise RuntimeError(
+            f"Failed to extract image features using 'get_image_features': {e}\n"
+            f"Model may not be properly loaded or may have unexpected structure."
+        ) from e
+    
+    # Normalize embeddings (standard for CLIP-style models)
+    pooled_embeddings = torch.nn.functional.normalize(pooled_embeddings, p=2, dim=-1)
+    
+    # Extract patch tokens if needed (raw, before projection)
+    patch_tokens = None
+    if save_patch_tokens:
+        if not hasattr(model, 'vision_model'):
+            raise AttributeError(
+                "Model does not have 'vision_model' attribute. "
+                "Cannot extract patch tokens. Model structure not recognized."
+            )
         
-        # Get patch tokens (exclude CLS token if present)
-        # Vision transformer typically outputs [batch, num_patches+1, hidden_dim]
-        # where first token is CLS token
-        hidden_states = outputs.last_hidden_state  # [1, P+1, 768] or [1, P, 768]
+        try:
+            outputs = model.vision_model(pixel_values=pixel_values)
+            hidden_states = outputs.last_hidden_state
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to extract patch tokens from vision_model: {e}"
+            ) from e
         
-        # Check if first token is CLS token (usually has different norm)
-        # For StreetCLIP, we'll extract all tokens as patch tokens
-        # If there's a CLS token, we can optionally use it as pooled embedding
-        if hidden_states.shape[1] > 196:  # Likely has CLS token
-            # First token is CLS, rest are patches
-            pooled_embedding = hidden_states[:, 0, :].squeeze(0)  # [768]
-            patch_tokens = hidden_states[:, 1:, :].squeeze(0)  # [P, 768]
+        if hidden_states.shape[1] > 196:
+            # Has CLS token, patches start at index 1
+            patch_tokens = hidden_states[:, 1:, :]  # [B, P, hidden_dim]
         else:
-            # No CLS token, all are patches
-            patch_tokens = hidden_states.squeeze(0)  # [P, 768]
-            # Use mean pooling for pooled embedding
-            pooled_embedding = patch_tokens.mean(dim=0)  # [768]
+            # No CLS token, all tokens are patches
+            patch_tokens = hidden_states  # [B, P, hidden_dim]
     
-    return patch_tokens.cpu(), pooled_embedding.cpu()
-
+    return pooled_embeddings.cpu(), patch_tokens.cpu() if patch_tokens is not None else None
 
 def main():
-    parser = argparse.ArgumentParser(description="Precompute StreetCLIP embeddings")
-    parser.add_argument("--train-csv", type=str, required=True, help="Path to train CSV")
-    parser.add_argument("--val-csv", type=str, required=True, help="Path to val CSV")
-    parser.add_argument("--test-csv", type=str, default=None, help="Path to test CSV (optional)")
-    parser.add_argument("--output-dir", type=str, required=True, help="Output directory for cached embeddings")
-    parser.add_argument("--model-name", type=str, default="geolocal/StreetCLIP", help="StreetCLIP model name")
-    parser.add_argument("--batch-size", type=int, default=32, help="Batch size for processing")
-    parser.add_argument("--num-workers", type=int, default=8, help="Number of data loading workers")
-    parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu", help="Device to use")
-    parser.add_argument("--save-patch-tokens", action="store_true", help="Also save patch tokens (for spatial mode)")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--train-csv", type=str, required=True, help="Path to train.csv")
+    parser.add_argument("--val-csv", type=str, required=True, help="Path to val.csv")
+    parser.add_argument("--test-csv", type=str, default=None, help="Path to test.csv")
+    parser.add_argument("--output-dir", type=str, required=True, help="Where to save .pt files")
+    parser.add_argument("--model-name", type=str, default="geolocal/StreetCLIP", help="HuggingFace model ID")
+    
+    # Tuning args
+    parser.add_argument("--batch-size", type=int, default=128, help="Batch size (Try 128 or 256)")
+    parser.add_argument("--num-workers", type=int, default=8, help="DataLoader workers (8-12 is usually optimal)") 
+    parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
+    parser.add_argument("--save-patch-tokens", action="store_true", help="Save spatial tokens (High disk usage!)")
     
     args = parser.parse_args()
     
-    # Create output directory
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Load StreetCLIP model
-    print(f"Loading StreetCLIP model: {args.model_name}")
+    # 1. Detect proper image size
+    print(f"Loading Config for: {args.model_name}")
     try:
-        model = AutoModel.from_pretrained(args.model_name)
-    except Exception as e:
-        print(f"Error loading model {args.model_name}: {e}")
-        exit(1)
-    
-    # Freeze model
-    model.eval()
-    for param in model.parameters():
-        param.requires_grad = False
-    
-    device = torch.device(args.device)
-    model = model.to(device)
-    
-    # Process each split
-    splits = {
-        'train': args.train_csv,
-        'val': args.val_csv,
-    }
-    if args.test_csv:
-        splits['test'] = args.test_csv
-    
-    for split_name, csv_path in splits.items():
-        print(f"\n{'='*60}")
-        print(f"Processing {split_name} split")
-        print(f"{'='*60}")
+        config = AutoConfig.from_pretrained(args.model_name)
+        # StreetCLIP uses 'vision_config', standard CLIP uses top-level config
+        if hasattr(config, 'vision_config'):
+            image_size = getattr(config.vision_config, "image_size", 336)
+        else:
+            image_size = getattr(config, "image_size", 336)
+    except Exception:
+        print("Warning: Could not auto-detect size. Defaulting to 336px.")
+        image_size = 336
         
-        # Create dataset
-        dataset = ImageDataset(csv_path, model_name=args.model_name)
+    print(f"Target Resolution: {image_size}x{image_size}")
+
+    # 2. Load Model
+    print(f"Loading Model Weights...")
+    model = AutoModel.from_pretrained(args.model_name)
+    model.eval()
+    model = model.to(args.device)
+    
+    splits = {'train': args.train_csv, 'val': args.val_csv}
+    if args.test_csv: splits['test'] = args.test_csv
+    
+    # 3. Processing Loop
+    for split_name, csv_path in splits.items():
+        print(f"\n{'='*40}")
+        print(f"Processing split: {split_name}")
+        print(f"{'='*40}")
+        
+        # Initialize Optimized Dataset
+        dataset = FastImageDataset(csv_path, image_size=image_size)
+        
+        # Safe to use workers now because imports are correct and transforms are C++
         dataloader = DataLoader(
             dataset,
             batch_size=args.batch_size,
             num_workers=args.num_workers,
             shuffle=False,
-            pin_memory=True if args.device == "cuda" else False
+            pin_memory=True, # Faster transfer to GPU
+            prefetch_factor=2, # Buffer batches
+            persistent_workers=True # Keep workers alive between batches
         )
         
-        # Storage for embeddings
-        all_patch_tokens = []
-        all_pooled_embeddings = []
-        all_pano_ids = []
-        all_indices = []
+        all_pooled = []
+        all_patches = []
+        all_panos = []
+        all_idxs = []
         
-        # Process batches
-        for batch_idx, (pixel_values, pano_ids, indices) in enumerate(tqdm(dataloader, desc=f"Processing {split_name}")):
-            # Move to device
-            pixel_values = pixel_values.to(device)
+        # Main Loop
+        for pixel_values, pano_ids, indices in tqdm(dataloader, desc=f"{split_name}"):
+            pixel_values = pixel_values.to(args.device)
             
-            # Process each image in batch (since model might not support batched patch extraction easily)
-            batch_patch_tokens = []
-            batch_pooled = []
+            # Inference
+            pooled, patches = extract_embeddings_batch(
+                model, pixel_values, save_patch_tokens=args.save_patch_tokens
+            )
             
-            for i in range(pixel_values.shape[0]):
-                patch_tokens, pooled_emb = extract_patch_tokens(
-                    model, pixel_values[i], device
-                )
-                batch_pooled.append(pooled_emb)  # Always collect pooled
-                if args.save_patch_tokens:
-                    batch_patch_tokens.append(patch_tokens)
+            all_pooled.append(pooled)
+            if patches is not None: all_patches.append(patches)
+            all_panos.extend(pano_ids)
+            all_idxs.extend(indices.tolist())
+        
+        # Save Results
+        if all_pooled:
+            print(f"Concatenating {len(all_pooled)} batches...")
+            pooled_tensor = torch.cat(all_pooled, dim=0)
             
-            all_pooled_embeddings.extend(batch_pooled)
-            if args.save_patch_tokens:
-                all_patch_tokens.extend(batch_patch_tokens)
-            all_pano_ids.extend(pano_ids)
-            all_indices.extend(indices.tolist())
-        
-        # Stack into tensors and save
-        print(f"Stacking {len(all_pooled_embeddings)} embeddings...")
-        
-        # Always save pooled embeddings (for global mode)
-        pooled_tensor = torch.stack(all_pooled_embeddings)  # [N, 768]
-        pooled_path = output_dir / f"{split_name}_pooled_embeddings.pt"
-        torch.save(pooled_tensor, pooled_path)
-        print(f"Saved pooled embeddings to {pooled_path}")
-        print(f"  Shape: {pooled_tensor.shape}")
-        
-        # Optionally save patch tokens (for spatial mode)
-        if args.save_patch_tokens:
-            patch_tokens_tensor = torch.stack(all_patch_tokens)  # [N, P, 768]
-            patch_tokens_path = output_dir / f"{split_name}_patch_tokens.pt"
-            torch.save(patch_tokens_tensor, patch_tokens_path)
-            print(f"Saved patch tokens to {patch_tokens_path}")
-            print(f"  Shape: {patch_tokens_tensor.shape}")
-        
-        # Save metadata (pano_ids and indices for mapping back to CSV)
-        metadata = {
-            'pano_ids': all_pano_ids,
-            'indices': all_indices,
-            'num_samples': len(all_patch_tokens),
-            'patch_shape': list(patch_tokens_tensor.shape[1:]),  # [P, 768]
-        }
-        metadata_path = output_dir / f"{split_name}_metadata.json"
-        with open(metadata_path, 'w') as f:
-            json.dump(metadata, f, indent=2)
-        print(f"Saved metadata to {metadata_path}")
-    
-    print(f"\n{'='*60}")
-    print("Precomputation complete!")
-    print(f"Embeddings saved to: {output_dir}")
-    print(f"{'='*60}")
+            save_path = output_dir / f"{split_name}_pooled_embeddings.pt"
+            torch.save(pooled_tensor, save_path)
+            print(f"Saved pooled embeddings: {pooled_tensor.shape} (dimension: {pooled_tensor.shape[1]})")
+            
+            if args.save_patch_tokens and all_patches:
+                patch_tensor = torch.cat(all_patches, dim=0)
+                patches_path = output_dir / f"{split_name}_patch_tokens.pt"
+                torch.save(patch_tensor, patches_path)
+                print(f"Saved patch tokens: {patch_tensor.shape}")
 
+            # Save Metadata mapping
+            metadata = {
+                'pano_ids': list(all_panos),
+                'indices': all_idxs,
+                'total_samples': pooled_tensor.shape[0],
+                'image_size': image_size
+            }
+            with open(output_dir / f"{split_name}_metadata.json", 'w') as f:
+                json.dump(metadata, f, indent=2)
+
+    print(f"\nDone! Outputs saved to {output_dir}")
 
 if __name__ == "__main__":
     main()
-
