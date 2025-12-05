@@ -15,7 +15,9 @@ cd $HOME/Project_AI/
 
 # Activate environment
 source activate streetview
-
+pip install wandb
+wandb_api_key="9073a011764cb23fce5384443a3996ca9c5d9198"
+export WANDB_API_KEY="$wandb_api_key"
 # Paths
 SPLITS_DIR="data/6921d7831744c5356b098bf7_balanced/splits"
 TRAIN_CSV="${SPLITS_DIR}/dataset_train.csv"
@@ -59,7 +61,8 @@ python scripts/training/train_cbm.py \
     --output-dir $OUTPUT_DIR \
     --epochs 200 \
     --batch-size 64 \
-    --lr 1e-3
+    --lr 1e-3 \
+    --wandb
 
 # Phase 2: Geo Training
 echo "============================================================"
@@ -75,7 +78,8 @@ python scripts/training/train_cbm.py \
     --output-dir $OUTPUT_DIR \
     --epochs 100 \
     --batch-size 256 \
-    --lr 1e-3
+    --lr 1e-3 \
+    --wandb
 
 # Phase 3: Joint Training
 echo "============================================================"
@@ -91,4 +95,5 @@ python scripts/training/train_cbm.py \
     --output-dir $OUTPUT_DIR \
     --epochs 100 \
     --batch-size 128 \
-    --lr 1e-4
+    --lr 1e-4 \
+    --wandb

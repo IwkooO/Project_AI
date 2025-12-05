@@ -1,0 +1,1 @@
+{"_timestamp":1.764972106187e+09,"_step":200,"_wandb":{"runtime":1170},"train_concept_acc":0.6857293993182085,"phase":1,"val_concept_acc":0.45589273112101647,"val_cell_acc":0,"train_loss":4.75513100985622,"train_contrastive_loss":3.4832480914772805,"epoch":200,"_runtime":1170.559008167,"val_loss":5.080356632673272,"train_cell_acc":0}
