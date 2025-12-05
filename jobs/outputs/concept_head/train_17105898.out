@@ -1,0 +1,41 @@
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+============================================================
+Concept Head Training Pipeline
+============================================================
+Job started at: Wed Dec  3 20:26:03 CET 2025
+CSV data: /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced
+Cached data: /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced
+Mode: global
+============================================================
+
+STEP 1: Splits already exist, skipping...
+
+============================================================
+STEP 2: Precomputing StreetCLIP embeddings...
+============================================================
+/home/igodzwon/.conda/envs/streetview/lib/python3.11/site-packages/transformers/utils/hub.py:110: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+Loading Config for: geolocal/StreetCLIP
+Target Resolution: 336x336
+Loading Model Weights...
+
+========================================
+Processing split: train
+========================================
+Loading metadata from /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/splits/dataset_train.csv...
+Loaded 34028 samples into memory.
+train:   0%|          | 0/266 [00:00<?, ?it/s]train:   0%|          | 1/266 [01:19<5:51:08, 79.50s/it]train:   1%|          | 2/266 [01:20<2:27:16, 33.47s/it]train:   1%|          | 3/266 [01:22<1:22:39, 18.86s/it]train:   2%|▏         | 4/266 [01:23<51:50, 11.87s/it]  train:   2%|▏         | 5/266 [01:24<34:51,  8.01s/it]train:   2%|▏         | 6/266 [01:25<24:37,  5.68s/it]train:   3%|▎         | 7/266 [01:26<18:09,  4.21s/it]train:   3%|▎         | 8/266 [01:28<13:55,  3.24s/it]train:   3%|▎         | 9/266 [02:37<1:42:57, 24.04s/it]train:   4%|▍         | 10/266 [02:39<1:12:29, 16.99s/it]train:   4%|▍         | 11/266 [02:40<51:36, 12.14s/it]  train:   5%|▍         | 12/266 [02:41<37:16,  8.80s/it]train:   5%|▍         | 13/266 [02:42<27:21,  6.49s/it]train:   5%|▌         | 14/266 [02:43<20:29,  4.88s/it]train:   6%|▌         | 15/266 [02:44<15:43,  3.76s/it]train:   6%|▌         | 16/266 [02:45<12:24,  2.98s/it][2025-12-03T20:29:07.453] error: *** JOB 17105898 ON gcn118 CANCELLED AT 2025-12-03T20:29:07 DUE to SIGNAL Terminated ***

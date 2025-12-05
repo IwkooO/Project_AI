@@ -1,0 +1,37 @@
+#!/bin/bash
+#SBATCH --partition=gpu_mig
+#SBATCH --gpus=1
+#SBATCH --job-name=fine_tune_concepts
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=24:00:00
+#SBATCH --mem=16GB
+#SBATCH --output=jobs/outputs/fine_tune_concepts_%j.out
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd $HOME/Project_AI/
+source activate streetview
+
+# Install agno if needed
+pip install agno --quiet
+pip install openai --quiet
+
+mkdir -p jobs/outputs
+
+echo "========================================================================"
+echo "Fine-tune Concepts Job"
+echo "========================================================================"
+echo "Job started at: $(date)"
+echo "Refining overly frequent or rare concepts into more fine-grained concepts"
+echo "Checkpoints saved every 100 refinements"
+echo "========================================================================"
+
+python -u scripts/data_processing/fine_tune_concepts.py
+
+echo "========================================================================"
+echo "Job finished at: $(date)"
+echo "========================================================================"
+

@@ -1,0 +1,203 @@
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+============================================================
+Concept Head Training Pipeline
+============================================================
+Job started at: Wed Dec  3 23:16:56 CET 2025
+CSV data: /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced
+Cached data: /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced
+Mode: global
+============================================================
+
+STEP 1: Splits already exist, skipping...
+
+STEP 2: Cached embeddings already exist, skipping...
+
+============================================================
+STEP 3: Computing concept embeddings and priors...
+============================================================
+/home/igodzwon/.conda/envs/streetview/lib/python3.11/site-packages/transformers/utils/hub.py:110: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+Loading train split for concept extraction from /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/splits/dataset_train.csv
+(Using only train concepts ensures we only use concepts with training data)
+Loaded 34028 train samples
+
+Found 6272 unique concepts in train split
+
+Loading StreetCLIP model: geolocal/StreetCLIP
+
+Extracting and cleaning concept text descriptions...
+
+Computing text embeddings for 6272 concepts...
+Text embeddings shape: torch.Size([6272, 768]) (dimension: 768)
+
+Loading pooled embeddings from /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/train_pooled_embeddings.pt
+Pooled embeddings shape: torch.Size([34028, 768]) (dimension: 768)
+Using pooled embeddings for zero-shot scores
+✓ Verified: Pooled and text embeddings have matching dimensions (768D)
+
+Computing zero-shot scores...
+Zero-shot scores shape: (34028, 6272)
+
+Loading train split for prior estimation from /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/splits/dataset_train.csv
+
+Estimating class priors (CLIP percentile: 100.0)...
+
+Class prior statistics:
+  Mean annotated prior: 0.0002
+  Mean CLIP prior: 0.0000
+  Mean final prior: 0.0002
+
+Saving concept data to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data...
+Saved concept vocabulary to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data/concept_vocabulary.json
+Saved text embeddings to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data/concept_text_embeddings.pt
+Saved class priors to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data/class_priors.json
+Saved zero-shot scores to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data/train_zero_shot_scores.npy
+
+============================================================
+Concept embedding computation complete!
+Output saved to: /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data
+============================================================
+
+Computing zero-shot scores for val split...
+/home/igodzwon/.conda/envs/streetview/lib/python3.11/site-packages/transformers/utils/hub.py:110: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+Loading train split for concept extraction from /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/splits/dataset_train.csv
+(Using only train concepts ensures we only use concepts with training data)
+Loaded 34028 train samples
+
+Found 6272 unique concepts in train split
+
+Loading StreetCLIP model: geolocal/StreetCLIP
+
+Extracting and cleaning concept text descriptions...
+
+Computing text embeddings for 6272 concepts...
+Text embeddings shape: torch.Size([6272, 768]) (dimension: 768)
+
+Loading pooled embeddings from /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/val_pooled_embeddings.pt
+Pooled embeddings shape: torch.Size([4254, 768]) (dimension: 768)
+Using pooled embeddings for zero-shot scores
+✓ Verified: Pooled and text embeddings have matching dimensions (768D)
+
+Computing zero-shot scores...
+Zero-shot scores shape: (4254, 6272)
+
+Loading val split for prior estimation from /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/splits/dataset_val.csv
+
+Estimating class priors (CLIP percentile: 98.0)...
+
+Class prior statistics:
+  Mean annotated prior: 0.0002
+  Mean CLIP prior: 0.0202
+  Mean final prior: 0.0202
+
+Saving concept data to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data...
+Saved concept vocabulary to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data/concept_vocabulary.json
+Saved text embeddings to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data/concept_text_embeddings.pt
+Skipping prior saving for split 'val' (only saved for 'train')
+Saved zero-shot scores to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data/val_zero_shot_scores.npy
+
+============================================================
+Concept embedding computation complete!
+Output saved to: /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data
+============================================================
+
+Computing zero-shot scores for test split...
+/home/igodzwon/.conda/envs/streetview/lib/python3.11/site-packages/transformers/utils/hub.py:110: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+Loading train split for concept extraction from /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/splits/dataset_train.csv
+(Using only train concepts ensures we only use concepts with training data)
+Loaded 34028 train samples
+
+Found 6272 unique concepts in train split
+
+Loading StreetCLIP model: geolocal/StreetCLIP
+
+Extracting and cleaning concept text descriptions...
+
+Computing text embeddings for 6272 concepts...
+Text embeddings shape: torch.Size([6272, 768]) (dimension: 768)
+
+Loading pooled embeddings from /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/test_pooled_embeddings.pt
+Pooled embeddings shape: torch.Size([4254, 768]) (dimension: 768)
+Using pooled embeddings for zero-shot scores
+✓ Verified: Pooled and text embeddings have matching dimensions (768D)
+
+Computing zero-shot scores...
+Zero-shot scores shape: (4254, 6272)
+
+Loading test split for prior estimation from /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/splits/dataset_test.csv
+
+Estimating class priors (CLIP percentile: 98.0)...
+
+Class prior statistics:
+  Mean annotated prior: 0.0002
+  Mean CLIP prior: 0.0202
+  Mean final prior: 0.0202
+
+Saving concept data to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data...
+Saved concept vocabulary to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data/concept_vocabulary.json
+Saved text embeddings to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data/concept_text_embeddings.pt
+Skipping prior saving for split 'test' (only saved for 'train')
+Saved zero-shot scores to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data/test_zero_shot_scores.npy
+
+============================================================
+Concept embedding computation complete!
+Output saved to: /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data
+============================================================
+
+============================================================
+STEP 4: Training concept head...
+============================================================
+Mode: global
+Epochs: 50
+Batch size: 256
+Learning rate: 5e-3
+Lambda drift: 0.00001
+============================================================
+Saved config to /home/igodzwon/Project_AI/checkpoints/concept_head/config.json
+
+Loading concept data...
+Loaded 6272 concepts
+Class priors: mean=0.0002, min=0.0000, max=0.0091
+
+Creating datasets (mode: global)...
+Loading pooled embeddings from /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/train_pooled_embeddings.pt
+Loaded 34028 pooled embeddings (dimension: 768)
+Filtered dataset: 4254 -> 4069 samples (185 samples with concepts not in vocabulary)
+Loading pooled embeddings from /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/val_pooled_embeddings.pt
+Loaded 4254 pooled embeddings (dimension: 768)
+Warning: Mismatch between CSV rows (4069) and cached embeddings (4254)
+Will use pano_id mapping to align
+Train samples: 34028
+Val samples: 4069
+Filtered dataset: 4254 -> 4090 samples (164 samples with concepts not in vocabulary)
+Loading pooled embeddings from /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/test_pooled_embeddings.pt
+Loaded 4254 pooled embeddings (dimension: 768)
+Warning: Mismatch between CSV rows (4090) and cached embeddings (4254)
+Will use pano_id mapping to align
+Test samples: 4090
+
+Creating model (mode: global)...
+Detected embedding dimension: 768
+Verified: Dataset embeddings match concept embeddings (768D)
+Model parameters: 4,816,896
+
+============================================================
+Starting training (mode: global)...
+============================================================
+Epoch 0 [Train]:   0%|          | 0/133 [00:00<?, ?it/s]Epoch 0 [Train]:   0%|          | 0/133 [00:02<?, ?it/s, loss=0.7517, nnpu=0.7517, drift=0.0000]Epoch 0 [Train]:   1%|          | 1/133 [00:02<05:41,  2.58s/it, loss=0.7517, nnpu=0.7517, drift=0.0000]Epoch 0 [Train]:   1%|          | 1/133 [00:04<05:41,  2.58s/it, loss=0.7216, nnpu=0.7205, drift=0.0011]Epoch 0 [Train]:   2%|▏         | 2/133 [00:04<05:06,  2.34s/it, loss=0.7216, nnpu=0.7205, drift=0.0011]Epoch 0 [Train]:   2%|▏         | 2/133 [00:06<05:06,  2.34s/it, loss=0.6952, nnpu=0.6908, drift=0.0043]Epoch 0 [Train]:   2%|▏         | 3/133 [00:06<04:46,  2.20s/it, loss=0.6952, nnpu=0.6908, drift=0.0043]Epoch 0 [Train]:   2%|▏         | 3/133 [00:08<04:46,  2.20s/it, loss=0.6702, nnpu=0.6608, drift=0.0093]Epoch 0 [Train]:   3%|▎         | 4/133 [00:08<04:36,  2.15s/it, loss=0.6702, nnpu=0.6608, drift=0.0093]Epoch 0 [Train]:   3%|▎         | 4/133 [00:10<04:36,  2.15s/it, loss=0.6493, nnpu=0.6335, drift=0.0159]Epoch 0 [Train]:   4%|▍         | 5/133 [00:10<04:34,  2.14s/it, loss=0.6493, nnpu=0.6335, drift=0.0159]Epoch 0 [Train]:   4%|▍         | 5/133 [00:13<04:34,  2.14s/it, loss=0.6310, nnpu=0.6074, drift=0.0236]Epoch 0 [Train]:   5%|▍         | 6/133 [00:13<04:28,  2.12s/it, loss=0.6310, nnpu=0.6074, drift=0.0236]Epoch 0 [Train]:   5%|▍         | 6/133 [00:15<04:28,  2.12s/it, loss=0.6147, nnpu=0.5824, drift=0.0323]Epoch 0 [Train]:   5%|▌         | 7/133 [00:15<04:24,  2.10s/it, loss=0.6147, nnpu=0.5824, drift=0.0323]Epoch 0 [Train]:   5%|▌         | 7/133 [00:17<04:24,  2.10s/it, loss=0.6027, nnpu=0.5612, drift=0.0416]Epoch 0 [Train]:   6%|▌         | 8/133 [00:17<04:25,  2.12s/it, loss=0.6027, nnpu=0.5612, drift=0.0416]Epoch 0 [Train]:   6%|▌         | 8/133 [00:19<04:25,  2.12s/it, loss=0.5889, nnpu=0.5378, drift=0.0511]Epoch 0 [Train]:   7%|▋         | 9/133 [00:19<04:20,  2.10s/it, loss=0.5889, nnpu=0.5378, drift=0.0511]Epoch 0 [Train]:   7%|▋         | 9/133 [00:21<04:20,  2.10s/it, loss=0.5790, nnpu=0.5182, drift=0.0608]Epoch 0 [Train]:   8%|▊         | 10/133 [00:21<04:16,  2.09s/it, loss=0.5790, nnpu=0.5182, drift=0.0608]Epoch 0 [Train]:   8%|▊         | 10/133 [00:23<04:16,  2.09s/it, loss=0.5705, nnpu=0.5001, drift=0.0704]Epoch 0 [Train]:   8%|▊         | 11/133 [00:23<04:17,  2.11s/it, loss=0.5705, nnpu=0.5001, drift=0.0704]Epoch 0 [Train]:   8%|▊         | 11/133 [00:25<04:17,  2.11s/it, loss=0.5644, nnpu=0.4848, drift=0.0796]Epoch 0 [Train]:   9%|▉         | 12/133 [00:25<04:13,  2.09s/it, loss=0.5644, nnpu=0.4848, drift=0.0796]Epoch 0 [Train]:   9%|▉         | 12/133 [00:27<04:13,  2.09s/it, loss=0.5568, nnpu=0.4684, drift=0.0884]Epoch 0 [Train]:  10%|▉         | 13/133 [00:27<04:09,  2.08s/it, loss=0.5568, nnpu=0.4684, drift=0.0884]Epoch 0 [Train]:  10%|▉         | 13/133 [00:29<04:09,  2.08s/it, loss=0.5505, nnpu=0.4540, drift=0.0965]Epoch 0 [Train]:  11%|█         | 14/133 [00:29<04:10,  2.11s/it, loss=0.5505, nnpu=0.4540, drift=0.0965]Epoch 0 [Train]:  11%|█         | 14/133 [00:31<04:10,  2.11s/it, loss=0.5482, nnpu=0.4442, drift=0.1039]Epoch 0 [Train]:  11%|█▏        | 15/133 [00:31<04:06,  2.09s/it, loss=0.5482, nnpu=0.4442, drift=0.1039]Epoch 0 [Train]:  11%|█▏        | 15/133 [00:33<04:06,  2.09s/it, loss=0.5418, nnpu=0.4313, drift=0.1106]Epoch 0 [Train]:  12%|█▏        | 16/133 [00:33<04:04,  2.09s/it, loss=0.5418, nnpu=0.4313, drift=0.1106]Epoch 0 [Train]:  12%|█▏        | 16/133 [00:36<04:04,  2.09s/it, loss=0.5387, nnpu=0.4223, drift=0.1164]Epoch 0 [Train]:  13%|█▎        | 17/133 [00:36<04:04,  2.11s/it, loss=0.5387, nnpu=0.4223, drift=0.1164]Epoch 0 [Train]:  13%|█▎        | 17/133 [00:38<04:04,  2.11s/it, loss=0.5359, nnpu=0.4145, drift=0.1214]Epoch 0 [Train]:  14%|█▎        | 18/133 [00:38<04:00,  2.09s/it, loss=0.5359, nnpu=0.4145, drift=0.1214][2025-12-03T23:20:45.272] error: *** JOB 17119677 ON gcn103 CANCELLED AT 2025-12-03T23:20:45 DUE to SIGNAL Terminated ***
