@@ -2,12 +2,12 @@
 #SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
 #SBATCH --job-name=cgeo
-#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/train_concept_aware_full.log
+#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/train_concept_aware_precompute.log
 #SBATCH --time=24:00:00  
 #SBATCH --cpus-per-task=9
-#SBATCH --mem=32G
-#SBATCH --mail-type=END
-#SBATCH --mail-user=pradyut.nair@student.uva.nl
+#SBATCH --mem=64G
+## SBATCH --mail-type=END
+## SBATCH --mail-user=pradyut.nair@student.uva.nl
 
 # Activate environment
 module load 2025
@@ -20,37 +20,38 @@ export PYTHONNOUSERSITE=1
 export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
 
 # ===== Stage-specific epoch counts =====
-STAGE0_EPOCHS=5    # Domain adaptation 
-STAGE1_EPOCHS=20   # Concept learning 
+STAGE0_EPOCHS=10   # Domain adaptation 
+STAGE1_EPOCHS=30   # Concept learning (increased from 20 to 30)
 STAGE2_EPOCHS=20   # Geolocation learning
 
 # Run Training with Three-Stage Concept-Aware Pipeline
-python scripts/training/train_concept_aware.py \
+python scripts/training/train_concept_aware_ckpt_resume.py \
     --encoder_model "geolocal/StreetCLIP" \
-    --batch_size 128 \
+    --batch_size 512 \
     --stage0_epochs ${STAGE0_EPOCHS} \
     --stage0_lr 1e-5 \
     --stage0_weight_decay 0.01 \
     --unfreeze_layers 2 \
     --stage1_epochs ${STAGE1_EPOCHS} \
-    --stage1_lr 1e-4 \
+    --stage1_lr 3e-4 \
     --stage1_weight_decay 0.01 \
     --stage2_epochs ${STAGE2_EPOCHS} \
     --stage2_lr 1e-4 \
     --stage2_weight_decay 0.01 \
     --temperature 0.07 \
     --lambda_concept_gps 1.0 \
-    --lambda_concept 1.0 \
+    --lambda_concept 3.0 \
     --lambda_cell 1.0 \
-    --lambda_offset 5.0 \
+    --lambda_offset 1.0 \
     --lambda_country 0.5 \
     --label_smoothing 0.1 \
     --early_stopping_patience 7 \
-    --save_interval 5 \
+    --save_interval 1 \
     --min_samples_per_cell 20 \
     --gradient_accumulation_steps 2 \
     --use_wandb \
     --use_amp \
     --use_class_weights \
     --coordinate_loss_type "haversine" \
-    --csv_path "/scratch-shared/pnair/Project_AI/data/dataset-43k-updated.csv"
+    --csv_path "/scratch-shared/pnair/Project_AI/data/dataset-43k-updated.csv" \
+    --precompute_embeddings \

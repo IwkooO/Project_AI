@@ -153,7 +153,6 @@ class ConceptAwareGeoModel(nn.Module):
         x_img = self.image_encoder(images)  # [batch, 768]
         
         # 2. Concept Bottleneck → Concept Embeddings
-        # This is the CENTRAL representation for all downstream tasks
         concept_emb = self.concept_bottleneck(x_img)  # [batch, 512]
         
         # 3. All downstream heads operate ONLY on concept_emb
@@ -204,7 +203,103 @@ class ConceptAwareGeoModel(nn.Module):
         x_img = self.image_encoder(images)
         concept_emb = self.concept_bottleneck(x_img)
         return concept_emb
+
+    def forward_from_features(
+        self, image_features: torch.Tensor, gps_coords: Optional[torch.Tensor] = None
+    ):
+        """
+        Forward pass using PRECOMPUTED image features (skips image encoder).
         
+        Use this for Stage 1 and Stage 2 training when image encoder is frozen,
+        to avoid redundant computation of image embeddings each epoch.
+        
+        Args:
+            image_features: Precomputed image features [batch, 768] from frozen encoder
+            gps_coords: GPS coordinates [batch, 2] (lat, lon) - for GPS embedding during training
+            
+        Returns:
+            Same dict as forward() method
+        """
+        # 1. Skip image encoder - use precomputed features directly
+        # 2. Concept Bottleneck → Concept Embeddings
+        concept_emb = self.concept_bottleneck(image_features)  # [batch, 512]
+        
+        # 3. All downstream heads operate ONLY on concept_emb
+        concept_logits = self.concept_head(concept_emb)  # [batch, num_concepts]
+        country_logits = self.country_head(concept_emb)  # [batch, num_countries]
+        cell_logits = self.cell_head(concept_emb)  # [batch, num_cells]
+        pred_offsets = self.offset_head(concept_emb)  # [batch, coord_dim]
+        
+        result = {
+            "concept_emb": concept_emb,
+            "concept_logits": concept_logits,
+            "country_logits": country_logits,
+            "cell_logits": cell_logits,
+            "pred_offsets": pred_offsets,
+        }
+
+        # 4. GPS Encoding (for contrastive alignment during training)
+        if gps_coords is not None:
+            gps_emb = self.encode_gps(gps_coords)  # [batch, 512]
+            result["gps_emb"] = gps_emb
+            
+        return result
+
+    @torch.no_grad()
+    def extract_image_features(self, images: torch.Tensor) -> torch.Tensor:
+        """
+        Extract image features using the frozen image encoder.
+        
+        Use this for precomputing features before Stage 1/2 training.
+        
+        Args:
+            images: Image tensor [batch, 3, H, W]
+            
+        Returns:
+            image_features: Image features [batch, 768]
+        """
+        self.image_encoder.eval()
+        return self.image_encoder(images)
+
+    @torch.no_grad()
+    def extract_concept_embeddings(self, image_features: torch.Tensor) -> torch.Tensor:
+        """
+        Extract concept embeddings from precomputed image features.
+        
+        Use this for precomputing concept embeddings before Stage 2 training.
+        
+        Args:
+            image_features: Precomputed image features [batch, 768]
+            
+        Returns:
+            concept_emb: Concept embeddings [batch, 512]
+        """
+        return self.concept_bottleneck(image_features)
+
+    def forward_from_concept_emb(self, concept_emb: torch.Tensor):
+        """
+        Forward pass using PRECOMPUTED concept embeddings (skips image encoder AND concept bottleneck).
+        
+        Use this for Stage 2 training when both image encoder and concept bottleneck are frozen,
+        to avoid redundant computation each epoch.
+        
+        Args:
+            concept_emb: Precomputed concept embeddings [batch, 512] from frozen bottleneck
+            
+        Returns:
+            Dict containing only Stage 2 outputs:
+                - cell_logits: Geocell predictions [batch, num_cells]
+                - pred_offsets: Predicted coordinate offsets [batch, coord_dim]
+        """
+        # Only run Stage 2 heads on precomputed concept embeddings
+        cell_logits = self.cell_head(concept_emb)  # [batch, num_cells]
+        pred_offsets = self.offset_head(concept_emb)  # [batch, coord_dim]
+        
+        return {
+            "cell_logits": cell_logits,
+            "pred_offsets": pred_offsets,
+        }
+
     def parameters_to_optimize(self) -> Iterable[nn.Parameter]:
         """Return parameters that should be optimized (excludes frozen image encoder)."""
         return (

@@ -77,12 +77,13 @@ VIZ_TOP_K_CONCEPTS = 5
 # Argument Parsing
 # ============================================================================
 
+
 def parse_args() -> argparse.Namespace:
     cfg = DEFAULT_CONFIG
     parser = argparse.ArgumentParser(
         description="Train StreetCLIP CBM geolocation model"
     )
-    
+
     # --- Dataset and Data Loading ---
     parser.add_argument(
         "--data_root", type=str, default="data", help="Dataset root directory"
@@ -101,7 +102,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Use concept-level stratified splits instead of disjoint concept splits",
     )
-    
+
     # --- Model Architecture ---
     parser.add_argument(
         "--encoder_model",
@@ -145,7 +146,7 @@ def parse_args() -> argparse.Namespace:
         default="train",
         help="Samples to use when computing centroid residual stats.",
     )
-    
+
     # --- Training Configuration ---
     parser.add_argument("--sequential", action="store_true", default=cfg.sequential)
     parser.add_argument("--concept_epochs", type=int, default=cfg.stages.concept_epochs)
@@ -162,7 +163,7 @@ def parse_args() -> argparse.Namespace:
         default=1.0,
         help="If > 0, clip gradients to this global norm.",
     )
-    
+
     # --- Learning Rates ---
     parser.add_argument("--encoder_lr", type=float, default=cfg.encoder_lr)
     parser.add_argument("--cbm_lr", type=float, default=cfg.cbm_lr)
@@ -179,7 +180,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Override learning rate for country head (defaults to cbm_lr).",
     )
-    
+
     # --- Loss Weights ---
     parser.add_argument("--concept_weight", type=float, default=cfg.concept_weight)
     parser.add_argument("--distance_weight", type=float, default=cfg.distance_weight)
@@ -196,7 +197,7 @@ def parse_args() -> argparse.Namespace:
         default=0.0,
         help="Optional country loss weight during concept stage.",
     )
-    
+
     # --- Checkpointing and Logging ---
     parser.add_argument(
         "--checkpoint_dir",
@@ -209,7 +210,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--checkpoint_interval", type=int, default=1)
     parser.add_argument("--resume_from", type=str, default=None)
-    
+
     # --- Weights & Biases (W&B) Logging ---
     parser.add_argument(
         "--wandb_project",
@@ -233,7 +234,7 @@ def parse_args() -> argparse.Namespace:
         default="geo_cbm_v2",
         help="Experiment name for organizing results",
     )
-    
+
     # --- Diagnostics and Visualization ---
     parser.add_argument(
         "--diagnostics_interval",
@@ -253,6 +254,7 @@ def parse_args() -> argparse.Namespace:
 # ============================================================================
 # Data Loading Utilities
 # ============================================================================
+
 
 def collate_batch(batch):
     images, concept_idx, country_idx, coords, metadata = zip(*batch)
@@ -274,6 +276,7 @@ def worker_init_fn(worker_id: int):
 # ============================================================================
 # Coordinate Utilities
 # ============================================================================
+
 
 def coords_tensor_from_samples(samples: List[Dict]) -> Optional[torch.Tensor]:
     coords = []
@@ -304,6 +307,7 @@ def compute_coordinate_stats(
 # ============================================================================
 # Training Utilities
 # ============================================================================
+
 
 def resolve_stage_loss_weights(
     stage: str,
@@ -620,6 +624,7 @@ def create_checkpoint_dir(
 # Visualization and Diagnostics
 # ============================================================================
 
+
 @torch.no_grad()
 def visualize_predictions(
     model,
@@ -872,6 +877,7 @@ def dump_coordinate_diagnostics(
 # ============================================================================
 # Main Training Function
 # ============================================================================
+
 
 def main():
     args = parse_args()
