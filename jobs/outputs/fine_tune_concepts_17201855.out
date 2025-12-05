@@ -1,0 +1,132 @@
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+
+[notice] A new release of pip is available: 25.1.1 -> 25.3
+[notice] To update, run: pip install --upgrade pip
+
+[notice] A new release of pip is available: 25.1.1 -> 25.3
+[notice] To update, run: pip install --upgrade pip
+========================================================================
+Fine-tune Concepts Job
+========================================================================
+Job started at: Thu Dec  4 20:19:05 CET 2025
+Refining overly frequent or rare concepts into more fine-grained concepts
+Checkpoints saved every 100 refinements
+========================================================================
+Loading generalized concepts from /gpfs/home4/igodzwon/Project_AI/data/generalized_concepts.csv
+Total rows: 7,289
+Valid rows (after filtering errors): 7,289
+
+Grouping by unique concepts...
+Found 354 unique concepts to evaluate
+Loaded checkpoint: 300 concepts already processed
+Concepts remaining to process: 54
+
+Setting up Agno agent...
+
+Processing 54 concepts in batches of 10...
+Using 10 parallel workers
+Counts updated after each batch
+
+Evaluating:   0%|          | 0/54 [00:00<?, ?it/s]                                                    transport (1, 0.0%) -> infrastructure_yellow_backboards (now 26)
+Evaluating:   0%|          | 0/54 [00:02<?, ?it/s]                                                    tram (2, 0.0%) -> infrastructure_yellow_backboards (now 28)
+Evaluating:   0%|          | 0/54 [00:02<?, ?it/s]                                                    track (1, 0.0%) -> infrastructure_yellow_backboards (now 29)
+Evaluating:   0%|          | 0/54 [00:02<?, ?it/s]                                                    tiles (6, 0.1%) -> architecture_unique (now 490)
+Evaluating:   0%|          | 0/54 [00:02<?, ?it/s]                                                    transformer (1, 0.0%) -> infrastructure_yellow_backboards (now 30)
+Evaluating:   0%|          | 0/54 [00:02<?, ?it/s]                                                    tile (12, 0.2%) -> architecture_unique (now 502)
+Evaluating:   0%|          | 0/54 [00:02<?, ?it/s]                                                    tower (2, 0.0%) -> infrastructure_yellow_backboards (now 32)
+Evaluating:   0%|          | 0/54 [00:02<?, ?it/s]                                                    traffic light (2, 0.0%) -> infrastructure_yellow_backboards (now 34)
+Evaluating:   0%|          | 0/54 [00:02<?, ?it/s]                                                    traffic_light (11, 0.2%) -> infrastructure_yellow_backboards (now 45)
+Evaluating:   0%|          | 0/54 [00:02<?, ?it/s]                                                    train (2, 0.0%) -> infrastructure_yellow_backboards (now 47)
+Evaluating:   0%|          | 0/54 [00:02<?, ?it/s]Evaluating:  19%|█▊        | 10/54 [00:02<00:09,  4.80it/s]                                                             tree (52, 0.7%) -> agriculture_unique_cacti (now 134)
+Evaluating:  19%|█▊        | 10/54 [00:06<00:09,  4.80it/s]                                                             trashbin (1, 0.0%) -> infrastructure_yellow_backboards (now 48)
+Evaluating:  19%|█▊        | 10/54 [00:06<00:09,  4.80it/s]                                                             trash_container (1, 0.0%) -> infrastructure_yellow_backboards (now 49)
+Evaluating:  19%|█▊        | 10/54 [00:06<00:09,  4.80it/s]                                                             trashcan (2, 0.0%) -> infrastructure_yellow_backboards (now 51)
+Evaluating:  19%|█▊        | 10/54 [00:06<00:09,  4.80it/s]                                                             trolleybus (1, 0.0%) -> infrastructure_yellow_backboards (now 52)
+Evaluating:  19%|█▊        | 10/54 [00:06<00:09,  4.80it/s]                                                             tropical plants (1, 0.0%) -> agriculture_unique_cacti (now 135)
+Evaluating:  19%|█▊        | 10/54 [00:06<00:09,  4.80it/s]                                                             truck (12, 0.2%) -> infrastructure_yellow_backboards (now 64)
+Evaluating:  19%|█▊        | 10/54 [00:06<00:09,  4.80it/s]                                                             trash_bin (7, 0.1%) -> infrastructure_yellow_backboards (now 71)
+Evaluating:  19%|█▊        | 10/54 [00:06<00:09,  4.80it/s]                                                             triangle (1, 0.0%) -> landscape_unique_hillside (now 447)
+Evaluating:  19%|█▊        | 10/54 [00:06<00:09,  4.80it/s]                                                             trees (6, 0.1%) -> infrastructure_yellow_backboards (now 77)
+Evaluating:  19%|█▊        | 10/54 [00:06<00:09,  4.80it/s]Evaluating:  37%|███▋      | 20/54 [00:06<00:11,  3.00it/s]                                                             valley (36, 0.5%) -> landscape_unique_hillside (now 483)
+Evaluating:  37%|███▋      | 20/54 [00:08<00:11,  3.00it/s]                                                             urban (3, 0.0%) -> infrastructure_yellow_backboards (now 80)
+Evaluating:  37%|███▋      | 20/54 [00:08<00:11,  3.00it/s]                                                             trunk (1, 0.0%) -> infrastructure_yellow_backboards (now 81)
+Evaluating:  37%|███▋      | 20/54 [00:08<00:11,  3.00it/s]                                                             twig (1, 0.0%) -> infrastructure_yellow_backboards (now 82)
+Evaluating:  37%|███▋      | 20/54 [00:08<00:11,  3.00it/s]                                                             turbine (1, 0.0%) -> infrastructure_yellow_backboards (now 83)
+Evaluating:  37%|███▋      | 20/54 [00:08<00:11,  3.00it/s]                                                             villa (1, 0.0%) -> landscape_unique_hillside (now 484)
+Evaluating:  37%|███▋      | 20/54 [00:08<00:11,  3.00it/s]                                                             vineyard (6, 0.1%) -> agriculture_cotton_sugarcane (now 66)
+Evaluating:  37%|███▋      | 20/54 [00:08<00:11,  3.00it/s]                                                             tundra (2, 0.0%) -> landscape_unique_hillside (now 486)
+Evaluating:  37%|███▋      | 20/54 [00:08<00:11,  3.00it/s]Evaluating:  56%|█████▌    | 30/54 [00:08<00:06,  3.83it/s]                                                             volcano (6, 0.1%) -> landscape_unique_crater (now 136)
+Evaluating:  56%|█████▌    | 30/54 [00:09<00:06,  3.83it/s]                                                             volcanoes (1, 0.0%) -> landscape_unique_crater (now 137)
+Evaluating:  56%|█████▌    | 30/54 [00:09<00:06,  3.83it/s]                                                             water tank (1, 0.0%) -> infrastructure_yellow_backboards (now 84)
+Evaluating:  56%|█████▌    | 30/54 [00:09<00:06,  3.83it/s]                                                             water (1, 0.0%) -> vegetation (now 143)
+Evaluating:  56%|█████▌    | 30/54 [00:09<00:06,  3.83it/s]                                                             water droplet (1, 0.0%) -> vegetation (now 144)
+Evaluating:  56%|█████▌    | 30/54 [00:09<00:06,  3.83it/s]                                                             visual object (16, 0.2%) -> infrastructure_yellow_backboards (now 100)
+Evaluating:  56%|█████▌    | 30/54 [00:09<00:06,  3.83it/s]                                                             walls (1, 0.0%) -> infrastructure_yellow_backboards (now 101)
+Evaluating:  56%|█████▌    | 30/54 [00:09<00:06,  3.83it/s]                                                             walkway (1, 0.0%) -> infrastructure_yellow_backboards (now 102)
+Evaluating:  56%|█████▌    | 30/54 [00:09<00:06,  3.83it/s]                                                             wall (12, 0.2%) -> infrastructure_yellow_backboards (now 114)
+Evaluating:  56%|█████▌    | 30/54 [00:09<00:06,  3.83it/s]                                                             visual (5, 0.1%) -> vehicle (now 29)
+Evaluating:  56%|█████▌    | 30/54 [00:09<00:06,  3.83it/s]Evaluating:  74%|███████▍  | 40/54 [00:09<00:02,  4.83it/s]                                                             wetland (4, 0.1%) -> landscape_unique_fjord (now 118)
+Evaluating:  74%|███████▍  | 40/54 [00:10<00:02,  4.83it/s]                                                             window (6, 0.1%) -> antenna_short_tilted (now 43)
+Evaluating:  74%|███████▍  | 40/54 [00:10<00:02,  4.83it/s]                                                             weather (1, 0.0%) -> vegetation (now 145)
+Evaluating:  74%|███████▍  | 40/54 [00:10<00:02,  4.83it/s]                                                             wildlife (1, 0.0%) -> vegetation (now 146)
+Evaluating:  74%|███████▍  | 40/54 [00:10<00:02,  4.83it/s]                                                             wind turbine (1, 0.0%) -> infrastructure_yellow_backboards (now 115)
+Evaluating:  74%|███████▍  | 40/54 [00:10<00:02,  4.83it/s]                                                             water_tank (1, 0.0%) -> infrastructure_yellow_backboards (now 116)
+Evaluating:  74%|███████▍  | 40/54 [00:10<00:02,  4.83it/s]                                                             wind farm (1, 0.0%) -> infrastructure_yellow_backboards (now 117)
+Evaluating:  74%|███████▍  | 40/54 [00:10<00:02,  4.83it/s]                                                             wire (7, 0.1%) -> antenna_short_tilted (now 50)
+Evaluating:  74%|███████▍  | 40/54 [00:10<00:02,  4.83it/s]                                                             yurt (1, 0.0%) -> landscape_unique_hillside (now 487)
+Evaluating:  74%|███████▍  | 40/54 [00:10<00:02,  4.83it/s]                                                             waystone (2, 0.0%) -> infrastructure_yellow_backboards (now 119)
+Evaluating:  74%|███████▍  | 40/54 [00:10<00:02,  4.83it/s]Evaluating:  93%|█████████▎| 50/54 [00:10<00:00,  5.29it/s]                                                             zip-tie (2, 0.0%) -> vehicle (now 31)
+Evaluating:  93%|█████████▎| 50/54 [00:12<00:00,  5.29it/s]                                                             zebra (8, 0.1%) -> agriculture_unique_cacti (now 143)
+Evaluating:  93%|█████████▎| 50/54 [00:12<00:00,  5.29it/s]                                                             zebra stripe (2, 0.0%) -> landscape_unique_hillside (now 489)
+Evaluating:  93%|█████████▎| 50/54 [00:12<00:00,  5.29it/s]                                                             zip_tie (1, 0.0%) -> infrastructure_yellow_backboards (now 120)
+Evaluating:  93%|█████████▎| 50/54 [00:12<00:00,  5.29it/s]Evaluating: 100%|██████████| 54/54 [00:12<00:00,  4.57it/s]Evaluating: 100%|██████████| 54/54 [00:12<00:00,  4.39it/s]
+  Saved checkpoint: 354 concepts
+
+Applying concept mapping to all rows...
+
+============================================================
+FINAL STATISTICS
+============================================================
+Original unique concepts: 354
+Final unique concepts: 29
+Change: -325 concepts
+
+Concepts kept unchanged: 2
+Concepts refined/merged: 352
+
+Top 15 concepts by count:
+  infrastructure_unique: 3731 (51.2%)
+  landscape_unique_flatland: 1286 (17.6%)
+  architecture_unique: 502 (6.9%)
+  landscape_unique_hillside: 489 (6.7%)
+  language_unique: 357 (4.9%)
+  vegetation: 146 (2.0%)
+  agriculture_unique_cacti: 143 (2.0%)
+  landscape_unique_crater: 137 (1.9%)
+  infrastructure_yellow_backboards: 120 (1.6%)
+  landscape_unique_fjord: 118 (1.6%)
+  beach_resort: 66 (0.9%)
+  agriculture_cotton_sugarcane: 66 (0.9%)
+  antenna_short_tilted: 50 (0.7%)
+  vehicle: 31 (0.4%)
+  architecture_unique_bricks: 9 (0.1%)
+
+Saving results to /gpfs/home4/igodzwon/Project_AI/data/fine_tuned_concepts.csv
+Done! Saved 7,289 rows
+========================================================================
+Job finished at: Thu Dec  4 20:19:19 CET 2025
+========================================================================

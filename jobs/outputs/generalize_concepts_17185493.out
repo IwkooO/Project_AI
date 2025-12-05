@@ -1,0 +1,45 @@
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+gradio 5.29.0 requires aiofiles<25.0,>=22.0, which is not installed.
+
+[notice] A new release of pip is available: 25.1.1 -> 25.3
+[notice] To update, run: pip install --upgrade pip
+========================================================================
+Generalize Concepts Job
+========================================================================
+Job started at: Thu Dec  4 16:51:57 CET 2025
+Processing concept+note pairs and generalizing concept names
+Checkpoints saved every 1000 items
+========================================================================
+Traceback (most recent call last):
+  File "/home/igodzwon/.conda/envs/streetview/lib/python3.11/site-packages/agno/models/openai/chat.py", line 24, in <module>
+    from openai import APIConnectionError, APIStatusError, RateLimitError
+ModuleNotFoundError: No module named 'openai'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/gpfs/home4/igodzwon/Project_AI/scripts/data_processing/generalize_concepts.py", line 24, in <module>
+    from agno.models.openai import OpenAIChat
+  File "/home/igodzwon/.conda/envs/streetview/lib/python3.11/site-packages/agno/models/openai/__init__.py", line 1, in <module>
+    from agno.models.openai.chat import OpenAIChat
+  File "/home/igodzwon/.conda/envs/streetview/lib/python3.11/site-packages/agno/models/openai/chat.py", line 31, in <module>
+    raise ImportError("`openai` not installed. Please install using `pip install openai`")
+ImportError: `openai` not installed. Please install using `pip install openai`
+========================================================================
+Job finished at: Thu Dec  4 16:51:58 CET 2025
+========================================================================

@@ -1,0 +1,45 @@
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+
+[notice] A new release of pip is available: 25.1.1 -> 25.3
+[notice] To update, run: pip install --upgrade pip
+
+[notice] A new release of pip is available: 25.1.1 -> 25.3
+[notice] To update, run: pip install --upgrade pip
+========================================================================
+Fine-tune Concepts Job
+========================================================================
+Job started at: Thu Dec  4 21:07:56 CET 2025
+Refining overly frequent or rare concepts into more fine-grained concepts
+Checkpoints saved every 100 refinements
+========================================================================
+Loading generalized concepts from /gpfs/home4/igodzwon/Project_AI/data/generalized_concepts.csv
+Total rows: 7,289
+Valid rows (after filtering errors): 7,289
+Unique existing concepts: 354
+Traceback (most recent call last):
+  File "/gpfs/home4/igodzwon/Project_AI/scripts/data_processing/fine_tune_concepts.py", line 305, in <module>
+    main()
+  File "/gpfs/home4/igodzwon/Project_AI/scripts/data_processing/fine_tune_concepts.py", line 136, in main
+    checkpoint = load_checkpoint(checkpoint_path)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/gpfs/home4/igodzwon/Project_AI/scripts/data_processing/fine_tune_concepts.py", line 55, in load_checkpoint
+    print(f"Loaded checkpoint: {len(data['results'])} rows already processed")
+                                    ~~~~^^^^^^^^^^^
+KeyError: 'results'
+========================================================================
+Job finished at: Thu Dec  4 21:07:58 CET 2025
+========================================================================
