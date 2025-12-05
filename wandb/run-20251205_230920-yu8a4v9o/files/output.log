@@ -1,0 +1,647 @@
+Loading datasets...
+Loaded S2 vocabulary: 12524 cells (Level 8)
+Loading pooled embeddings from /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/train_pooled_embeddings.pt
+Loaded 34028 pooled embeddings
+Warning: Patch tokens not found at /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/train_patch_tokens.pt, skipping.
+Loaded S2 vocabulary: 12524 cells (Level 8)
+Filtered dataset: 4254 -> 4251 samples (3 samples with unknown concepts)
+Loading pooled embeddings from /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/val_pooled_embeddings.pt
+Loaded 4254 pooled embeddings
+Warning: Patch tokens not found at /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/val_patch_tokens.pt, skipping.
+Initializing CBM...
+Loading checkpoint from checkpoints/cbm_v1/best_phase2.pt
+Computing concept class weights...
+Phase 3: Joint Training
+
+Epoch 1/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 115.50it/s, C_Loss=4.26, G_Loss=2.93]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 137.44it/s]
+Train Loss: 6.1997 | C Acc: 0.6775 | Cell Acc: 0.4208
+Val   Loss: 7.3491   | C Acc: 0.4533 | Cell Acc: 0.2282
+Generating visualizations...
+Saved best model to checkpoints/cbm_v1/best_phase3.pt
+
+Epoch 2/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 131.41it/s, C_Loss=4.25, G_Loss=2.62]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 128.69it/s]
+Train Loss: 6.1948 | C Acc: 0.6797 | Cell Acc: 0.4252
+Val   Loss: 7.3492   | C Acc: 0.4542 | Cell Acc: 0.2258
+
+Epoch 3/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 136.26it/s, C_Loss=4.48, G_Loss=2.52]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 134.37it/s]
+Train Loss: 6.1997 | C Acc: 0.6765 | Cell Acc: 0.4277
+Val   Loss: 7.3397   | C Acc: 0.4552 | Cell Acc: 0.2272
+Saved best model to checkpoints/cbm_v1/best_phase3.pt
+
+Epoch 4/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 136.68it/s, C_Loss=4.51, G_Loss=2.57]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 130.40it/s]
+Train Loss: 6.1865 | C Acc: 0.6766 | Cell Acc: 0.4295
+Val   Loss: 7.3405   | C Acc: 0.4505 | Cell Acc: 0.2270
+
+Epoch 5/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 136.24it/s, C_Loss=4.03, G_Loss=2.33]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 132.93it/s]
+Train Loss: 6.1830 | C Acc: 0.6775 | Cell Acc: 0.4286
+Val   Loss: 7.3341   | C Acc: 0.4528 | Cell Acc: 0.2282
+Generating visualizations...
+
+Epoch 6/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 123.08it/s, C_Loss=4.45, G_Loss=2.74]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 128.10it/s]
+Train Loss: 6.1698 | C Acc: 0.6840 | Cell Acc: 0.4300
+Val   Loss: 7.3357   | C Acc: 0.4550 | Cell Acc: 0.2279
+Saved best model to checkpoints/cbm_v1/best_phase3.pt
+
+Epoch 7/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 122.58it/s, C_Loss=4.41, G_Loss=2.68]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 129.38it/s]
+Train Loss: 6.1596 | C Acc: 0.6789 | Cell Acc: 0.4337
+Val   Loss: 7.3442   | C Acc: 0.4531 | Cell Acc: 0.2279
+
+Epoch 8/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 121.24it/s, C_Loss=4.74, G_Loss=2.78]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 129.35it/s]
+Train Loss: 6.1752 | C Acc: 0.6775 | Cell Acc: 0.4314
+Val   Loss: 7.3415   | C Acc: 0.4545 | Cell Acc: 0.2296
+Saved best model to checkpoints/cbm_v1/best_phase3.pt
+
+Epoch 9/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 119.43it/s, C_Loss=4.40, G_Loss=2.54]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 119.57it/s]
+Train Loss: 6.1560 | C Acc: 0.6817 | Cell Acc: 0.4395
+Val   Loss: 7.3462   | C Acc: 0.4535 | Cell Acc: 0.2263
+
+Epoch 10/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 121.21it/s, C_Loss=4.00, G_Loss=2.67]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 128.79it/s]
+Train Loss: 6.1592 | C Acc: 0.6801 | Cell Acc: 0.4361
+Val   Loss: 7.3490   | C Acc: 0.4528 | Cell Acc: 0.2319
+Generating visualizations...
+Saved best model to checkpoints/cbm_v1/best_phase3.pt
+
+Epoch 11/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 135.73it/s, C_Loss=3.73, G_Loss=2.46]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 127.01it/s]
+Train Loss: 6.1524 | C Acc: 0.6800 | Cell Acc: 0.4404
+Val   Loss: 7.3530   | C Acc: 0.4535 | Cell Acc: 0.2287
+
+Epoch 12/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 132.58it/s, C_Loss=4.55, G_Loss=2.68]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 126.41it/s]
+Train Loss: 6.1505 | C Acc: 0.6793 | Cell Acc: 0.4431
+Val   Loss: 7.3476   | C Acc: 0.4526 | Cell Acc: 0.2282
+
+Epoch 13/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 136.21it/s, C_Loss=3.84, G_Loss=2.42]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 125.32it/s]
+Train Loss: 6.1422 | C Acc: 0.6791 | Cell Acc: 0.4456
+Val   Loss: 7.3458   | C Acc: 0.4538 | Cell Acc: 0.2315
+Saved best model to checkpoints/cbm_v1/best_phase3.pt
+
+Epoch 14/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 134.86it/s, C_Loss=4.24, G_Loss=2.60]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 132.44it/s]
+Train Loss: 6.1349 | C Acc: 0.6811 | Cell Acc: 0.4421
+Val   Loss: 7.3464   | C Acc: 0.4533 | Cell Acc: 0.2298
+
+Epoch 15/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 133.78it/s, C_Loss=3.97, G_Loss=2.60]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 127.47it/s]
+Train Loss: 6.1351 | C Acc: 0.6796 | Cell Acc: 0.4454
+Val   Loss: 7.3506   | C Acc: 0.4519 | Cell Acc: 0.2275
+Generating visualizations...
+
+Epoch 16/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 132.60it/s, C_Loss=4.52, G_Loss=2.69]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 127.31it/s]
+Train Loss: 6.1279 | C Acc: 0.6789 | Cell Acc: 0.4472
+Val   Loss: 7.3580   | C Acc: 0.4533 | Cell Acc: 0.2291
+
+Epoch 17/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 131.56it/s, C_Loss=3.54, G_Loss=2.58]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 135.76it/s]
+Train Loss: 6.1185 | C Acc: 0.6798 | Cell Acc: 0.4519
+Val   Loss: 7.3559   | C Acc: 0.4519 | Cell Acc: 0.2310
+
+Epoch 18/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 131.53it/s, C_Loss=3.86, G_Loss=2.56]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 124.77it/s]
+Train Loss: 6.1157 | C Acc: 0.6803 | Cell Acc: 0.4504
+Val   Loss: 7.3544   | C Acc: 0.4540 | Cell Acc: 0.2296
+
+Epoch 19/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 131.43it/s, C_Loss=4.42, G_Loss=2.70]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 126.53it/s]
+Train Loss: 6.1126 | C Acc: 0.6859 | Cell Acc: 0.4480
+Val   Loss: 7.3542   | C Acc: 0.4521 | Cell Acc: 0.2303
+
+Epoch 20/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 131.49it/s, C_Loss=4.30, G_Loss=2.53]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 131.07it/s]
+Train Loss: 6.1040 | C Acc: 0.6832 | Cell Acc: 0.4546
+Val   Loss: 7.3610   | C Acc: 0.4521 | Cell Acc: 0.2312
+Generating visualizations...
+
+Epoch 21/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 129.90it/s, C_Loss=3.82, G_Loss=2.65]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 130.98it/s]
+Train Loss: 6.1018 | C Acc: 0.6814 | Cell Acc: 0.4571
+Val   Loss: 7.3592   | C Acc: 0.4531 | Cell Acc: 0.2334
+Saved best model to checkpoints/cbm_v1/best_phase3.pt
+
+Epoch 22/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 134.50it/s, C_Loss=4.29, G_Loss=2.40]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 128.29it/s]
+Train Loss: 6.0959 | C Acc: 0.6787 | Cell Acc: 0.4563
+Val   Loss: 7.3552   | C Acc: 0.4524 | Cell Acc: 0.2301
+
+Epoch 23/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 135.83it/s, C_Loss=4.29, G_Loss=2.62]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 126.62it/s]
+Train Loss: 6.0886 | C Acc: 0.6836 | Cell Acc: 0.4580
+Val   Loss: 7.3613   | C Acc: 0.4547 | Cell Acc: 0.2287
+
+Epoch 24/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 132.46it/s, C_Loss=4.43, G_Loss=2.41]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 128.28it/s]
+Train Loss: 6.0936 | C Acc: 0.6818 | Cell Acc: 0.4620
+Val   Loss: 7.3611   | C Acc: 0.4550 | Cell Acc: 0.2305
+
+Epoch 25/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 133.54it/s, C_Loss=4.33, G_Loss=2.50]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 128.04it/s]
+Train Loss: 6.0784 | C Acc: 0.6846 | Cell Acc: 0.4607
+Val   Loss: 7.3684   | C Acc: 0.4526 | Cell Acc: 0.2329
+Generating visualizations...
+
+Epoch 26/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 133.90it/s, C_Loss=4.70, G_Loss=2.60]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 130.31it/s]
+Train Loss: 6.0769 | C Acc: 0.6819 | Cell Acc: 0.4631
+Val   Loss: 7.3645   | C Acc: 0.4550 | Cell Acc: 0.2308
+
+Epoch 27/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 133.84it/s, C_Loss=4.25, G_Loss=2.36]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 131.98it/s]
+Train Loss: 6.0755 | C Acc: 0.6821 | Cell Acc: 0.4640
+Val   Loss: 7.3666   | C Acc: 0.4517 | Cell Acc: 0.2305
+
+Epoch 28/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 132.87it/s, C_Loss=4.39, G_Loss=2.42]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 131.91it/s]
+Train Loss: 6.0706 | C Acc: 0.6828 | Cell Acc: 0.4639
+Val   Loss: 7.3649   | C Acc: 0.4507 | Cell Acc: 0.2308
+
+Epoch 29/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 131.59it/s, C_Loss=3.53, G_Loss=2.39]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 131.60it/s]
+Train Loss: 6.0679 | C Acc: 0.6801 | Cell Acc: 0.4659
+Val   Loss: 7.3736   | C Acc: 0.4524 | Cell Acc: 0.2317
+
+Epoch 30/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 135.99it/s, C_Loss=4.07, G_Loss=2.40]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 127.01it/s]
+Train Loss: 6.0668 | C Acc: 0.6809 | Cell Acc: 0.4686
+Val   Loss: 7.3776   | C Acc: 0.4519 | Cell Acc: 0.2315
+Generating visualizations...
+
+Epoch 31/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 131.01it/s, C_Loss=3.88, G_Loss=2.28]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 127.47it/s]
+Train Loss: 6.0536 | C Acc: 0.6826 | Cell Acc: 0.4672
+Val   Loss: 7.3701   | C Acc: 0.4538 | Cell Acc: 0.2331
+Saved best model to checkpoints/cbm_v1/best_phase3.pt
+
+Epoch 32/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 130.52it/s, C_Loss=4.74, G_Loss=2.27]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 133.78it/s]
+Train Loss: 6.0517 | C Acc: 0.6797 | Cell Acc: 0.4672
+Val   Loss: 7.3742   | C Acc: 0.4524 | Cell Acc: 0.2327
+
+Epoch 33/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 130.83it/s, C_Loss=4.21, G_Loss=2.56]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 125.20it/s]
+Train Loss: 6.0444 | C Acc: 0.6827 | Cell Acc: 0.4690
+Val   Loss: 7.3773   | C Acc: 0.4531 | Cell Acc: 0.2357
+Saved best model to checkpoints/cbm_v1/best_phase3.pt
+
+Epoch 34/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 131.19it/s, C_Loss=4.47, G_Loss=2.19]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 139.42it/s]
+Train Loss: 6.0504 | C Acc: 0.6808 | Cell Acc: 0.4680
+Val   Loss: 7.3728   | C Acc: 0.4564 | Cell Acc: 0.2301
+
+Epoch 35/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 132.21it/s, C_Loss=4.38, G_Loss=2.32]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 131.27it/s]
+Train Loss: 6.0368 | C Acc: 0.6833 | Cell Acc: 0.4716
+Val   Loss: 7.3741   | C Acc: 0.4540 | Cell Acc: 0.2327
+Generating visualizations...
+
+Epoch 36/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 131.72it/s, C_Loss=4.20, G_Loss=2.20]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 130.15it/s]
+Train Loss: 6.0351 | C Acc: 0.6799 | Cell Acc: 0.4749
+Val   Loss: 7.3815   | C Acc: 0.4531 | Cell Acc: 0.2329
+
+Epoch 37/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 132.27it/s, C_Loss=4.51, G_Loss=2.40]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 125.37it/s]
+Train Loss: 6.0362 | C Acc: 0.6809 | Cell Acc: 0.4746
+Val   Loss: 7.3830   | C Acc: 0.4538 | Cell Acc: 0.2305
+
+Epoch 38/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 134.33it/s, C_Loss=3.99, G_Loss=2.53]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 120.76it/s]
+Train Loss: 6.0299 | C Acc: 0.6841 | Cell Acc: 0.4758
+Val   Loss: 7.3821   | C Acc: 0.4547 | Cell Acc: 0.2312
+
+Epoch 39/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 131.13it/s, C_Loss=3.73, G_Loss=2.33]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 128.64it/s]
+Train Loss: 6.0298 | C Acc: 0.6823 | Cell Acc: 0.4757
+Val   Loss: 7.3831   | C Acc: 0.4547 | Cell Acc: 0.2336
+
+Epoch 40/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 130.05it/s, C_Loss=4.09, G_Loss=2.11]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 128.35it/s]
+Train Loss: 6.0207 | C Acc: 0.6839 | Cell Acc: 0.4837
+Val   Loss: 7.3864   | C Acc: 0.4547 | Cell Acc: 0.2315
+Generating visualizations...
+
+Epoch 41/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 129.91it/s, C_Loss=4.14, G_Loss=2.52]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 129.64it/s]
+Train Loss: 6.0231 | C Acc: 0.6815 | Cell Acc: 0.4767
+Val   Loss: 7.3836   | C Acc: 0.4547 | Cell Acc: 0.2315
+
+Epoch 42/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 132.00it/s, C_Loss=3.76, G_Loss=2.36]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 122.20it/s]
+Train Loss: 6.0074 | C Acc: 0.6825 | Cell Acc: 0.4800
+Val   Loss: 7.3857   | C Acc: 0.4561 | Cell Acc: 0.2319
+
+Epoch 43/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 134.85it/s, C_Loss=4.29, G_Loss=2.29]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 122.12it/s]
+Train Loss: 6.0039 | C Acc: 0.6861 | Cell Acc: 0.4826
+Val   Loss: 7.3899   | C Acc: 0.4524 | Cell Acc: 0.2317
+
+Epoch 44/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 130.42it/s, C_Loss=4.08, G_Loss=2.34]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 128.62it/s]
+Train Loss: 6.0028 | C Acc: 0.6870 | Cell Acc: 0.4814
+Val   Loss: 7.3864   | C Acc: 0.4538 | Cell Acc: 0.2308
+
+Epoch 45/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 135.03it/s, C_Loss=4.20, G_Loss=2.42]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 129.43it/s]
+Train Loss: 5.9970 | C Acc: 0.6850 | Cell Acc: 0.4826
+Val   Loss: 7.3928   | C Acc: 0.4538 | Cell Acc: 0.2329
+Generating visualizations...
+
+Epoch 46/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 134.56it/s, C_Loss=3.89, G_Loss=2.25]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 128.01it/s]
+Train Loss: 5.9981 | C Acc: 0.6846 | Cell Acc: 0.4846
+Val   Loss: 7.3947   | C Acc: 0.4500 | Cell Acc: 0.2331
+
+Epoch 47/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 134.77it/s, C_Loss=4.35, G_Loss=2.26]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 127.19it/s]
+Train Loss: 5.9888 | C Acc: 0.6873 | Cell Acc: 0.4824
+Val   Loss: 7.3905   | C Acc: 0.4545 | Cell Acc: 0.2329
+
+Epoch 48/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 134.83it/s, C_Loss=4.64, G_Loss=2.22]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 129.18it/s]
+Train Loss: 5.9999 | C Acc: 0.6840 | Cell Acc: 0.4855
+Val   Loss: 7.3944   | C Acc: 0.4519 | Cell Acc: 0.2348
+
+Epoch 49/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 133.73it/s, C_Loss=4.19, G_Loss=2.09]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 132.42it/s]
+Train Loss: 5.9900 | C Acc: 0.6819 | Cell Acc: 0.4855
+Val   Loss: 7.3945   | C Acc: 0.4528 | Cell Acc: 0.2348
+
+Epoch 50/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 133.38it/s, C_Loss=4.51, G_Loss=2.21]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 126.99it/s]
+Train Loss: 5.9853 | C Acc: 0.6851 | Cell Acc: 0.4848
+Val   Loss: 7.3941   | C Acc: 0.4512 | Cell Acc: 0.2341
+Generating visualizations...
+
+Epoch 51/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 130.21it/s, C_Loss=3.83, G_Loss=2.22]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 129.23it/s]
+Train Loss: 5.9817 | C Acc: 0.6830 | Cell Acc: 0.4858
+Val   Loss: 7.3940   | C Acc: 0.4521 | Cell Acc: 0.2338
+
+Epoch 52/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 130.67it/s, C_Loss=4.25, G_Loss=2.25]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 126.65it/s]
+Train Loss: 5.9891 | C Acc: 0.6844 | Cell Acc: 0.4845
+Val   Loss: 7.3936   | C Acc: 0.4528 | Cell Acc: 0.2310
+
+Epoch 53/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 130.43it/s, C_Loss=4.47, G_Loss=2.33]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 124.25it/s]
+Train Loss: 5.9793 | C Acc: 0.6866 | Cell Acc: 0.4899
+Val   Loss: 7.4010   | C Acc: 0.4495 | Cell Acc: 0.2348
+
+Epoch 54/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 134.06it/s, C_Loss=4.47, G_Loss=2.24]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 126.44it/s]
+Train Loss: 5.9784 | C Acc: 0.6854 | Cell Acc: 0.4864
+Val   Loss: 7.3977   | C Acc: 0.4528 | Cell Acc: 0.2334
+
+Epoch 55/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 130.83it/s, C_Loss=4.04, G_Loss=2.44]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 136.41it/s]
+Train Loss: 5.9780 | C Acc: 0.6809 | Cell Acc: 0.4916
+Val   Loss: 7.3996   | C Acc: 0.4535 | Cell Acc: 0.2338
+Generating visualizations...
+
+Epoch 56/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 132.62it/s, C_Loss=4.04, G_Loss=2.44]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 121.03it/s]
+Train Loss: 5.9643 | C Acc: 0.6847 | Cell Acc: 0.4934
+Val   Loss: 7.4058   | C Acc: 0.4521 | Cell Acc: 0.2343
+
+Epoch 57/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 133.70it/s, C_Loss=4.47, G_Loss=2.54]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 126.85it/s]
+Train Loss: 5.9748 | C Acc: 0.6852 | Cell Acc: 0.4881
+Val   Loss: 7.4018   | C Acc: 0.4535 | Cell Acc: 0.2362
+Saved best model to checkpoints/cbm_v1/best_phase3.pt
+
+Epoch 58/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 131.74it/s, C_Loss=4.05, G_Loss=2.17]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 127.79it/s]
+Train Loss: 5.9732 | C Acc: 0.6824 | Cell Acc: 0.4885
+Val   Loss: 7.3986   | C Acc: 0.4528 | Cell Acc: 0.2343
+
+Epoch 59/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 133.77it/s, C_Loss=4.03, G_Loss=1.94]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 121.63it/s]
+Train Loss: 5.9668 | C Acc: 0.6857 | Cell Acc: 0.4891
+Val   Loss: 7.3991   | C Acc: 0.4507 | Cell Acc: 0.2364
+
+Epoch 60/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 135.05it/s, C_Loss=4.38, G_Loss=2.34]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 125.62it/s]
+Train Loss: 5.9607 | C Acc: 0.6843 | Cell Acc: 0.4937
+Val   Loss: 7.4036   | C Acc: 0.4533 | Cell Acc: 0.2362
+Generating visualizations...
+
+Epoch 61/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 134.83it/s, C_Loss=4.53, G_Loss=2.24]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 135.83it/s]
+Train Loss: 5.9596 | C Acc: 0.6860 | Cell Acc: 0.4904
+Val   Loss: 7.4069   | C Acc: 0.4526 | Cell Acc: 0.2362
+
+Epoch 62/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 134.25it/s, C_Loss=4.33, G_Loss=2.08]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 121.96it/s]
+Train Loss: 5.9570 | C Acc: 0.6845 | Cell Acc: 0.4969
+Val   Loss: 7.4039   | C Acc: 0.4517 | Cell Acc: 0.2371
+
+Epoch 63/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 130.54it/s, C_Loss=4.34, G_Loss=2.22]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 129.05it/s]
+Train Loss: 5.9631 | C Acc: 0.6839 | Cell Acc: 0.4894
+Val   Loss: 7.4039   | C Acc: 0.4526 | Cell Acc: 0.2371
+
+Epoch 64/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 135.70it/s, C_Loss=4.41, G_Loss=2.41]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 125.30it/s]
+Train Loss: 5.9547 | C Acc: 0.6854 | Cell Acc: 0.4930
+Val   Loss: 7.4065   | C Acc: 0.4540 | Cell Acc: 0.2367
+Saved best model to checkpoints/cbm_v1/best_phase3.pt
+
+Epoch 65/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 130.34it/s, C_Loss=4.50, G_Loss=2.31]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 122.48it/s]
+Train Loss: 5.9531 | C Acc: 0.6827 | Cell Acc: 0.4975
+Val   Loss: 7.4051   | C Acc: 0.4535 | Cell Acc: 0.2369
+Generating visualizations...
+
+Epoch 66/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 134.48it/s, C_Loss=3.64, G_Loss=2.31]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 125.36it/s]
+Train Loss: 5.9498 | C Acc: 0.6843 | Cell Acc: 0.4973
+Val   Loss: 7.4069   | C Acc: 0.4528 | Cell Acc: 0.2376
+
+Epoch 67/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 131.56it/s, C_Loss=4.03, G_Loss=2.33]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 123.22it/s]
+Train Loss: 5.9447 | C Acc: 0.6875 | Cell Acc: 0.4971
+Val   Loss: 7.4080   | C Acc: 0.4519 | Cell Acc: 0.2364
+
+Epoch 68/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 131.31it/s, C_Loss=4.48, G_Loss=2.24]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 129.58it/s]
+Train Loss: 5.9391 | C Acc: 0.6890 | Cell Acc: 0.4973
+Val   Loss: 7.4072   | C Acc: 0.4533 | Cell Acc: 0.2357
+
+Epoch 69/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 135.05it/s, C_Loss=4.10, G_Loss=2.38]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 132.93it/s]
+Train Loss: 5.9426 | C Acc: 0.6839 | Cell Acc: 0.4965
+Val   Loss: 7.4046   | C Acc: 0.4519 | Cell Acc: 0.2376
+
+Epoch 70/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 130.27it/s, C_Loss=4.48, G_Loss=2.04]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 129.54it/s]
+Train Loss: 5.9457 | C Acc: 0.6871 | Cell Acc: 0.4958
+Val   Loss: 7.4060   | C Acc: 0.4524 | Cell Acc: 0.2376
+Generating visualizations...
+
+Epoch 71/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 133.02it/s, C_Loss=3.73, G_Loss=1.96]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 136.46it/s]
+Train Loss: 5.9297 | C Acc: 0.6852 | Cell Acc: 0.4984
+Val   Loss: 7.4092   | C Acc: 0.4540 | Cell Acc: 0.2376
+Saved best model to checkpoints/cbm_v1/best_phase3.pt
+
+Epoch 72/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 133.82it/s, C_Loss=4.19, G_Loss=2.17]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 130.99it/s]
+Train Loss: 5.9471 | C Acc: 0.6841 | Cell Acc: 0.4970
+Val   Loss: 7.4097   | C Acc: 0.4524 | Cell Acc: 0.2383
+
+Epoch 73/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 131.32it/s, C_Loss=4.51, G_Loss=2.29]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 134.29it/s]
+Train Loss: 5.9410 | C Acc: 0.6903 | Cell Acc: 0.4973
+Val   Loss: 7.4091   | C Acc: 0.4510 | Cell Acc: 0.2385
+
+Epoch 74/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 131.84it/s, C_Loss=4.03, G_Loss=2.30]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 125.05it/s]
+Train Loss: 5.9359 | C Acc: 0.6891 | Cell Acc: 0.4976
+Val   Loss: 7.4092   | C Acc: 0.4507 | Cell Acc: 0.2371
+
+Epoch 75/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 131.84it/s, C_Loss=4.02, G_Loss=2.29]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 131.03it/s]
+Train Loss: 5.9378 | C Acc: 0.6861 | Cell Acc: 0.4960
+Val   Loss: 7.4102   | C Acc: 0.4519 | Cell Acc: 0.2367
+Generating visualizations...
+
+Epoch 76/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 135.22it/s, C_Loss=4.30, G_Loss=2.10]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 131.16it/s]
+Train Loss: 5.9314 | C Acc: 0.6859 | Cell Acc: 0.4960
+Val   Loss: 7.4118   | C Acc: 0.4519 | Cell Acc: 0.2374
+
+Epoch 77/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 135.30it/s, C_Loss=4.03, G_Loss=1.98]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 126.97it/s]
+Train Loss: 5.9347 | C Acc: 0.6866 | Cell Acc: 0.4991
+Val   Loss: 7.4131   | C Acc: 0.4524 | Cell Acc: 0.2364
+
+Epoch 78/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 135.05it/s, C_Loss=4.92, G_Loss=2.22]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 127.05it/s]
+Train Loss: 5.9295 | C Acc: 0.6858 | Cell Acc: 0.5008
+Val   Loss: 7.4135   | C Acc: 0.4514 | Cell Acc: 0.2362
+
+Epoch 79/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 135.25it/s, C_Loss=4.23, G_Loss=2.33]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 126.56it/s]
+Train Loss: 5.9375 | C Acc: 0.6848 | Cell Acc: 0.4972
+Val   Loss: 7.4139   | C Acc: 0.4519 | Cell Acc: 0.2359
+
+Epoch 80/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 135.22it/s, C_Loss=4.74, G_Loss=2.12]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 120.41it/s]
+Train Loss: 5.9275 | C Acc: 0.6901 | Cell Acc: 0.4997
+Val   Loss: 7.4143   | C Acc: 0.4521 | Cell Acc: 0.2359
+Generating visualizations...
+
+Epoch 81/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 133.57it/s, C_Loss=4.30, G_Loss=2.17]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 124.71it/s]
+Train Loss: 5.9306 | C Acc: 0.6861 | Cell Acc: 0.4996
+Val   Loss: 7.4131   | C Acc: 0.4521 | Cell Acc: 0.2355
+
+Epoch 82/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 134.59it/s, C_Loss=3.84, G_Loss=2.24]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 121.22it/s]
+Train Loss: 5.9271 | C Acc: 0.6871 | Cell Acc: 0.5001
+Val   Loss: 7.4140   | C Acc: 0.4521 | Cell Acc: 0.2364
+
+Epoch 83/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 131.01it/s, C_Loss=4.73, G_Loss=2.36]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 129.15it/s]
+Train Loss: 5.9318 | C Acc: 0.6853 | Cell Acc: 0.4974
+Val   Loss: 7.4147   | C Acc: 0.4519 | Cell Acc: 0.2359
+
+Epoch 84/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 130.52it/s, C_Loss=3.82, G_Loss=2.27]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 125.79it/s]
+Train Loss: 5.9265 | C Acc: 0.6867 | Cell Acc: 0.5007
+Val   Loss: 7.4133   | C Acc: 0.4512 | Cell Acc: 0.2367
+
+Epoch 85/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 134.85it/s, C_Loss=4.00, G_Loss=2.18]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 125.52it/s]
+Train Loss: 5.9289 | C Acc: 0.6893 | Cell Acc: 0.4974
+Val   Loss: 7.4135   | C Acc: 0.4526 | Cell Acc: 0.2367
+Generating visualizations...
+
+Epoch 86/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 118.29it/s, C_Loss=4.82, G_Loss=2.35]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 127.17it/s]
+Train Loss: 5.9246 | C Acc: 0.6851 | Cell Acc: 0.4996
+Val   Loss: 7.4142   | C Acc: 0.4531 | Cell Acc: 0.2359
+
+Epoch 87/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 131.89it/s, C_Loss=4.23, G_Loss=2.23]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 128.83it/s]
+Train Loss: 5.9285 | C Acc: 0.6890 | Cell Acc: 0.4997
+Val   Loss: 7.4139   | C Acc: 0.4519 | Cell Acc: 0.2362
+
+Epoch 88/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 131.60it/s, C_Loss=4.13, G_Loss=2.07]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 129.62it/s]
+Train Loss: 5.9241 | C Acc: 0.6862 | Cell Acc: 0.5005
+Val   Loss: 7.4139   | C Acc: 0.4524 | Cell Acc: 0.2359
+
+Epoch 89/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 130.40it/s, C_Loss=4.50, G_Loss=1.81]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 126.34it/s]
+Train Loss: 5.9213 | C Acc: 0.6874 | Cell Acc: 0.5044
+Val   Loss: 7.4138   | C Acc: 0.4519 | Cell Acc: 0.2364
+
+Epoch 90/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 131.24it/s, C_Loss=4.41, G_Loss=2.45]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 124.41it/s]
+Train Loss: 5.9251 | C Acc: 0.6856 | Cell Acc: 0.5009
+Val   Loss: 7.4143   | C Acc: 0.4526 | Cell Acc: 0.2364
+Generating visualizations...
+
+Epoch 91/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 130.40it/s, C_Loss=4.55, G_Loss=2.09]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 128.88it/s]
+Train Loss: 5.9190 | C Acc: 0.6868 | Cell Acc: 0.5015
+Val   Loss: 7.4148   | C Acc: 0.4524 | Cell Acc: 0.2362
+
+Epoch 92/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 135.66it/s, C_Loss=4.18, G_Loss=2.45]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 131.45it/s]
+Train Loss: 5.9187 | C Acc: 0.6871 | Cell Acc: 0.5036
+Val   Loss: 7.4152   | C Acc: 0.4521 | Cell Acc: 0.2362
+
+Epoch 93/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 134.98it/s, C_Loss=3.87, G_Loss=2.34]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 128.14it/s]
+Train Loss: 5.9200 | C Acc: 0.6875 | Cell Acc: 0.5000
+Val   Loss: 7.4159   | C Acc: 0.4526 | Cell Acc: 0.2362
+
+Epoch 94/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 119.56it/s, C_Loss=4.11, G_Loss=2.09]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 127.90it/s]
+Train Loss: 5.9204 | C Acc: 0.6895 | Cell Acc: 0.5029
+Val   Loss: 7.4156   | C Acc: 0.4524 | Cell Acc: 0.2357
+
+Epoch 95/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 130.53it/s, C_Loss=4.80, G_Loss=2.18]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 132.68it/s]
+Train Loss: 5.9337 | C Acc: 0.6888 | Cell Acc: 0.5011
+Val   Loss: 7.4156   | C Acc: 0.4528 | Cell Acc: 0.2357
+Generating visualizations...
+
+Epoch 96/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 132.22it/s, C_Loss=4.01, G_Loss=2.21]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 125.88it/s]
+Train Loss: 5.9230 | C Acc: 0.6881 | Cell Acc: 0.5040
+Val   Loss: 7.4156   | C Acc: 0.4524 | Cell Acc: 0.2359
+
+Epoch 97/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 131.24it/s, C_Loss=3.46, G_Loss=2.03]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 131.06it/s]
+Train Loss: 5.9154 | C Acc: 0.6843 | Cell Acc: 0.5014
+Val   Loss: 7.4157   | C Acc: 0.4521 | Cell Acc: 0.2357
+
+Epoch 98/100
+Train: 100%|██████████| 266/266 [00:01<00:00, 134.29it/s, C_Loss=4.31, G_Loss=2.23]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 127.49it/s]
+Train Loss: 5.9221 | C Acc: 0.6866 | Cell Acc: 0.5025
+Val   Loss: 7.4157   | C Acc: 0.4521 | Cell Acc: 0.2357
+
+Epoch 99/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 132.41it/s, C_Loss=4.07, G_Loss=2.17]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 127.38it/s]
+Train Loss: 5.9256 | C Acc: 0.6878 | Cell Acc: 0.5008
+Val   Loss: 7.4157   | C Acc: 0.4521 | Cell Acc: 0.2357
+
+Epoch 100/100
+Train: 100%|██████████| 266/266 [00:02<00:00, 131.91it/s, C_Loss=3.86, G_Loss=2.22]
+Eval: 100%|██████████| 34/34 [00:00<00:00, 129.17it/s]
+Train Loss: 5.9242 | C Acc: 0.6875 | Cell Acc: 0.4983
+Val   Loss: 7.4157   | C Acc: 0.4521 | Cell Acc: 0.2357
+Generating visualizations...

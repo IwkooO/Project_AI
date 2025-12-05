@@ -6,19 +6,31 @@ import torch.nn.functional as F
 class ConceptHead(nn.Module):
     """
     Predicts concept probabilities from image embeddings.
-    z (768) -> MLP -> K concepts
+    Produces a richer hidden embedding to support contrastive/metric losses.
     """
     def __init__(self, input_dim=768, num_concepts=100, hidden_dim=512, dropout=0.3):
         super().__init__()
-        self.net = nn.Sequential(
+        self.pre = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden_dim, num_concepts)
         )
+        self.gate = nn.Linear(input_dim, hidden_dim)
+        self.second = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+        )
+        self.output_layer = nn.Linear(hidden_dim, num_concepts)
     
     def forward(self, x):
-        return self.net(x) # logits
+        h = self.pre(x)
+        gated = torch.sigmoid(self.gate(x))
+        h = h + gated * h
+        h2 = self.second(h)
+        hidden = h + h2  # residual
+        logits = self.output_layer(hidden)
+        return logits, hidden
 
 
 class GeoHead(nn.Module):
@@ -82,7 +94,7 @@ class CBM(nn.Module):
         
     def forward(self, z):
         # 1. Concept Prediction
-        c_logits = self.concept_head(z)
+        c_logits, c_hidden = self.concept_head(z)
         c_probs = torch.softmax(c_logits, dim=1)
         
         # 2. Geo Prediction (using soft concept probs)
@@ -90,6 +102,6 @@ class CBM(nn.Module):
         # But usually we can train joint or freeze concept head via optimizer
         cell_logits, offsets = self.geo_head(z, c_probs)
         
-        return c_logits, cell_logits, offsets
+        return c_logits, cell_logits, offsets, c_hidden
 
 
