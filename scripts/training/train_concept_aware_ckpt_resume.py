@@ -1009,7 +1009,10 @@ def train(args):
         scheduler = CosineAnnealingLR(optimizer, T_max=args.stage0_epochs, eta_min=args.stage0_lr * 0.01)
 
         if resume_from_stage == 0 and checkpoint_optimizer_state is not None:
-            optimizer.load_state_dict(checkpoint_optimizer_state)
+            try:
+                optimizer.load_state_dict(checkpoint_optimizer_state)
+            except ValueError as e:
+                logger.warning(f"Could not load optimizer state (param mismatch), starting fresh: {e}")
         if resume_from_stage == 0 and checkpoint_scheduler_state is not None:
             scheduler.load_state_dict(checkpoint_scheduler_state)
 
@@ -1162,7 +1165,10 @@ def train(args):
         scheduler = CosineAnnealingLR(optimizer, T_max=args.stage1_epochs, eta_min=args.stage1_lr * 0.01)
 
         if resume_from_stage == 1 and checkpoint_optimizer_state is not None:
-            optimizer.load_state_dict(checkpoint_optimizer_state)
+            try:
+                optimizer.load_state_dict(checkpoint_optimizer_state)
+            except ValueError as e:
+                logger.warning(f"Could not load optimizer state (param mismatch), starting fresh: {e}")
         if resume_from_stage == 1 and checkpoint_scheduler_state is not None:
             scheduler.load_state_dict(checkpoint_scheduler_state)
 
@@ -1252,7 +1258,7 @@ def train(args):
                 wandb.log({"train_loss": avg_train_loss, "train_concept_acc": train_concept_acc, "epoch": global_epoch + 1, "stage": 1})
 
             logger.info(f"Validating Stage 1...")
-            val_metrics = validate(model, val_loader, device, args, cell_centers, concept_weights, current_stage=1)
+            val_metrics = validate(model, current_val_loader, device, args, cell_centers, concept_weights, current_stage=1, use_precomputed=use_precomputed)
 
             scheduler.step()
 
@@ -1293,7 +1299,10 @@ def train(args):
     scheduler = CosineAnnealingLR(optimizer, T_max=args.stage2_epochs, eta_min=args.stage2_lr * 0.01)
 
     if resume_from_stage == 2 and checkpoint_optimizer_state is not None:
-        optimizer.load_state_dict(checkpoint_optimizer_state)
+        try:
+            optimizer.load_state_dict(checkpoint_optimizer_state)
+        except ValueError as e:
+            logger.warning(f"Could not load optimizer state (param mismatch), starting fresh: {e}")
     if resume_from_stage == 2 and checkpoint_scheduler_state is not None:
         scheduler.load_state_dict(checkpoint_scheduler_state)
 
@@ -1415,7 +1424,7 @@ def train(args):
 
 # ---------- Validation Function ----------
 @torch.no_grad()
-def validate(model, val_loader, device, args, cell_centers, concept_weights=None, current_stage=1):
+def validate(model, val_loader, device, args, cell_centers, concept_weights=None, current_stage=1, use_precomputed=False):
     model.eval()
     total_loss = 0
     total_concept_correct = 0
@@ -1428,14 +1437,22 @@ def validate(model, val_loader, device, args, cell_centers, concept_weights=None
 
     val_pbar = tqdm(val_loader, desc=f"Validating Stage {current_stage}")
     for batch in val_pbar:
-        images, concept_idx, target_idx, coords, _, cell_labels = batch
-        images = images.to(device)
+        if use_precomputed:
+            embeddings, concept_idx, target_idx, coords, _, cell_labels = batch
+            embeddings = embeddings.to(device)
+        else:
+            images, concept_idx, target_idx, coords, _, cell_labels = batch
+            images = images.to(device)
+        
         coords = coords.to(device)
         concept_idx = concept_idx.to(device)
         target_idx = target_idx.to(device)
         cell_labels = cell_labels.to(device)
 
-        outputs = model(images, coords)
+        if use_precomputed:
+            outputs = model.forward_from_features(embeddings, coords)
+        else:
+            outputs = model(images, coords)
         concept_emb = outputs["concept_emb"]
         concept_logits = outputs["concept_logits"]
         country_logits = outputs["country_logits"]

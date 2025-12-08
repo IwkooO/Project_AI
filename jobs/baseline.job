@@ -1,0 +1,31 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=bsl
+#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/baseline.log
+#SBATCH --time=12:00:00  
+#SBATCH --cpus-per-task=9
+#SBATCH --mem=32G
+
+# Activate environment
+module load 2025
+module load Anaconda3/2025.06-1
+cd /scratch-shared/pnair/Project_AI/
+module load CUDA/12.8.0
+
+source activate streetview_pnair
+export PYTHONNOUSERSITE=1
+export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
+
+python scripts/evaluation/baseline_geoclip_streetclip.py \
+    --csv /scratch-shared/pnair/Project_AI/data/dataset-43k-updated.csv \
+    --image_col image_path \
+    --lat_col lat \
+    --lng_col lng \
+    --device cuda \
+    --grid_step 5.0 \
+    --candidate_csv /scratch-shared/pnair/Project_AI/data/dataset-43k-updated.csv \
+    --candidate_lat_col lat \
+    --candidate_lng_col lng \
+    --candidate_label_col country \
+    --streetclip_batch_size 256

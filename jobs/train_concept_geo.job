@@ -20,9 +20,9 @@ export PYTHONNOUSERSITE=1
 export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
 
 # ===== Stage-specific epoch counts =====
-STAGE0_EPOCHS=10   # Domain adaptation 
-STAGE1_EPOCHS=30   # Concept learning (increased from 20 to 30)
-STAGE2_EPOCHS=20   # Geolocation learning
+STAGE0_EPOCHS=0   # Domain adaptation 
+STAGE1_EPOCHS=100   # Concept learning (increased from 20 to 30)
+STAGE2_EPOCHS=50   # Geolocation learning
 
 # Run Training with Three-Stage Concept-Aware Pipeline
 python scripts/training/train_concept_aware_ckpt_resume.py \
@@ -55,3 +55,4 @@ python scripts/training/train_concept_aware_ckpt_resume.py \
     --coordinate_loss_type "haversine" \
     --csv_path "/scratch-shared/pnair/Project_AI/data/dataset-43k-updated.csv" \
     --precompute_embeddings \
+    --resume_from_checkpoint "/scratch-shared/pnair/Project_AI/results/concept-aware-3-stage/streetclip/global/haversine/2025-12-04_20-07-33/checkpoints/best_model_stage0.pt" 
