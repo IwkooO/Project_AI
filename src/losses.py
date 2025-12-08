@@ -291,6 +291,128 @@ def geocell_contrastive_loss(
     return (loss_c2g + loss_g2c) / 2.0
 
 
+class FocalLoss(torch.nn.Module):
+    """
+    Focal Loss for handling class imbalance and hard examples.
+    
+    FL(p_t) = -α_t * (1 - p_t)^γ * log(p_t)
+    
+    When γ=0, equivalent to cross-entropy. Higher γ focuses more on hard examples.
+    
+    Args:
+        gamma: Focusing parameter (default 2.0). Higher values focus more on hard examples.
+        alpha: Class weights tensor [num_classes] or None. If None, no class weighting.
+        reduction: 'mean', 'sum', or 'none'
+        label_smoothing: Label smoothing factor (default 0.0)
+    """
+    
+    def __init__(
+        self,
+        gamma: float = 2.0,
+        alpha: Optional[torch.Tensor] = None,
+        reduction: str = 'mean',
+        label_smoothing: float = 0.0
+    ):
+        super().__init__()
+        self.gamma = gamma
+        self.reduction = reduction
+        self.label_smoothing = label_smoothing
+        # Register alpha as buffer so it moves with model to device
+        if alpha is not None:
+            self.register_buffer('alpha', alpha)
+        else:
+            self.alpha = None
+    
+    def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            logits: Predictions [batch, num_classes]
+            targets: Ground truth labels [batch] (class indices)
+            
+        Returns:
+            Focal loss (scalar if reduction='mean' or 'sum')
+        """
+        num_classes = logits.size(1)
+        
+        # Apply label smoothing to create soft targets
+        if self.label_smoothing > 0:
+            # One-hot encode targets
+            targets_one_hot = F.one_hot(targets, num_classes).float()
+            # Smooth: (1 - ε) * one_hot + ε / num_classes
+            targets_smooth = (1 - self.label_smoothing) * targets_one_hot + self.label_smoothing / num_classes
+        else:
+            targets_smooth = None
+        
+        # Compute softmax probabilities
+        log_probs = F.log_softmax(logits, dim=1)
+        probs = torch.exp(log_probs)
+        
+        if targets_smooth is not None:
+            # Soft targets: compute weighted sum
+            # p_t for each class weighted by target probability
+            p_t = (probs * targets_smooth).sum(dim=1)
+            log_p_t = (log_probs * targets_smooth).sum(dim=1)
+        else:
+            # Hard targets: gather probability of correct class
+            p_t = probs.gather(1, targets.unsqueeze(1)).squeeze(1)
+            log_p_t = log_probs.gather(1, targets.unsqueeze(1)).squeeze(1)
+        
+        # Focal weight: (1 - p_t)^γ
+        focal_weight = (1 - p_t) ** self.gamma
+        
+        # Focal loss: -α * (1 - p_t)^γ * log(p_t)
+        focal_loss = -focal_weight * log_p_t
+        
+        # Apply class weights (alpha)
+        if self.alpha is not None:
+            alpha_t = self.alpha.gather(0, targets)
+            focal_loss = alpha_t * focal_loss
+        
+        # Reduction
+        if self.reduction == 'mean':
+            return focal_loss.mean()
+        elif self.reduction == 'sum':
+            return focal_loss.sum()
+        else:
+            return focal_loss
+
+
+def concept_prototype_contrastive_loss(
+    embeddings: torch.Tensor,
+    prototypes: torch.Tensor,
+    labels: torch.Tensor,
+    temperature: float = 0.07
+) -> torch.Tensor:
+    """
+    Contrastive loss that pulls embeddings toward correct prototype and pushes away from others.
+    
+    This is essentially a softmax cross-entropy over prototype similarities, but framed
+    as contrastive learning to leverage the semantic structure of prototypes.
+    
+    loss = -log(exp(sim(emb, T[label])/τ) / Σ_j exp(sim(emb, T[j])/τ))
+    
+    Args:
+        embeddings: Image/concept embeddings [batch, dim]
+        prototypes: Text prototype embeddings [num_classes, dim]
+        labels: Ground truth class indices [batch]
+        temperature: Temperature for softmax scaling
+        
+    Returns:
+        Scalar loss
+    """
+    # L2 normalize embeddings and prototypes
+    embeddings_norm = F.normalize(embeddings, p=2, dim=1)
+    prototypes_norm = F.normalize(prototypes, p=2, dim=1)
+    
+    # Compute similarity matrix: [batch, num_classes]
+    sim = torch.matmul(embeddings_norm, prototypes_norm.t()) / temperature
+    
+    # Cross-entropy loss with labels as targets
+    loss = F.cross_entropy(sim, labels)
+    
+    return loss
+
+
 def combined_loss(
     concept_logits: torch.Tensor,
     country_logits: torch.Tensor,

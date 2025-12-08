@@ -7,13 +7,402 @@ operate on concept embeddings, not raw image features.
 
 from __future__ import annotations
 
-from typing import Optional, Iterable
+from typing import Optional, Iterable, List, Dict
 
 import torch
 from torch import nn
 import torch.nn.functional as F
 from geoclip import LocationEncoder
 
+
+# ============================================================================
+# TEXT PROTOTYPE UTILITIES
+# ============================================================================
+
+# Default templates for concept text encoding
+DEFAULT_CONCEPT_TEMPLATES = [
+    "A street view showing {}",
+    "A photo of {} in the scene",
+    "An area characterized by {}",
+    "{} visible from the road",
+    "A location with {}",
+]
+
+DEFAULT_PARENT_TEMPLATES = [
+    "A {} area",
+    "A scene showing {} features",
+    "An environment with {} characteristics",
+    "{} landscape",
+    "A {} region",
+]
+
+
+@torch.no_grad()
+def build_text_prototypes(
+    concept_names: List[str],
+    text_encoder: nn.Module,
+    concept_descriptions: Optional[Dict[str, str]] = None,
+    templates: Optional[List[str]] = None,
+    device: torch.device = None,
+    max_description_length: int = 200,
+) -> torch.Tensor:
+    """
+    Build text prototypes for concepts using StreetCLIP text encoder.
+    
+    For each concept, encodes either:
+    1. The cleaned note description (if available and non-empty)
+    2. Template-filled prompts using the concept name
+    
+    Then averages across all encodings and L2-normalizes.
+    
+    Args:
+        concept_names: List of concept names (meta_name or parent_concept)
+        text_encoder: StreetCLIP text encoder with get_text_features() method
+        concept_descriptions: Optional dict mapping concept_name -> description text
+        templates: List of template strings with {} placeholder for concept name
+        device: Device to place prototypes on
+        max_description_length: Truncate descriptions longer than this (CLIP has 77 token limit)
+        
+    Returns:
+        Tensor of shape [num_concepts, embedding_dim] with L2-normalized prototypes
+    """
+    if templates is None:
+        templates = DEFAULT_CONCEPT_TEMPLATES
+    
+    if device is None:
+        device = next(text_encoder.parameters()).device
+    
+    text_encoder.eval()
+    prototypes = []
+    
+    for concept_name in concept_names:
+        embeddings = []
+        
+        # Option 1: Use description if available
+        if concept_descriptions and concept_name in concept_descriptions:
+            desc = concept_descriptions[concept_name]
+            if desc and len(desc.strip()) > 0:
+                # Truncate if too long (CLIP has 77 token limit, ~4 chars per token)
+                if len(desc) > max_description_length:
+                    desc = desc[:max_description_length] + "..."
+                
+                try:
+                    emb = text_encoder.get_text_features(desc)
+                    embeddings.append(emb)
+                except Exception:
+                    pass  # Fall back to templates
+        
+        # Option 2: Use templates (always add for robustness)
+        for template in templates:
+            prompt = template.format(concept_name)
+            try:
+                emb = text_encoder.get_text_features(prompt)
+                embeddings.append(emb)
+            except Exception:
+                continue
+        
+        if len(embeddings) == 0:
+            # Fallback: just encode the concept name directly
+            emb = text_encoder.get_text_features(concept_name)
+            embeddings.append(emb)
+        
+        # Stack and average
+        stacked = torch.cat(embeddings, dim=0)  # [num_prompts, dim]
+        avg_emb = stacked.mean(dim=0, keepdim=True)  # [1, dim]
+        prototypes.append(avg_emb)
+    
+    # Stack all prototypes: [num_concepts, dim]
+    prototypes_tensor = torch.cat(prototypes, dim=0)
+    
+    # L2 normalize
+    prototypes_tensor = F.normalize(prototypes_tensor, p=2, dim=1)
+    
+    return prototypes_tensor.to(device)
+
+
+def build_meta_to_parent_idx(
+    meta_to_parent: Dict[str, str],
+    concept_to_idx: Dict[str, int],
+    parent_to_idx: Dict[str, int],
+) -> torch.Tensor:
+    """
+    Build a tensor that maps meta_name index to parent_concept index.
+    
+    Args:
+        meta_to_parent: Dict mapping meta_name -> parent_concept
+        concept_to_idx: Dict mapping meta_name -> index
+        parent_to_idx: Dict mapping parent_concept -> index
+        
+    Returns:
+        Tensor of shape [num_concepts] where tensor[concept_idx] = parent_idx
+    """
+    num_concepts = len(concept_to_idx)
+    mapping = torch.zeros(num_concepts, dtype=torch.long)
+    
+    for meta_name, meta_idx in concept_to_idx.items():
+        parent_concept = meta_to_parent.get(meta_name, 'unknown')
+        parent_idx = parent_to_idx.get(parent_concept, 0)
+        mapping[meta_idx] = parent_idx
+    
+    return mapping
+
+
+# ============================================================================
+# STAGE 1 CONCEPT MODEL (Text-Prototype Based)
+# ============================================================================
+
+class Stage1ConceptModel(nn.Module):
+    """
+    Stage 1 Concept Model with text-anchored prototype-based classification.
+    
+    Instead of MLP-based concept head, uses cosine similarity between
+    image embeddings and text prototypes, with learnable refinements:
+    - Learnable prototype residuals (fine-tune text prototypes)
+    - Per-concept bias (calibrate confidence per class)
+    - Learnable temperature/logit scale
+    
+    Supports hierarchical supervision with both meta-level (fine-grained)
+    and parent-level (coarse) concept predictions.
+    """
+    
+    def __init__(
+        self,
+        image_encoder: nn.Module,
+        T_meta: torch.Tensor,
+        T_parent: torch.Tensor,
+        meta_to_parent_idx: torch.Tensor,
+        streetclip_dim: int = 768,
+        concept_emb_dim: int = 512,
+        init_logit_scale: float = 14.0,  # ~1/0.07 temperature
+        learnable_prototypes: bool = True,
+        prototype_residual_scale: float = 0.01,
+    ):
+        """
+        Args:
+            image_encoder: Pretrained StreetCLIP image encoder (will be frozen)
+            T_meta: Text prototypes for meta_name concepts [num_metas, dim]
+            T_parent: Text prototypes for parent concepts [num_parents, dim]
+            meta_to_parent_idx: Tensor mapping meta_idx -> parent_idx [num_metas]
+            streetclip_dim: Dimension of StreetCLIP features (768)
+            concept_emb_dim: Dimension of concept embedding space (512)
+            init_logit_scale: Initial value for learnable logit scale
+            learnable_prototypes: Whether to learn residuals on top of prototypes
+            prototype_residual_scale: Scale for initializing prototype residuals
+        """
+        super().__init__()
+        
+        self.streetclip_dim = streetclip_dim
+        self.concept_emb_dim = concept_emb_dim
+        self.num_metas = T_meta.shape[0]
+        self.num_parents = T_parent.shape[0]
+        
+        # ========== Frozen Image Encoder ==========
+        self.image_encoder = image_encoder
+        self.image_encoder.eval()
+        for p in self.image_encoder.parameters():
+            p.requires_grad = False
+        
+        # ========== Text Prototypes (frozen base + learnable residuals) ==========
+        self.register_buffer("T_meta_base", T_meta)  # [num_metas, dim]
+        self.register_buffer("T_parent_base", T_parent)  # [num_parents, dim]
+        self.register_buffer("meta_to_parent_idx", meta_to_parent_idx)  # [num_metas]
+        
+        # Learnable prototype residuals
+        if learnable_prototypes:
+            self.meta_residuals = nn.Parameter(
+                torch.randn_like(T_meta) * prototype_residual_scale
+            )
+            self.parent_residuals = nn.Parameter(
+                torch.randn_like(T_parent) * prototype_residual_scale
+            )
+        else:
+            self.register_buffer("meta_residuals", torch.zeros_like(T_meta))
+            self.register_buffer("parent_residuals", torch.zeros_like(T_parent))
+        
+        # ========== Concept Bottleneck Projection ==========
+        # Projects from StreetCLIP dim (768) to concept embedding dim (512)
+        self.concept_bottleneck = nn.Sequential(
+            nn.Linear(streetclip_dim, 1024),
+            nn.LayerNorm(1024),
+            nn.GELU(),
+            nn.Dropout(0.1),
+            nn.Linear(1024, concept_emb_dim),
+            nn.LayerNorm(concept_emb_dim),
+        )
+        
+        # ========== Text Prototype Projection ==========
+        # Projects text prototypes from StreetCLIP dim to concept embedding dim
+        self.prototype_projection = nn.Linear(streetclip_dim, concept_emb_dim, bias=False)
+        
+        # ========== Learnable Logit Scales and Biases ==========
+        self.logit_scale_meta = nn.Parameter(torch.tensor(init_logit_scale))
+        self.logit_scale_parent = nn.Parameter(torch.tensor(init_logit_scale))
+        
+        self.meta_bias = nn.Parameter(torch.zeros(self.num_metas))
+        self.parent_bias = nn.Parameter(torch.zeros(self.num_parents))
+        
+        # Initialize bottleneck weights
+        self._init_weights()
+    
+    def _init_weights(self):
+        """Initialize projection layers with Xavier uniform initialization."""
+        for layer in self.concept_bottleneck:
+            if isinstance(layer, nn.Linear):
+                nn.init.xavier_uniform_(layer.weight)
+                if layer.bias is not None:
+                    nn.init.zeros_(layer.bias)
+        # Initialize prototype projection
+        nn.init.xavier_uniform_(self.prototype_projection.weight)
+    
+    @property
+    def T_meta(self) -> torch.Tensor:
+        """Get effective meta prototypes (base + residuals, projected and normalized)."""
+        T = self.T_meta_base + self.meta_residuals
+        T = self.prototype_projection(T)  # Project to concept_emb_dim
+        return F.normalize(T, p=2, dim=1)
+    
+    @property
+    def T_parent(self) -> torch.Tensor:
+        """Get effective parent prototypes (base + residuals, projected and normalized)."""
+        T = self.T_parent_base + self.parent_residuals
+        T = self.prototype_projection(T)  # Project to concept_emb_dim
+        return F.normalize(T, p=2, dim=1)
+    
+    def forward(
+        self,
+        images: torch.Tensor,
+        meta_labels: Optional[torch.Tensor] = None,
+        parent_labels: Optional[torch.Tensor] = None,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Forward pass through Stage 1 concept model.
+        
+        Args:
+            images: Image tensor [batch, 3, H, W]
+            meta_labels: Ground truth meta concept indices [batch]
+            parent_labels: Ground truth parent concept indices [batch]
+            
+        Returns:
+            Dict containing:
+                - concept_emb: Concept embeddings [batch, concept_emb_dim]
+                - meta_logits: Meta concept logits [batch, num_metas]
+                - parent_logits: Parent concept logits [batch, num_parents]
+                - meta_probs: Meta concept probabilities [batch, num_metas]
+                - parent_probs: Parent concept probabilities [batch, num_parents]
+        """
+        # 1. Extract image features (frozen encoder)
+        with torch.no_grad():
+            x_img = self.image_encoder(images)  # [batch, 768]
+        
+        # 2. Project through concept bottleneck
+        concept_emb = self.concept_bottleneck(x_img)  # [batch, 512]
+        concept_emb_norm = F.normalize(concept_emb, p=2, dim=1)
+        
+        # 3. Compute meta concept logits via cosine similarity
+        # logits = scale * (emb @ T.T) + bias
+        meta_logits = self.logit_scale_meta * (concept_emb_norm @ self.T_meta.T) + self.meta_bias
+        meta_probs = F.softmax(meta_logits, dim=-1)
+        
+        # 4. Compute parent concept logits
+        parent_logits = self.logit_scale_parent * (concept_emb_norm @ self.T_parent.T) + self.parent_bias
+        parent_probs = F.softmax(parent_logits, dim=-1)
+        
+        return {
+            "concept_emb": concept_emb,
+            "meta_logits": meta_logits,
+            "parent_logits": parent_logits,
+            "meta_probs": meta_probs,
+            "parent_probs": parent_probs,
+        }
+    
+    def forward_from_features(
+        self,
+        image_features: torch.Tensor,
+        meta_labels: Optional[torch.Tensor] = None,
+        parent_labels: Optional[torch.Tensor] = None,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Forward pass using precomputed image features (skips image encoder).
+        
+        Use this for faster training when image encoder is frozen.
+        
+        Args:
+            image_features: Precomputed image features [batch, 768]
+            meta_labels: Ground truth meta concept indices [batch]
+            parent_labels: Ground truth parent concept indices [batch]
+            
+        Returns:
+            Same dict as forward()
+        """
+        # Project through concept bottleneck
+        concept_emb = self.concept_bottleneck(image_features)  # [batch, 512]
+        concept_emb_norm = F.normalize(concept_emb, p=2, dim=1)
+        
+        # Compute meta concept logits
+        meta_logits = self.logit_scale_meta * (concept_emb_norm @ self.T_meta.T) + self.meta_bias
+        meta_probs = F.softmax(meta_logits, dim=-1)
+        
+        # Compute parent concept logits
+        parent_logits = self.logit_scale_parent * (concept_emb_norm @ self.T_parent.T) + self.parent_bias
+        parent_probs = F.softmax(parent_logits, dim=-1)
+        
+        return {
+            "concept_emb": concept_emb,
+            "meta_logits": meta_logits,
+            "parent_logits": parent_logits,
+            "meta_probs": meta_probs,
+            "parent_probs": parent_probs,
+        }
+    
+    def get_trainable_params(self) -> Iterable[nn.Parameter]:
+        """
+        Return parameters to train in Stage 1.
+        
+        Includes:
+        - concept_bottleneck (projection layer)
+        - prototype_projection (text prototype projection)
+        - meta_residuals (prototype refinements)
+        - parent_residuals (prototype refinements)
+        - logit_scale_meta, logit_scale_parent
+        - meta_bias, parent_bias
+        """
+        params = list(self.concept_bottleneck.parameters())
+        params.extend(self.prototype_projection.parameters())
+        params.append(self.logit_scale_meta)
+        params.append(self.logit_scale_parent)
+        params.append(self.meta_bias)
+        params.append(self.parent_bias)
+        
+        # Only include residuals if they're learnable (nn.Parameter)
+        if isinstance(self.meta_residuals, nn.Parameter):
+            params.append(self.meta_residuals)
+        if isinstance(self.parent_residuals, nn.Parameter):
+            params.append(self.parent_residuals)
+        
+        return params
+    
+    def get_prototype_regularization_loss(self, lambda_reg: float = 0.001) -> torch.Tensor:
+        """
+        Compute L2 regularization loss on prototype residuals.
+        
+        Prevents prototypes from drifting too far from CLIP's semantic space.
+        
+        Args:
+            lambda_reg: Regularization coefficient
+            
+        Returns:
+            Scalar regularization loss
+        """
+        reg_loss = lambda_reg * (
+            self.meta_residuals.pow(2).sum() + 
+            self.parent_residuals.pow(2).sum()
+        )
+        return reg_loss
+
+
+# ============================================================================
+# ORIGINAL CONCEPT-AWARE GEO MODEL (for reference and Stage 2)
+# ============================================================================
 
 class ConceptAwareGeoModel(nn.Module):
     """

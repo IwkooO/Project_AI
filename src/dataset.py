@@ -278,9 +278,13 @@ class PanoramaCBMDataset(Dataset):
         # Build encoders
         self.concept_to_idx, self.idx_to_concept = get_concept_to_idx(self.samples)
         self.country_to_idx, self.idx_to_country = get_country_to_idx(self.samples)
+        self.parent_to_idx, self.idx_to_parent = get_parent_to_idx(self.samples)
+        # Build meta_name -> parent_concept mapping for hierarchical supervision
+        self.meta_to_parent = build_meta_to_parent_mapping(self.samples)
 
         print(f"Loaded {len(self.samples)} samples")
-        print(f"Concepts: {len(self.concept_to_idx)}")
+        print(f"Concepts (meta_name): {len(self.concept_to_idx)}")
+        print(f"Parent concepts: {len(self.parent_to_idx)}")
         print(f"Countries: {len(self.country_to_idx)}")
 
     def _load_samples(self) -> List[Dict]:
@@ -371,6 +375,7 @@ class PanoramaCBMDataset(Dataset):
                 'image_path': Path(row['image_path']),
                 'meta_path': None,
                 'meta_name': str(row['meta_name']),
+                'parent_concept': str(row.get('concept', 'unknown')),  # Parent concept from 'concept' column
                 'country': str(row['country']),
                 'lat': float(row['lat']),
                 'lng': float(row['lng']),
@@ -463,6 +468,7 @@ class PanoramaCBMDataset(Dataset):
                     'image_path': image_path,
                     'meta_path': meta_path,
                     'meta_name': meta['metaName'],
+                    'parent_concept': meta.get('concept', 'unknown'),  # Parent concept from JSON if available
                     'country': meta['country'],
                     'lat': lat,
                     'lng': lng,
@@ -498,11 +504,12 @@ class PanoramaCBMDataset(Dataset):
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int, int, torch.Tensor, Dict]:
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int, int, int, torch.Tensor, Dict]:
         """
         Returns:
             image_tensor: Processed image tensor
-            concept_idx: Index of metaName (concept)
+            concept_idx: Index of metaName (fine-grained concept)
+            parent_idx: Index of parent concept (coarse category)
             target_idx: Index of country (target)
             coordinates_tensor: Normalized (lat, lng) tensor in [-1, 1]
             metadata: Dict with sample information
@@ -524,8 +531,10 @@ class PanoramaCBMDataset(Dataset):
             image = np.array(image).astype(np.float32) / 255.0
             image = torch.from_numpy(image).permute(2, 0, 1)  # HWC -> CHW
 
-        # Encode concept and target
+        # Encode concept, parent concept, and country
         concept_idx = self.concept_to_idx[sample['meta_name']]
+        parent_concept = sample.get('parent_concept', 'unknown')
+        parent_idx = self.parent_to_idx.get(parent_concept, 0)
         target_idx = self.country_to_idx[sample['country']]
 
         if self.return_cartesian:
@@ -546,6 +555,7 @@ class PanoramaCBMDataset(Dataset):
         metadata = {
             'pano_id': sample['pano_id'],
             'meta_name': sample['meta_name'],
+            'parent_concept': sample.get('parent_concept', 'unknown'),
             'country': sample['country'],
             'lat': sample['lat'],
             'lng': sample['lng'],
@@ -557,7 +567,7 @@ class PanoramaCBMDataset(Dataset):
         if 'cell_label' in sample:
             metadata['cell_label'] = sample['cell_label']
 
-        return image, concept_idx, target_idx, coordinates, metadata
+        return image, concept_idx, parent_idx, target_idx, coordinates, metadata
 
     def set_cell_labels(self, sample_to_cell: torch.Tensor):
         """
@@ -586,6 +596,36 @@ def get_country_to_idx(samples: List[Dict]) -> Tuple[Dict[str, int], Dict[int, s
     country_to_idx = {country: i for i, country in enumerate(countries)}
     idx_to_country = {i: country for country, i in country_to_idx.items()}
     return country_to_idx, idx_to_country
+
+
+def get_parent_to_idx(samples: List[Dict]) -> Tuple[Dict[str, int], Dict[int, str]]:
+    """Create mapping from parent concept (coarse category) strings to indices."""
+    parent_concepts = sorted(set(s.get('parent_concept', 'unknown') for s in samples))
+    parent_to_idx = {parent: i for i, parent in enumerate(parent_concepts)}
+    idx_to_parent = {i: parent for parent, i in parent_to_idx.items()}
+    return parent_to_idx, idx_to_parent
+
+
+def build_meta_to_parent_mapping(samples: List[Dict]) -> Dict[str, str]:
+    """
+    Build mapping from meta_name (fine-grained concept) to parent_concept (coarse category).
+    
+    This is used for hierarchical supervision in Stage 1 training.
+    
+    Args:
+        samples: List of sample dictionaries with 'meta_name' and 'parent_concept' keys
+        
+    Returns:
+        Dict mapping meta_name -> parent_concept
+    """
+    meta_to_parent = {}
+    for sample in samples:
+        meta_name = sample['meta_name']
+        parent_concept = sample.get('parent_concept', 'unknown')
+        if meta_name not in meta_to_parent:
+            meta_to_parent[meta_name] = parent_concept
+    return meta_to_parent
+
 
 def create_splits_stratified(samples: List[Dict],
                   train_ratio: float = 0.7,
