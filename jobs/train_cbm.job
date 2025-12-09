@@ -4,7 +4,7 @@
 #SBATCH --job-name=cbm_train
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --time=24:00:00
+#SBATCH --time=12:00:00
 #SBATCH --output=jobs/outputs/cbm_train_%j.out
 
 module purge
@@ -24,7 +24,7 @@ TRAIN_CSV="${SPLITS_DIR}/dataset_train.csv"
 VAL_CSV="${SPLITS_DIR}/dataset_val.csv"
 CACHED_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip"
 CONCEPT_DATA="data/concept_data"
-OUTPUT_DIR="checkpoints/cbm_v1"
+OUTPUT_DIR="checkpoints/cbm_v2"
 CONCEPT_MAPPING="data/concept_refinement_mapped.csv"
 
 mkdir -p jobs/outputs
@@ -48,7 +48,18 @@ python scripts/data_processing/precompute_geo_priors.py \
     --output-dir $CONCEPT_DATA \
     --s2-level 8
 
-# Phase 1: Concept Training
+# Step 1.5: Precompute embeddings (including patch tokens)
+echo "============================================================"
+echo "Step 1.5: Precomputing embeddings & patch tokens (SKIPPED)"
+echo "============================================================"
+# python scripts/data_processing/precompute_streetclip_embeddings.py \
+#     --train-csv $TRAIN_CSV \
+#     --val-csv $VAL_CSV \
+#     --output-dir $CACHED_DIR \
+#     --batch-size 32 \
+#     --save-patch-tokens
+
+# Phase 1: Concept Training (with stability fixes)
 echo "============================================================"
 echo "Starting Phase 1: Concept Training"
 echo "============================================================"
@@ -59,10 +70,14 @@ python scripts/training/train_cbm.py \
     --cached-dir $CACHED_DIR \
     --concept-data-dir $CONCEPT_DATA \
     --output-dir $OUTPUT_DIR \
-    --epochs 200 \
+    --epochs 80 \
     --batch-size 64 \
-    --lr 1e-3 \
-    --wandb
+    --lr 5e-4 \
+    --warmup-epochs 5 \
+    --wandb \
+    --load-patch-tokens \
+    --geo-aware-supcon --supcon-geo-scale 0.3 \
+    --patch-depth 2 --patch-heads 4 --num-pool-heads 4
 
 # Phase 2: Geo Training
 echo "============================================================"
@@ -70,16 +85,19 @@ echo "Starting Phase 2: Geo Training (resuming from Phase 1)"
 echo "============================================================"
 python scripts/training/train_cbm.py \
     --phase 2 \
-    --resume-checkpoint $OUTPUT_DIR/best_phase1.pt \
+    --resume-checkpoint $OUTPUT_DIR/phase1/best_phase1.pt \
     --train-csv $TRAIN_CSV \
     --val-csv $VAL_CSV \
     --cached-dir $CACHED_DIR \
     --concept-data-dir $CONCEPT_DATA \
     --output-dir $OUTPUT_DIR \
-    --epochs 100 \
-    --batch-size 256 \
-    --lr 1e-3 \
-    --wandb
+    --epochs 50 \
+    --batch-size 128 \
+    --lr 5e-4 \
+    --warmup-epochs 3 \
+    --wandb \
+    --load-patch-tokens \
+    --patch-depth 2 --patch-heads 4 --num-pool-heads 4
 
 # Phase 3: Joint Training
 echo "============================================================"
@@ -87,13 +105,17 @@ echo "Starting Phase 3: Joint Training (fine-tuning)"
 echo "============================================================"
 python scripts/training/train_cbm.py \
     --phase 3 \
-    --resume-checkpoint $OUTPUT_DIR/best_phase2.pt \
+    --resume-checkpoint $OUTPUT_DIR/phase2/best_phase2.pt \
     --train-csv $TRAIN_CSV \
     --val-csv $VAL_CSV \
     --cached-dir $CACHED_DIR \
     --concept-data-dir $CONCEPT_DATA \
     --output-dir $OUTPUT_DIR \
-    --epochs 100 \
-    --batch-size 128 \
+    --epochs 50 \
+    --batch-size 64 \
     --lr 1e-4 \
-    --wandb
+    --warmup-epochs 3 \
+    --wandb \
+    --load-patch-tokens \
+    --geo-aware-supcon --supcon-geo-scale 0.3 \
+    --patch-depth 2 --patch-heads 4 --num-pool-heads 4

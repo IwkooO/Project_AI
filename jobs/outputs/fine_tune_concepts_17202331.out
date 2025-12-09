@@ -1,398 +1,0 @@
-============================================================================================== 
-Warning! Mixing Conda and module environments may lead to corruption of the
-user environment. 
-We do not recommend users mixing those two environments unless absolutely
-necessary. Note that 
-SURF does not provide any support for Conda environment.
-For more information, please refer to our software policy page:
-https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
-
-Remember that many packages have already been installed on the system and can
-be loaded using 
-the 'module load <package__name>' command. If you are uncertain if a package is
-already available 
-on the system, please use 'module avail' or 'module spider' to search for it.
-============================================================================================== 
-
-[notice] A new release of pip is available: 25.1.1 -> 25.3
-[notice] To update, run: pip install --upgrade pip
-
-[notice] A new release of pip is available: 25.1.1 -> 25.3
-[notice] To update, run: pip install --upgrade pip
-========================================================================
-Fine-tune Concepts Job
-========================================================================
-Job started at: Thu Dec  4 21:10:57 CET 2025
-Refining overly frequent or rare concepts into more fine-grained concepts
-Checkpoints saved every 100 refinements
-========================================================================
-Loading generalized concepts from /gpfs/home4/igodzwon/Project_AI/data/generalized_concepts.csv
-Total rows: 7,289
-Valid rows (after filtering errors): 7,289
-Unique existing concepts: 354
-Old checkpoint format detected, starting fresh
-Rows remaining to process: 7,289
-
-Setting up Agno agent...
-
-Processing 7289 rows in batches of 10...
-Using 10 parallel workers
-Counts updated after each batch
-
-Fine-tuning:   0%|          | 0/7289 [00:00<?, ?it/s]                                                       [7] pole -> western_cape_pole (now 1)
-Fine-tuning:   0%|          | 0/7289 [00:03<?, ?it/s]                                                       [8] sign -> sa_property_markers (now 1)
-Fine-tuning:   0%|          | 0/7289 [00:03<?, ?it/s]                                                       [9] license_plate -> license_plate_yellow (now 1)
-Fine-tuning:   0%|          | 0/7289 [00:03<?, ?it/s]                                                       [6] pole -> ten_digit_yellow_pole_codes (now 1)
-Fine-tuning:   0%|          | 0/7289 [00:03<?, ?it/s]                                                       [0] language -> language_telugu (now 1)
-Fine-tuning:   0%|          | 0/7289 [00:03<?, ?it/s]                                                       [1] railroad -> railroad_infrastructure (now 1)
-Fine-tuning:   0%|          | 0/7289 [00:03<?, ?it/s]                                                       [3] roof -> roof_hipped (now 1)
-Fine-tuning:   0%|          | 0/7289 [00:03<?, ?it/s]                                                       [5] landscape -> landscape_red_fields (now 1)
-Fine-tuning:   0%|          | 0/7289 [00:03<?, ?it/s]Fine-tuning:   0%|          | 10/7289 [00:03<39:44,  3.05it/s]                                                                [18] chimney -> architecture (now 1)
-Fine-tuning:   0%|          | 10/7289 [00:06<39:44,  3.05it/s]                                                                [19] sign -> infrastructure_road_sign_tab_short_arrow (now 1)
-Fine-tuning:   0%|          | 10/7289 [00:06<39:44,  3.05it/s]                                                                [11] pole -> waikato_trident_insulator (now 1)
-Fine-tuning:   0%|          | 10/7289 [00:06<39:44,  3.05it/s]Fine-tuning:   0%|          | 20/7289 [00:06<37:09,  3.26it/s]                                                                [26] road -> roadlines (now 1)
-Fine-tuning:   0%|          | 20/7289 [00:07<37:09,  3.26it/s]                                                                [29] sticker -> black_sticker_with_digits (now 1)
-Fine-tuning:   0%|          | 20/7289 [00:07<37:09,  3.26it/s]                                                                [20] hills -> landscape_hills (now 1)
-Fine-tuning:   0%|          | 20/7289 [00:07<37:09,  3.26it/s]Fine-tuning:   0%|          | 30/7289 [00:07<25:43,  4.70it/s]                                                                [37] landscape -> landscape_hilly (now 1)
-Fine-tuning:   0%|          | 30/7289 [00:08<25:43,  4.70it/s]                                                                [39] language -> language_telugu (now 2)
-Fine-tuning:   0%|          | 30/7289 [00:08<25:43,  4.70it/s]                                                                [33] architecture -> architecture_ankara (now 1)
-Fine-tuning:   0%|          | 30/7289 [00:08<25:43,  4.70it/s]                                                                [31] lamppost -> lamppost_green_wooden (now 1)
-Fine-tuning:   0%|          | 30/7289 [00:08<25:43,  4.70it/s]Fine-tuning:   1%|          | 40/7289 [00:08<23:13,  5.20it/s]                                                                [40] landscape -> landscape_hilly (now 2)
-Fine-tuning:   1%|          | 40/7289 [00:09<23:13,  5.20it/s]                                                                [41] language -> language_bilingual_town_names (now 1)
-Fine-tuning:   1%|          | 40/7289 [00:09<23:13,  5.20it/s]                                                                [46] trees -> tree (now 1)
-Fine-tuning:   1%|          | 40/7289 [00:09<23:13,  5.20it/s]                                                                [44] vegetation -> vegetation_date_palm (now 1)
-Fine-tuning:   1%|          | 40/7289 [00:09<23:13,  5.20it/s]                                                                [47] valley -> landscape_hilly (now 3)
-Fine-tuning:   1%|          | 40/7289 [00:09<23:13,  5.20it/s]Fine-tuning:   1%|          | 50/7289 [00:09<19:51,  6.07it/s]                                                                [57] building -> architecture (now 3)
-Fine-tuning:   1%|          | 50/7289 [00:11<19:51,  6.07it/s]                                                                [52] sign -> orange_bus_stop (now 1)
-Fine-tuning:   1%|          | 50/7289 [00:11<19:51,  6.07it/s]                                                                [53] architecture -> architecture_northwestern (now 1)
-Fine-tuning:   1%|          | 50/7289 [00:11<19:51,  6.07it/s]                                                                [58] landscape -> landscape_red_fields (now 2)
-Fine-tuning:   1%|          | 50/7289 [00:11<19:51,  6.07it/s]                                                                [55] road -> roadlines (now 2)
-Fine-tuning:   1%|          | 50/7289 [00:11<19:51,  6.07it/s]                                                                [56] pole -> twin_poles (now 1)
-Fine-tuning:   1%|          | 50/7289 [00:11<19:51,  6.07it/s]                                                                [59] language -> language_bilingual_town_names (now 2)
-Fine-tuning:   1%|          | 50/7289 [00:11<19:51,  6.07it/s]                                                                [54] pole -> red_white_pole_tape (now 1)
-Fine-tuning:   1%|          | 50/7289 [00:11<19:51,  6.07it/s]                                                                [51] bollard -> alberta_bollard (now 1)
-Fine-tuning:   1%|          | 50/7289 [00:11<19:51,  6.07it/s]Fine-tuning:   1%|          | 60/7289 [00:11<19:29,  6.18it/s]                                                                [62] car -> pickup_car (now 1)
-Fine-tuning:   1%|          | 60/7289 [00:13<19:29,  6.18it/s]                                                                [63] pole -> painted_pole (now 1)
-Fine-tuning:   1%|          | 60/7289 [00:13<19:29,  6.18it/s]                                                                [64] visual -> shitcam (now 1)
-Fine-tuning:   1%|          | 60/7289 [00:13<19:29,  6.18it/s]                                                                [67] landscape -> landscape_hilly (now 4)
-Fine-tuning:   1%|          | 60/7289 [00:13<19:29,  6.18it/s]                                                                [60] bin -> heraklion_bins (now 1)
-Fine-tuning:   1%|          | 60/7289 [00:13<19:29,  6.18it/s]                                                                [69] landscape -> landscape_red_fields (now 3)
-Fine-tuning:   1%|          | 60/7289 [00:13<19:29,  6.18it/s]                                                                [65] hills -> landscape_hills (now 2)
-Fine-tuning:   1%|          | 60/7289 [00:13<19:29,  6.18it/s]Fine-tuning:   1%|          | 70/7289 [00:13<20:40,  5.82it/s]                                                                [77] pole -> birmingham_yellow_pole (now 1)
-Fine-tuning:   1%|          | 70/7289 [00:14<20:40,  5.82it/s]                                                                [71] landscape -> landscape_hilly (now 5)
-Fine-tuning:   1%|          | 70/7289 [00:14<20:40,  5.82it/s]                                                                [75] bollard -> nayarit_bollard (now 1)
-Fine-tuning:   1%|          | 70/7289 [00:14<20:40,  5.82it/s]                                                                [70] car -> cage_car (now 1)
-Fine-tuning:   1%|          | 70/7289 [00:14<20:40,  5.82it/s]                                                                [79] landscape -> landscape_coastal_andhra_pradesh (now 1)
-Fine-tuning:   1%|          | 70/7289 [00:14<20:40,  5.82it/s]                                                                [73] landscape -> landscape_hills (now 3)
-Fine-tuning:   1%|          | 70/7289 [00:14<20:40,  5.82it/s]Fine-tuning:   1%|          | 80/7289 [00:14<18:55,  6.35it/s]                                                                [82] sign -> warning_sticker (now 1)
-Fine-tuning:   1%|          | 80/7289 [00:15<18:55,  6.35it/s]                                                                [86] language -> language_bilingual_town_names (now 3)
-Fine-tuning:   1%|          | 80/7289 [00:15<18:55,  6.35it/s]                                                                [88] pole -> elba_poles (now 1)
-Fine-tuning:   1%|          | 80/7289 [00:15<18:55,  6.35it/s]                                                                [87] landscape -> landscape_agricultural_fields (now 1)
-Fine-tuning:   1%|          | 80/7289 [00:15<18:55,  6.35it/s]Fine-tuning:   1%|          | 90/7289 [00:15<16:58,  7.07it/s]                                                                [91] pole -> infrastructure_pole_paint (now 1)
-Fine-tuning:   1%|          | 90/7289 [00:16<16:58,  7.07it/s]                                                                [95] road -> roadlines (now 3)
-Fine-tuning:   1%|          | 90/7289 [00:16<16:58,  7.07it/s]                                                                [94] simple scene -> scene (now 3)
-Fine-tuning:   1%|          | 90/7289 [00:16<16:58,  7.07it/s]                                                                [92] chevron -> chevron_greek (now 1)
-Fine-tuning:   1%|          | 90/7289 [00:16<16:58,  7.07it/s]                                                                [97] sign -> dresden_street_signs (now 1)
-Fine-tuning:   1%|          | 90/7289 [00:16<16:58,  7.07it/s]                                                                [90] sign -> sign_no_cap (now 1)
-Fine-tuning:   1%|          | 90/7289 [00:16<16:58,  7.07it/s]Fine-tuning:   1%|▏         | 100/7289 [00:16<16:03,  7.46it/s]  Checkpoint saved: 100 rows
-                                                                 Unique new concepts: 60
-Fine-tuning:   1%|▏         | 100/7289 [00:16<16:03,  7.46it/s]                                                                 [101] landscape -> landscape_red_fields (now 4)
-Fine-tuning:   1%|▏         | 100/7289 [00:18<16:03,  7.46it/s]                                                                 [102] km_marker -> km_marker_romania (now 1)
-Fine-tuning:   1%|▏         | 100/7289 [00:18<16:03,  7.46it/s]                                                                 [109] architecture -> architecture_ankara (now 2)
-Fine-tuning:   1%|▏         | 100/7289 [00:18<16:03,  7.46it/s]                                                                 [103] sign -> wooden_street_sign (now 1)
-Fine-tuning:   1%|▏         | 100/7289 [00:18<16:03,  7.46it/s]                                                                 [105] car -> dirty_car_with_1_dot_on_the_right (now 1)
-Fine-tuning:   1%|▏         | 100/7289 [00:18<16:03,  7.46it/s]Fine-tuning:   2%|▏         | 110/7289 [00:18<15:48,  7.57it/s]                                                                 [118] yurt -> tent (now 2)
-Fine-tuning:   2%|▏         | 110/7289 [00:19<15:48,  7.57it/s]                                                                 [117] language -> language_bilingual_town_names (now 4)
-Fine-tuning:   2%|▏         | 110/7289 [00:19<15:48,  7.57it/s]                                                                 [115] language -> language_bilingual_town_names (now 5)
-Fine-tuning:   2%|▏         | 110/7289 [00:19<15:48,  7.57it/s]                                                                 [116] bollard -> bollard_wedge_shape (now 1)
-Fine-tuning:   2%|▏         | 110/7289 [00:19<15:48,  7.57it/s]                                                                 [111] pole -> white_pole_sticker (now 1)
-Fine-tuning:   2%|▏         | 110/7289 [00:19<15:48,  7.57it/s]Fine-tuning:   2%|▏         | 120/7289 [00:19<15:19,  7.80it/s]                                                                 [124] bollard -> guardrail_bollard (now 1)
-Fine-tuning:   2%|▏         | 120/7289 [00:21<15:19,  7.80it/s]                                                                 [122] car -> unique_car (now 1)
-Fine-tuning:   2%|▏         | 120/7289 [00:21<15:19,  7.80it/s]                                                                 [126] agriculture -> agriculture_cotton_maharashtra (now 1)
-Fine-tuning:   2%|▏         | 120/7289 [00:21<15:19,  7.80it/s]                                                                 [123] pavement -> pavement_cobblestone (now 1)
-Fine-tuning:   2%|▏         | 120/7289 [00:21<15:19,  7.80it/s]                                                                 [129] sign -> sign_post_peru (now 1)
-Fine-tuning:   2%|▏         | 120/7289 [00:21<15:19,  7.80it/s]Fine-tuning:   2%|▏         | 130/7289 [00:21<16:30,  7.23it/s]                                                                 [133] tree -> vegetation (now 1)
-Fine-tuning:   2%|▏         | 130/7289 [00:24<16:30,  7.23it/s]                                                                 [134] pole -> eastern_pole_sticker (now 1)
-Fine-tuning:   2%|▏         | 130/7289 [00:24<16:30,  7.23it/s]                                                                 [136] road -> city_roads (now 1)
-Fine-tuning:   2%|▏         | 130/7289 [00:24<16:30,  7.23it/s]                                                                 [138] fern -> vegetation_fern (now 1)
-Fine-tuning:   2%|▏         | 130/7289 [00:24<16:30,  7.23it/s]                                                                 [139] mountains -> landscape_hilly (now 6)
-Fine-tuning:   2%|▏         | 130/7289 [00:24<16:30,  7.23it/s]Fine-tuning:   2%|▏         | 140/7289 [00:24<22:25,  5.31it/s]                                                                 [147] mountains -> mountains_exposed_rock (now 1)
-Fine-tuning:   2%|▏         | 140/7289 [00:25<22:25,  5.31it/s]                                                                 [140] road -> roadlines (now 4)
-Fine-tuning:   2%|▏         | 140/7289 [00:25<22:25,  5.31it/s]                                                                 [142] mountain -> mountains (now 6)
-Fine-tuning:   2%|▏         | 140/7289 [00:25<22:25,  5.31it/s]                                                                 [145] pole -> pole_shields (now 1)
-Fine-tuning:   2%|▏         | 140/7289 [00:25<22:25,  5.31it/s]Fine-tuning:   2%|▏         | 150/7289 [00:25<20:37,  5.77it/s]                                                                 [151] landscape -> landscape_hilly (now 7)
-Fine-tuning:   2%|▏         | 150/7289 [00:26<20:37,  5.77it/s]                                                                 [159] object -> hanging_tiles (now 1)
-Fine-tuning:   2%|▏         | 150/7289 [00:26<20:37,  5.77it/s]                                                                 [152] car -> unique_car (now 2)
-Fine-tuning:   2%|▏         | 150/7289 [00:26<20:37,  5.77it/s]                                                                 [158] pole -> shikoku_pole_plate (now 1)
-Fine-tuning:   2%|▏         | 150/7289 [00:26<20:37,  5.77it/s]                                                                 [153] language -> language_bilingual_town_names (now 6)
-Fine-tuning:   2%|▏         | 150/7289 [00:26<20:37,  5.77it/s]                                                                 [157] license_plate -> license_plate_yellow (now 2)
-Fine-tuning:   2%|▏         | 150/7289 [00:26<20:37,  5.77it/s]Fine-tuning:   2%|▏         | 160/7289 [00:26<19:10,  6.20it/s]                                                                 [165] trash_bin -> bin (now 1)
-Fine-tuning:   2%|▏         | 160/7289 [00:27<19:10,  6.20it/s]                                                                 [164] bin -> aquatera_bin (now 1)
-Fine-tuning:   2%|▏         | 160/7289 [00:27<19:10,  6.20it/s]                                                                 [169] chevron -> sign_chevron (now 1)
-Fine-tuning:   2%|▏         | 160/7289 [00:27<19:10,  6.20it/s]                                                                 [162] insulator -> insulator_with_7_or_more_ridges (now 1)
-Fine-tuning:   2%|▏         | 160/7289 [00:27<19:10,  6.20it/s]                                                                 [161] hill -> landscape_hills (now 4)
-Fine-tuning:   2%|▏         | 160/7289 [00:27<19:10,  6.20it/s]                                                                 [168] vegetation -> vegetation_date_palm (now 2)
-Fine-tuning:   2%|▏         | 160/7289 [00:27<19:10,  6.20it/s]                                                                 [163] language -> language_bilingual_town_names (now 7)
-Fine-tuning:   2%|▏         | 160/7289 [00:27<19:10,  6.20it/s]                                                                 [160] license_plate -> license_plate_yellow (now 3)
-Fine-tuning:   2%|▏         | 160/7289 [00:27<19:10,  6.20it/s]Fine-tuning:   2%|▏         | 170/7289 [00:27<17:15,  6.87it/s]                                                                 [173] mountain -> mountains (now 7)
-Fine-tuning:   2%|▏         | 170/7289 [00:28<17:15,  6.87it/s]                                                                 [176] language -> language_marathi (now 1)
-Fine-tuning:   2%|▏         | 170/7289 [00:28<17:15,  6.87it/s]                                                                 [171] dirt -> landscape_dirt (now 1)
-Fine-tuning:   2%|▏         | 170/7289 [00:28<17:15,  6.87it/s]Fine-tuning:   2%|▏         | 180/7289 [00:28<15:42,  7.55it/s]                                                                 [185] vegetation -> vegetation_date_palm (now 3)
-Fine-tuning:   2%|▏         | 180/7289 [00:30<15:42,  7.55it/s]                                                                 [182] language -> language_bilingual_town_names (now 8)
-Fine-tuning:   2%|▏         | 180/7289 [00:30<15:42,  7.55it/s]                                                                 [189] pole -> infrastructure_parana_black_paint_pole (now 1)
-Fine-tuning:   2%|▏         | 180/7289 [00:30<15:42,  7.55it/s]                                                                 [180] landscape -> landscape_flat_barren (now 1)
-Fine-tuning:   2%|▏         | 180/7289 [00:30<15:42,  7.55it/s]                                                                 [187] landscape -> landscape_hills (now 5)
-Fine-tuning:   2%|▏         | 180/7289 [00:30<15:42,  7.55it/s]Fine-tuning:   3%|▎         | 190/7289 [00:30<15:06,  7.83it/s]                                                                 [190] road -> road_south_of_resistencia (now 1)
-Fine-tuning:   3%|▎         | 190/7289 [00:31<15:06,  7.83it/s]                                                                 [193] pole -> bird_nests_on_pole_top (now 1)
-Fine-tuning:   3%|▎         | 190/7289 [00:31<15:06,  7.83it/s]                                                                 [198] sign -> highway_signs (now 1)
-Fine-tuning:   3%|▎         | 190/7289 [00:31<15:06,  7.83it/s]                                                                 [199] landscape -> landscape_hilly (now 8)
-Fine-tuning:   3%|▎         | 190/7289 [00:31<15:06,  7.83it/s]                                                                 [192] sign -> sign_yellow_red_bands (now 1)
-Fine-tuning:   3%|▎         | 190/7289 [00:31<15:06,  7.83it/s]Fine-tuning:   3%|▎         | 200/7289 [00:31<14:20,  8.24it/s]  Checkpoint saved: 200 rows
-                                                                 Unique new concepts: 94
-Fine-tuning:   3%|▎         | 200/7289 [00:31<14:20,  8.24it/s]                                                                 [203] road -> roadlines (now 5)
-Fine-tuning:   3%|▎         | 200/7289 [00:32<14:20,  8.24it/s]                                                                 [208] rolling hills -> landscape_hilly (now 9)
-Fine-tuning:   3%|▎         | 200/7289 [00:32<14:20,  8.24it/s]                                                                 [204] pole -> infrastructure_metal_holey_poles (now 1)
-Fine-tuning:   3%|▎         | 200/7289 [00:32<14:20,  8.24it/s]                                                                 [206] landscape -> landscape_hills (now 6)
-Fine-tuning:   3%|▎         | 200/7289 [00:32<14:20,  8.24it/s]                                                                 [202] mountains -> mountain (now 1)
-Fine-tuning:   3%|▎         | 200/7289 [00:32<14:20,  8.24it/s]                                                                 [207] trash_bin -> bin (now 2)
-Fine-tuning:   3%|▎         | 200/7289 [00:32<14:20,  8.24it/s]                                                                 [205] sticker -> sticker_yellow_large (now 1)
-Fine-tuning:   3%|▎         | 200/7289 [00:32<14:20,  8.24it/s]Fine-tuning:   3%|▎         | 210/7289 [00:32<13:39,  8.64it/s]                                                                 [213] landscape -> landscape_hilly (now 10)
-Fine-tuning:   3%|▎         | 210/7289 [00:33<13:39,  8.64it/s]                                                                 [219] sign -> sign_surface_mounted (now 1)
-Fine-tuning:   3%|▎         | 210/7289 [00:33<13:39,  8.64it/s]                                                                 [214] pole -> b_type_no_top (now 1)
-Fine-tuning:   3%|▎         | 210/7289 [00:33<13:39,  8.64it/s]                                                                 [217] sign -> stop_sign_turkey (now 1)
-Fine-tuning:   3%|▎         | 210/7289 [00:33<13:39,  8.64it/s]                                                                 [215] vegetation -> vegetation_date_palm (now 4)
-Fine-tuning:   3%|▎         | 210/7289 [00:33<13:39,  8.64it/s]Fine-tuning:   3%|▎         | 220/7289 [00:33<13:19,  8.84it/s]                                                                 [228] landscape -> landscape_hilly (now 11)
-Fine-tuning:   3%|▎         | 220/7289 [00:34<13:19,  8.84it/s]                                                                 [220] sign -> street_signs (now 1)
-Fine-tuning:   3%|▎         | 220/7289 [00:34<13:19,  8.84it/s]                                                                 [222] road -> roadlines (now 6)
-Fine-tuning:   3%|▎         | 220/7289 [00:34<13:19,  8.84it/s]Fine-tuning:   3%|▎         | 230/7289 [00:34<13:17,  8.85it/s]                                                                 [232] pole -> waikato_trident_insulator (now 2)
-Fine-tuning:   3%|▎         | 230/7289 [00:35<13:17,  8.85it/s]                                                                 [230] rock_wall -> infrastructure_light_rock_wall (now 1)
-Fine-tuning:   3%|▎         | 230/7289 [00:35<13:17,  8.85it/s]                                                                 [237] building -> architecture_red_brick (now 1)
-Fine-tuning:   3%|▎         | 230/7289 [00:35<13:17,  8.85it/s]                                                                 [234] cacti -> vegetation_saguaro_cacti (now 1)
-Fine-tuning:   3%|▎         | 230/7289 [00:35<13:17,  8.85it/s]                                                                 [238] pole -> kwazulu-natal_pole (now 1)
-Fine-tuning:   3%|▎         | 230/7289 [00:35<13:17,  8.85it/s]                                                                 [236] pole -> bamboo_snow_pole (now 1)
-Fine-tuning:   3%|▎         | 230/7289 [00:35<13:17,  8.85it/s]                                                                 [239] landscape -> landscape_red_fields (now 5)
-Fine-tuning:   3%|▎         | 230/7289 [00:35<13:17,  8.85it/s]Fine-tuning:   3%|▎         | 240/7289 [00:35<13:46,  8.52it/s]                                                                 [240] road -> roadlines (now 7)
-Fine-tuning:   3%|▎         | 240/7289 [00:36<13:46,  8.52it/s]                                                                 [248] landscape -> landscape_hills (now 7)
-Fine-tuning:   3%|▎         | 240/7289 [00:36<13:46,  8.52it/s]                                                                 [242] lamp -> infrastructure_aerodynamic_lamp (now 1)
-Fine-tuning:   3%|▎         | 240/7289 [00:36<13:46,  8.52it/s]Fine-tuning:   3%|▎         | 250/7289 [00:36<13:22,  8.77it/s]                                                                 [256] sign -> standard_street_sign (now 1)
-Fine-tuning:   3%|▎         | 250/7289 [00:37<13:22,  8.77it/s]                                                                 [259] pole -> mesh_body_pole (now 1)
-Fine-tuning:   3%|▎         | 250/7289 [00:37<13:22,  8.77it/s]                                                                 [250] sign -> oklahoma_highway_sign (now 1)
-Fine-tuning:   3%|▎         | 250/7289 [00:37<13:22,  8.77it/s]                                                                 [258] pole -> infrastructure_goa_poletops (now 1)
-Fine-tuning:   3%|▎         | 250/7289 [00:37<13:22,  8.77it/s]                                                                 [255] hills -> landscape_hills (now 8)
-Fine-tuning:   3%|▎         | 250/7289 [00:37<13:22,  8.77it/s]                                                                 [254] language -> language_bilingual_town_names (now 9)
-Fine-tuning:   3%|▎         | 250/7289 [00:37<13:22,  8.77it/s]Fine-tuning:   4%|▎         | 260/7289 [00:37<13:46,  8.50it/s]                                                                 [268] mountains -> landscape_hilly (now 12)
-Fine-tuning:   4%|▎         | 260/7289 [00:40<13:46,  8.50it/s]                                                                 [266] sign -> greater_london_bus_stop_sign (now 1)
-Fine-tuning:   4%|▎         | 260/7289 [00:40<13:46,  8.50it/s]Fine-tuning:   4%|▎         | 270/7289 [00:40<16:47,  6.97it/s]                                                                 [271] road -> city_roads (now 2)
-Fine-tuning:   4%|▎         | 270/7289 [00:41<16:47,  6.97it/s]                                                                 [273] infrastructure -> infrastructure_road_sign_tab_short_arrow (now 2)
-Fine-tuning:   4%|▎         | 270/7289 [00:41<16:47,  6.97it/s]                                                                 [277] car -> red_car (now 1)
-Fine-tuning:   4%|▎         | 270/7289 [00:41<16:47,  6.97it/s]                                                                 [272] landscape -> landscape_flat_barren (now 2)
-Fine-tuning:   4%|▎         | 270/7289 [00:41<16:47,  6.97it/s]                                                                 [276] language -> language_bilingual_town_names (now 10)
-Fine-tuning:   4%|▎         | 270/7289 [00:41<16:47,  6.97it/s]Fine-tuning:   4%|▍         | 280/7289 [00:41<15:14,  7.67it/s]                                                                 [280] car -> car_with_stripes_and_dirty_back (now 1)
-Fine-tuning:   4%|▍         | 280/7289 [00:42<15:14,  7.67it/s]                                                                 [287] sign -> greater_manchester_bus_stop_sign (now 1)
-Fine-tuning:   4%|▍         | 280/7289 [00:42<15:14,  7.67it/s]                                                                 [289] language -> language_bilingual_town_names (now 11)
-Fine-tuning:   4%|▍         | 280/7289 [00:42<15:14,  7.67it/s]                                                                 [282] fence -> suburbian_security (now 1)
-Fine-tuning:   4%|▍         | 280/7289 [00:42<15:14,  7.67it/s]                                                                 [281] architecture -> architecture_european (now 1)
-Fine-tuning:   4%|▍         | 280/7289 [00:42<15:14,  7.67it/s]Fine-tuning:   4%|▍         | 290/7289 [00:42<14:23,  8.10it/s]                                                                 [294] sign -> sign_green (now 1)
-Fine-tuning:   4%|▍         | 290/7289 [00:44<14:23,  8.10it/s]                                                                 [293] landscape -> landscape_hilly (now 13)
-Fine-tuning:   4%|▍         | 290/7289 [00:44<14:23,  8.10it/s]                                                                 [291] bollard -> austrian_bollard (now 1)
-Fine-tuning:   4%|▍         | 290/7289 [00:44<14:23,  8.10it/s]                                                                 [299] pole -> pole_sticker (now 1)
-Fine-tuning:   4%|▍         | 290/7289 [00:44<14:23,  8.10it/s]                                                                 [297] curb -> black_and_white_curbs (now 1)
-Fine-tuning:   4%|▍         | 290/7289 [00:44<14:23,  8.10it/s]                                                                 [296] gate -> northern_ireland_rounded_edge_gate (now 1)
-Fine-tuning:   4%|▍         | 290/7289 [00:44<14:23,  8.10it/s]Fine-tuning:   4%|▍         | 300/7289 [00:44<17:37,  6.61it/s]  Checkpoint saved: 300 rows
-                                                                 Unique new concepts: 127
-Fine-tuning:   4%|▍         | 300/7289 [00:44<17:37,  6.61it/s]                                                                 [303] license_plate -> license_plate_yellow (now 4)
-Fine-tuning:   4%|▍         | 300/7289 [00:48<17:37,  6.61it/s]                                                                 [304] bin -> city_bin (now 1)
-Fine-tuning:   4%|▍         | 300/7289 [00:48<17:37,  6.61it/s]                                                                 [300] post -> yellow_pole (now 1)
-Fine-tuning:   4%|▍         | 300/7289 [00:48<17:37,  6.61it/s]                                                                 [308] mountains -> mountain (now 2)
-Fine-tuning:   4%|▍         | 300/7289 [00:48<17:37,  6.61it/s]                                                                 [305] language -> language_galician (now 1)
-Fine-tuning:   4%|▍         | 300/7289 [00:48<17:37,  6.61it/s]                                                                 [306] object -> object_spare_tire (now 1)
-Fine-tuning:   4%|▍         | 300/7289 [00:48<17:37,  6.61it/s]                                                                 [307] language -> language_telugu (now 3)
-Fine-tuning:   4%|▍         | 300/7289 [00:48<17:37,  6.61it/s]                                                                 [301] car -> unique_car (now 3)
-Fine-tuning:   4%|▍         | 300/7289 [00:48<17:37,  6.61it/s]Fine-tuning:   4%|▍         | 310/7289 [00:48<28:29,  4.08it/s]                                                                 [310] pole -> black_label_yellow_numbers (now 1)
-Fine-tuning:   4%|▍         | 310/7289 [00:50<28:29,  4.08it/s]                                                                 [318] landscape -> landscape_hilly (now 14)
-Fine-tuning:   4%|▍         | 310/7289 [00:50<28:29,  4.08it/s]                                                                 [316] language -> language_bilingual_town_names (now 12)
-Fine-tuning:   4%|▍         | 310/7289 [00:50<28:29,  4.08it/s]                                                                 [319] landscape -> landscape_flat_barren (now 3)
-Fine-tuning:   4%|▍         | 310/7289 [00:50<28:29,  4.08it/s]                                                                 [314] vegetation -> vegetation_aspen_trees (now 1)
-Fine-tuning:   4%|▍         | 310/7289 [00:50<28:29,  4.08it/s]                                                                 [312] sign -> downtown_street_sign (now 1)
-Fine-tuning:   4%|▍         | 310/7289 [00:50<28:29,  4.08it/s]Fine-tuning:   4%|▍         | 320/7289 [00:50<24:49,  4.68it/s]                                                                 [327] hills -> landscape_hills (now 9)
-Fine-tuning:   4%|▍         | 320/7289 [00:51<24:49,  4.68it/s]                                                                 [320] pole -> pole_white_kv_stickers (now 1)
-Fine-tuning:   4%|▍         | 320/7289 [00:51<24:49,  4.68it/s]                                                                 [329] language -> culture_islam (now 1)
-Fine-tuning:   4%|▍         | 320/7289 [00:51<24:49,  4.68it/s]                                                                 [328] sign -> infrastructure_road_sign_johor_yellow (now 1)
-Fine-tuning:   4%|▍         | 320/7289 [00:51<24:49,  4.68it/s]                                                                 [325] sign -> infrastructure_road_sign_tab_short_arrow (now 3)
-Fine-tuning:   4%|▍         | 320/7289 [00:51<24:49,  4.68it/s]Fine-tuning:   5%|▍         | 330/7289 [00:51<21:49,  5.31it/s]                                                                 [339] sign -> infrastructure_road_sign_tab_short_arrow (now 4)
-Fine-tuning:   5%|▍         | 330/7289 [00:54<21:49,  5.31it/s]                                                                 [330] landscape -> landscape_hills (now 10)
-Fine-tuning:   5%|▍         | 330/7289 [00:54<21:49,  5.31it/s]                                                                 [338] sign -> infrastructure_road_sign_tab_short_arrow (now 5)
-Fine-tuning:   5%|▍         | 330/7289 [00:54<21:49,  5.31it/s]                                                                 [336] sign -> language_bilingual_town_names (now 13)
-Fine-tuning:   5%|▍         | 330/7289 [00:54<21:49,  5.31it/s]                                                                 [334] car -> unique_car (now 4)
-Fine-tuning:   5%|▍         | 330/7289 [00:54<21:49,  5.31it/s]                                                                 [337] license_plate -> license_plate_yellow (now 5)
-Fine-tuning:   5%|▍         | 330/7289 [00:54<21:49,  5.31it/s]Fine-tuning:   5%|▍         | 340/7289 [00:54<24:26,  4.74it/s]                                                                 [341] plant -> jute (now 1)
-Fine-tuning:   5%|▍         | 340/7289 [00:55<24:26,  4.74it/s]                                                                 [346] sign -> infrastructure_road_sign (now 1)
-Fine-tuning:   5%|▍         | 340/7289 [00:55<24:26,  4.74it/s]                                                                 [348] sign -> black_caps_sign (now 1)
-Fine-tuning:   5%|▍         | 340/7289 [00:55<24:26,  4.74it/s]                                                                 [344] chevron -> chevron_red_white_yellow_frame (now 1)
-Fine-tuning:   5%|▍         | 340/7289 [00:55<24:26,  4.74it/s]                                                                 [340] vegetation -> vegetation_date_palm (now 5)
-Fine-tuning:   5%|▍         | 340/7289 [00:55<24:26,  4.74it/s]                                                                 [343] vegetation -> vegetation_himalayan_cedar (now 1)
-Fine-tuning:   5%|▍         | 340/7289 [00:55<24:26,  4.74it/s]                                                                 [349] sign -> pedestrian_signs (now 1)
-Fine-tuning:   5%|▍         | 340/7289 [00:55<24:26,  4.74it/s]Fine-tuning:   5%|▍         | 350/7289 [00:55<20:27,  5.65it/s]                                                                 [358] language -> language_bilingual_town_names (now 14)
-Fine-tuning:   5%|▍         | 350/7289 [00:56<20:27,  5.65it/s]                                                                 [350] architecture -> architecture_belle_île_en_mer (now 1)
-Fine-tuning:   5%|▍         | 350/7289 [00:56<20:27,  5.65it/s]                                                                 [357] pole -> bihar_pole_paint (now 1)
-Fine-tuning:   5%|▍         | 350/7289 [00:56<20:27,  5.65it/s]                                                                 [351] sign -> quebec_double_sign_post (now 1)
-Fine-tuning:   5%|▍         | 350/7289 [00:56<20:27,  5.65it/s]                                                                 [354] hills -> landscape_hills (now 11)
-Fine-tuning:   5%|▍         | 350/7289 [00:56<20:27,  5.65it/s]                                                                 [353] lamp -> solar_panel_lamp (now 1)
-Fine-tuning:   5%|▍         | 350/7289 [00:56<20:27,  5.65it/s]                                                                 [352] language -> language_kannada (now 1)
-Fine-tuning:   5%|▍         | 350/7289 [00:56<20:27,  5.65it/s]Fine-tuning:   5%|▍         | 360/7289 [00:56<18:19,  6.30it/s]                                                                 [360] pole -> california_utility_pole (now 1)
-Fine-tuning:   5%|▍         | 360/7289 [00:57<18:19,  6.30it/s]                                                                 [367] pole -> insulators_on_top (now 1)
-Fine-tuning:   5%|▍         | 360/7289 [00:57<18:19,  6.30it/s]                                                                 [369] sign -> sign_red_cycling (now 1)
-Fine-tuning:   5%|▍         | 360/7289 [00:57<18:19,  6.30it/s]                                                                 [364] pavement -> pavement_grainy_blue_grey (now 1)
-Fine-tuning:   5%|▍         | 360/7289 [00:57<18:19,  6.30it/s]Fine-tuning:   5%|▌         | 370/7289 [00:57<16:36,  6.94it/s]                                                                 [378] power_line -> power_line_large (now 1)
-Fine-tuning:   5%|▌         | 370/7289 [00:58<16:36,  6.94it/s]                                                                 [371] pole -> yellow_traffic_light_pole (now 1)
-Fine-tuning:   5%|▌         | 370/7289 [00:58<16:36,  6.94it/s]                                                                 [373] sign -> infrastructure_road_sign_tab_short_arrow (now 6)
-Fine-tuning:   5%|▌         | 370/7289 [00:58<16:36,  6.94it/s]                                                                 [376] savannah -> savannah_landscape (now 1)
-Fine-tuning:   5%|▌         | 370/7289 [00:58<16:36,  6.94it/s]                                                                 [375] language -> language_bilingual_town_names (now 15)
-Fine-tuning:   5%|▌         | 370/7289 [00:58<16:36,  6.94it/s]                                                                 [377] language -> language_bilingual_town_names (now 16)
-Fine-tuning:   5%|▌         | 370/7289 [00:58<16:36,  6.94it/s]Fine-tuning:   5%|▌         | 380/7289 [00:58<15:08,  7.61it/s]                                                                 [386] landscape -> landscape_hilly (now 15)
-Fine-tuning:   5%|▌         | 380/7289 [00:59<15:08,  7.61it/s]                                                                 [388] sign -> signpost_sticker (now 1)
-Fine-tuning:   5%|▌         | 380/7289 [00:59<15:08,  7.61it/s]                                                                 [389] pole -> waikato_trident_insulator (now 3)
-Fine-tuning:   5%|▌         | 380/7289 [00:59<15:08,  7.61it/s]                                                                 [383] pole -> yellow_pole_sticker (now 1)
-Fine-tuning:   5%|▌         | 380/7289 [00:59<15:08,  7.61it/s]                                                                 [385] pole -> alternating_pole_top (now 1)
-Fine-tuning:   5%|▌         | 380/7289 [00:59<15:08,  7.61it/s]                                                                 [380] architecture -> architecture_west_coast (now 1)
-Fine-tuning:   5%|▌         | 380/7289 [00:59<15:08,  7.61it/s]                                                                 [381] pole -> pole_red_white (now 1)
-Fine-tuning:   5%|▌         | 380/7289 [00:59<15:08,  7.61it/s]                                                                 [382] agriculture -> agriculture_sugarcane_tamil_nadu (now 1)
-Fine-tuning:   5%|▌         | 380/7289 [00:59<15:08,  7.61it/s]                                                                 [384] dirt -> landscape_red_fields (now 6)
-Fine-tuning:   5%|▌         | 380/7289 [00:59<15:08,  7.61it/s]Fine-tuning:   5%|▌         | 390/7289 [00:59<14:44,  7.80it/s]                                                                 [395] highlands -> landscape_hilly (now 16)
-Fine-tuning:   5%|▌         | 390/7289 [01:00<14:44,  7.80it/s]                                                                 [393] hydrant -> hydrant_marker_yellow_border (now 1)
-Fine-tuning:   5%|▌         | 390/7289 [01:00<14:44,  7.80it/s]                                                                 [390] language -> language_bilingual_town_names (now 17)
-Fine-tuning:   5%|▌         | 390/7289 [01:00<14:44,  7.80it/s]                                                                 [392] pole -> infrastructure_crossbar_no_support (now 1)
-Fine-tuning:   5%|▌         | 390/7289 [01:00<14:44,  7.80it/s]                                                                 [397] mortar -> patches_of_mortar (now 1)
-Fine-tuning:   5%|▌         | 390/7289 [01:00<14:44,  7.80it/s]Fine-tuning:   5%|▌         | 400/7289 [01:00<14:01,  8.19it/s]  Checkpoint saved: 400 rows
-                                                                 Unique new concepts: 168
-Fine-tuning:   5%|▌         | 400/7289 [01:00<14:01,  8.19it/s]                                                                 [405] language -> language_latvia_unique_latin_letters (now 1)
-Fine-tuning:   5%|▌         | 400/7289 [01:01<14:01,  8.19it/s]                                                                 [408] car -> unique_car (now 5)
-Fine-tuning:   5%|▌         | 400/7289 [01:01<14:01,  8.19it/s]                                                                 [407] pole -> square_pole (now 1)
-Fine-tuning:   5%|▌         | 400/7289 [01:01<14:01,  8.19it/s]                                                                 [409] sign -> maximum_speed_sign (now 1)
-Fine-tuning:   5%|▌         | 400/7289 [01:01<14:01,  8.19it/s]Fine-tuning:   6%|▌         | 410/7289 [01:01<13:21,  8.58it/s]                                                                 [411] pole -> trapez_pole_top (now 1)
-Fine-tuning:   6%|▌         | 410/7289 [01:03<13:21,  8.58it/s]                                                                 [419] pole -> mounted_spools (now 1)
-Fine-tuning:   6%|▌         | 410/7289 [01:03<13:21,  8.58it/s]                                                                 [414] sign -> sign_highway_west_virginia (now 1)
-Fine-tuning:   6%|▌         | 410/7289 [01:03<13:21,  8.58it/s]                                                                 [410] language -> language_bilingual_town_names (now 18)
-Fine-tuning:   6%|▌         | 410/7289 [01:03<13:21,  8.58it/s]Fine-tuning:   6%|▌         | 420/7289 [01:03<15:31,  7.38it/s]                                                                 [428] plant -> vegetation (now 2)
-Fine-tuning:   6%|▌         | 420/7289 [01:04<15:31,  7.38it/s]                                                                 [420] desert -> landscape_flat_barren (now 4)
-Fine-tuning:   6%|▌         | 420/7289 [01:04<15:31,  7.38it/s]                                                                 [429] sign -> infrastructure_road_sign_pedestrian_crossing (now 1)
-Fine-tuning:   6%|▌         | 420/7289 [01:04<15:31,  7.38it/s]                                                                 [422] plant -> vegetation (now 3)
-Fine-tuning:   6%|▌         | 420/7289 [01:04<15:31,  7.38it/s]                                                                 [425] pole -> kostanay_pole_paint (now 1)
-Fine-tuning:   6%|▌         | 420/7289 [01:04<15:31,  7.38it/s]Fine-tuning:   6%|▌         | 430/7289 [01:04<14:34,  7.84it/s]                                                                 [435] marker -> wa_property_marker (now 1)
-Fine-tuning:   6%|▌         | 430/7289 [01:05<14:34,  7.84it/s]                                                                 [432] road -> roadlines (now 8)
-Fine-tuning:   6%|▌         | 430/7289 [01:05<14:34,  7.84it/s]                                                                 [438] sign -> sign_warning_yellow (now 1)
-Fine-tuning:   6%|▌         | 430/7289 [01:05<14:34,  7.84it/s]                                                                 [433] greenhouse -> glass_greenhouses (now 1)
-Fine-tuning:   6%|▌         | 430/7289 [01:05<14:34,  7.84it/s]Fine-tuning:   6%|▌         | 440/7289 [01:05<13:34,  8.40it/s]                                                                 [446] sign -> give_way_sign (now 1)
-Fine-tuning:   6%|▌         | 440/7289 [01:06<13:34,  8.40it/s]                                                                 [447] lake -> lake_glacial (now 1)
-Fine-tuning:   6%|▌         | 440/7289 [01:06<13:34,  8.40it/s]                                                                 [444] lamp -> lamp_rusted (now 1)
-Fine-tuning:   6%|▌         | 440/7289 [01:06<13:34,  8.40it/s]                                                                 [449] pole -> pole_black_sticker (now 1)
-Fine-tuning:   6%|▌         | 440/7289 [01:06<13:34,  8.40it/s]                                                                 [442] license_plate -> license_plate_yellow (now 6)
-Fine-tuning:   6%|▌         | 440/7289 [01:06<13:34,  8.40it/s]                                                                 [445] pole -> petropavl_pole_paint (now 1)
-Fine-tuning:   6%|▌         | 440/7289 [01:06<13:34,  8.40it/s]                                                                 [443] grassland -> far_north_grassland (now 1)
-Fine-tuning:   6%|▌         | 440/7289 [01:06<13:34,  8.40it/s]                                                                 [441] landscape -> landscape_plantations (now 1)
-Fine-tuning:   6%|▌         | 440/7289 [01:06<13:34,  8.40it/s]Fine-tuning:   6%|▌         | 450/7289 [01:06<13:39,  8.35it/s]                                                                 [456] savanna -> savannah (now 3)
-Fine-tuning:   6%|▌         | 450/7289 [01:08<13:39,  8.35it/s]                                                                 [455] brick -> ventilation_bricks (now 1)
-Fine-tuning:   6%|▌         | 450/7289 [01:08<13:39,  8.35it/s]                                                                 [457] object -> object_oil_pumpjack (now 1)
-Fine-tuning:   6%|▌         | 450/7289 [01:08<13:39,  8.35it/s]                                                                 [450] language -> language_bilingual_town_names (now 19)
-Fine-tuning:   6%|▌         | 450/7289 [01:08<13:39,  8.35it/s]                                                                 [454] house -> roof_orange_red_tiles (now 1)
-Fine-tuning:   6%|▌         | 450/7289 [01:08<13:39,  8.35it/s]                                                                 [459] desert -> landscape_flat_barren (now 5)
-Fine-tuning:   6%|▌         | 450/7289 [01:08<13:39,  8.35it/s]                                                                 [451] bus stop -> bus_stop_munich_surroundings (now 1)
-Fine-tuning:   6%|▌         | 450/7289 [01:08<13:39,  8.35it/s]Fine-tuning:   6%|▋         | 460/7289 [01:08<14:59,  7.59it/s]                                                                 [469] bollard -> quebec_guardrail_bollards (now 1)
-Fine-tuning:   6%|▋         | 460/7289 [01:09<14:59,  7.59it/s]                                                                 [464] landscape -> landscape_hilly (now 17)
-Fine-tuning:   6%|▋         | 460/7289 [01:09<14:59,  7.59it/s]                                                                 [460] hydrant -> common_design_hydrant (now 1)
-Fine-tuning:   6%|▋         | 460/7289 [01:09<14:59,  7.59it/s]                                                                 [467] hills -> landscape_hills (now 12)
-Fine-tuning:   6%|▋         | 460/7289 [01:09<14:59,  7.59it/s]                                                                 [466] pole -> steel_mesh_pole (now 1)
-Fine-tuning:   6%|▋         | 460/7289 [01:09<14:59,  7.59it/s]                                                                 [465] road -> roadlines (now 9)
-Fine-tuning:   6%|▋         | 460/7289 [01:09<14:59,  7.59it/s]Fine-tuning:   6%|▋         | 470/7289 [01:09<14:04,  8.08it/s]                                                                 [475] pole -> pole_marking (now 1)
-Fine-tuning:   6%|▋         | 470/7289 [01:11<14:04,  8.08it/s]                                                                 [476] sign -> sign_thicc_white_posts (now 1)
-Fine-tuning:   6%|▋         | 470/7289 [01:11<14:04,  8.08it/s]                                                                 [478] pole -> landscape_ladder_poles (now 1)
-Fine-tuning:   6%|▋         | 470/7289 [01:11<14:04,  8.08it/s]                                                                 [471] fence -> wooden_fence_with_big_gap (now 1)
-Fine-tuning:   6%|▋         | 470/7289 [01:11<14:04,  8.08it/s]                                                                 [479] architecture -> south_west_england_architecture (now 1)
-Fine-tuning:   6%|▋         | 470/7289 [01:11<14:04,  8.08it/s]Fine-tuning:   7%|▋         | 480/7289 [01:11<17:24,  6.52it/s]                                                                 [488] hydrant -> fortified_hydrant (now 1)
-Fine-tuning:   7%|▋         | 480/7289 [01:12<17:24,  6.52it/s]                                                                 [489] sign -> sign_pedestrian_lithuania (now 1)
-Fine-tuning:   7%|▋         | 480/7289 [01:12<17:24,  6.52it/s]                                                                 [482] architecture -> architecture_ankara (now 3)
-Fine-tuning:   7%|▋         | 480/7289 [01:12<17:24,  6.52it/s]                                                                 [486] landscape -> landscape_flat_barren (now 6)
-Fine-tuning:   7%|▋         | 480/7289 [01:12<17:24,  6.52it/s]                                                                 [480] road -> road_lines (now 1)
-Fine-tuning:   7%|▋         | 480/7289 [01:12<17:24,  6.52it/s]                                                                 [484] field -> cotton_field (now 1)
-Fine-tuning:   7%|▋         | 480/7289 [01:12<17:24,  6.52it/s]                                                                 [481] sign -> sign_warning_voltage_kv (now 1)
-Fine-tuning:   7%|▋         | 480/7289 [01:12<17:24,  6.52it/s]Fine-tuning:   7%|▋         | 490/7289 [01:12<15:59,  7.08it/s]                                                                 [497] road -> roadlines (now 10)
-Fine-tuning:   7%|▋         | 490/7289 [01:14<15:59,  7.08it/s]                                                                 [491] landscape -> landscape_hilly (now 18)
-Fine-tuning:   7%|▋         | 490/7289 [01:14<15:59,  7.08it/s]                                                                 [499] sign -> infrastructure_road_sign_tab_short_arrow (now 7)
-Fine-tuning:   7%|▋         | 490/7289 [01:14<15:59,  7.08it/s]                                                                 [490] road -> roadlines (now 11)
-Fine-tuning:   7%|▋         | 490/7289 [01:14<15:59,  7.08it/s]                                                                 [496] vegetation -> vegetation_areca_palm (now 1)
-Fine-tuning:   7%|▋         | 490/7289 [01:14<15:59,  7.08it/s]Fine-tuning:   7%|▋         | 500/7289 [01:14<16:21,  6.92it/s]  Checkpoint saved: 500 rows
-                                                                 Unique new concepts: 206
-Fine-tuning:   7%|▋         | 500/7289 [01:14<16:21,  6.92it/s]                                                                 [503] landscape -> landscape_hilly (now 19)
-Fine-tuning:   7%|▋         | 500/7289 [01:15<16:21,  6.92it/s]                                                                 [500] house -> house_on_stilts (now 1)
-Fine-tuning:   7%|▋         | 500/7289 [01:15<16:21,  6.92it/s]                                                                 [507] license_plate -> license_plate_yellow (now 7)
-Fine-tuning:   7%|▋         | 500/7289 [01:15<16:21,  6.92it/s]                                                                 [502] landscape -> landscape_hilly (now 20)
-Fine-tuning:   7%|▋         | 500/7289 [01:15<16:21,  6.92it/s]Fine-tuning:   7%|▋         | 510/7289 [01:15<15:43,  7.19it/s]                                                                 [516] architecture -> architecture_building (now 1)
-Fine-tuning:   7%|▋         | 510/7289 [01:16<15:43,  7.19it/s]                                                                 [517] highway -> divided_highway (now 1)
-Fine-tuning:   7%|▋         | 510/7289 [01:16<15:43,  7.19it/s]                                                                 [514] sign -> county_sign (now 1)
-Fine-tuning:   7%|▋         | 510/7289 [01:16<15:43,  7.19it/s]                                                                 [510] landscape -> landscape_hazy (now 1)
-Fine-tuning:   7%|▋         | 510/7289 [01:16<15:43,  7.19it/s]                                                                 [511] pole -> infrastructure_two_section_pole_low_bar (now 1)
-Fine-tuning:   7%|▋         | 510/7289 [01:16<15:43,  7.19it/s]                                                                 [518] sidewalk -> pavement (now 1)
-Fine-tuning:   7%|▋         | 510/7289 [01:16<15:43,  7.19it/s]                                                                 [513] language -> language_bilingual_town_names (now 20)
-Fine-tuning:   7%|▋         | 510/7289 [01:16<15:43,  7.19it/s]Fine-tuning:   7%|▋         | 520/7289 [01:16<15:01,  7.51it/s]                                                                 [521] infrastructure -> infrastructure_road_sign_tab_short_arrow (now 8)
-Fine-tuning:   7%|▋         | 520/7289 [01:18<15:01,  7.51it/s]                                                                 [522] license_plate -> license_plate_yellow (now 8)
-Fine-tuning:   7%|▋         | 520/7289 [01:18<15:01,  7.51it/s]                                                                 [528] pole -> pole_callao (now 1)
-Fine-tuning:   7%|▋         | 520/7289 [01:18<15:01,  7.51it/s]                                                                 [527] decoration -> decoration_mountain_dew (now 1)
-Fine-tuning:   7%|▋         | 520/7289 [01:18<15:01,  7.51it/s]Fine-tuning:   7%|▋         | 530/7289 [01:18<15:24,  7.31it/s]                                                                 [532] sky -> overcast (now 1)
-Fine-tuning:   7%|▋         | 530/7289 [01:20<15:24,  7.31it/s]                                                                 [538] flag -> misc_communism (now 1)
-Fine-tuning:   7%|▋         | 530/7289 [01:20<15:24,  7.31it/s]                                                                 [531] pole -> b_type_pole_standard_length_top (now 1)
-Fine-tuning:   7%|▋         | 530/7289 [01:20<15:24,  7.31it/s]                                                                 [535] guardrail -> guardrail_ontario (now 1)
-Fine-tuning:   7%|▋         | 530/7289 [01:20<15:24,  7.31it/s]                                                                 [539] trees -> fall_trees (now 1)
-Fine-tuning:   7%|▋         | 530/7289 [01:20<15:24,  7.31it/s]                                                                 [530] road -> roadlines (now 12)
-Fine-tuning:   7%|▋         | 530/7289 [01:20<15:24,  7.31it/s]                                                                 [537] pole -> tolima_pole_markings (now 1)
-Fine-tuning:   7%|▋         | 530/7289 [01:20<15:24,  7.31it/s]                                                                 [533] car -> unique_car (now 6)
-Fine-tuning:   7%|▋         | 530/7289 [01:20<15:24,  7.31it/s]Fine-tuning:   7%|▋         | 540/7289 [01:20<16:55,  6.65it/s]                                                                 [549] sign -> sign_quebec (now 1)
-Fine-tuning:   7%|▋         | 540/7289 [01:21<16:55,  6.65it/s]                                                                 [542] car -> unique_car (now 7)
-Fine-tuning:   7%|▋         | 540/7289 [01:21<16:55,  6.65it/s]                                                                 [541] license_plate -> license_plate_yellow (now 9)
-Fine-tuning:   7%|▋         | 540/7289 [01:21<16:55,  6.65it/s]                                                                 [547] fence -> fence_wooden_tightly_packed (now 1)
-Fine-tuning:   7%|▋         | 540/7289 [01:21<16:55,  6.65it/s]                                                                 [540] sign -> infrastructure_road_sign_tab_short_arrow (now 9)
-Fine-tuning:   7%|▋         | 540/7289 [01:21<16:55,  6.65it/s]                                                                 [548] desert -> landscape_flat_barren (now 7)
-Fine-tuning:   7%|▋         | 540/7289 [01:21<16:55,  6.65it/s]Fine-tuning:   8%|▊         | 550/7289 [01:21<15:41,  7.16it/s]                                                                 [553] car -> car_with_dirty_back_urban (now 1)
-Fine-tuning:   8%|▊         | 550/7289 [01:22<15:41,  7.16it/s]                                                                 [559] car -> unique_car (now 8)
-Fine-tuning:   8%|▊         | 550/7289 [01:22<15:41,  7.16it/s]                                                                 [554] architecture -> architecture_santorini (now 1)
-Fine-tuning:   8%|▊         | 550/7289 [01:22<15:41,  7.16it/s]                                                                 [551] truck -> white_truck (now 1)
-Fine-tuning:   8%|▊         | 550/7289 [01:22<15:41,  7.16it/s]                                                                 [555] road -> roadlines (now 13)
-Fine-tuning:   8%|▊         | 550/7289 [01:22<15:41,  7.16it/s]Fine-tuning:   8%|▊         | 560/7289 [01:22<14:20,  7.82it/s]                                                                 [567] landscape -> landscape_hilly (now 21)
-Fine-tuning:   8%|▊         | 560/7289 [01:23<14:20,  7.82it/s]                                                                 [563] building -> building_low_storey (now 1)
-Fine-tuning:   8%|▊         | 560/7289 [01:23<14:20,  7.82it/s]                                                                 [560] road -> landscape_orange_road (now 1)
-Fine-tuning:   8%|▊         | 560/7289 [01:23<14:20,  7.82it/s]                                                                 [568] farmland -> landscape_flat_farmland (now 1)
-Fine-tuning:   8%|▊         | 560/7289 [01:23<14:20,  7.82it/s]                                                                 [562] sign -> highway_signs (now 2)
-Fine-tuning:   8%|▊         | 560/7289 [01:23<14:20,  7.82it/s]Fine-tuning:   8%|▊         | 570/7289 [01:23<15:04,  7.43it/s]                                                                 [575] sign -> sign_black_give_way (now 1)
-Fine-tuning:   8%|▊         | 570/7289 [01:24<15:04,  7.43it/s]                                                                 [576] desert -> landscape_flat_barren (now 8)
-Fine-tuning:   8%|▊         | 570/7289 [01:24<15:04,  7.43it/s]                                                                 [574] road -> roadlines (now 14)
-Fine-tuning:   8%|▊         | 570/7289 [01:24<15:04,  7.43it/s]                                                                 [572] flower -> landscape_red_fields (now 7)
-Fine-tuning:   8%|▊         | 570/7289 [01:24<15:04,  7.43it/s]                                                                 [571] landscape -> landscape_hilly (now 22)
-Fine-tuning:   8%|▊         | 570/7289 [01:24<15:04,  7.43it/s]                                                                 [573] road -> roadlines (now 15)
-Fine-tuning:   8%|▊         | 570/7289 [01:24<15:04,  7.43it/s]                                                                 [577] mountains -> landscape_hills (now 13)
-Fine-tuning:   8%|▊         | 570/7289 [01:24<15:04,  7.43it/s]Fine-tuning:   8%|▊         | 580/7289 [01:24<14:04,  7.94it/s]                                                                 [585] bollard -> oregon_bollard (now 1)
-Fine-tuning:   8%|▊         | 580/7289 [01:26<14:04,  7.94it/s]                                                                 [583] forest -> vegetation_maritime_pine_forest (now 1)
-Fine-tuning:   8%|▊         | 580/7289 [01:26<14:04,  7.94it/s]                                                                 [587] architecture -> architecture_ankara (now 4)
-Fine-tuning:   8%|▊         | 580/7289 [01:26<14:04,  7.94it/s]                                                                 [584] hills -> landscape_hills (now 14)
-Fine-tuning:   8%|▊         | 580/7289 [01:26<14:04,  7.94it/s]                                                                 [582] sign -> sign_highway_alabama (now 1)
-Fine-tuning:   8%|▊         | 580/7289 [01:26<14:04,  7.94it/s]                                                                 [580] pole -> pole_sticker_pucallpa (now 1)
-Fine-tuning:   8%|▊         | 580/7289 [01:26<14:04,  7.94it/s]                                                                 [589] road -> road_signs_spain (now 1)
-Fine-tuning:   8%|▊         | 580/7289 [01:26<14:04,  7.94it/s]Fine-tuning:   8%|▊         | 590/7289 [01:26<14:14,  7.84it/s]                                                                 [592] bin -> bin_concrete (now 1)
-Fine-tuning:   8%|▊         | 590/7289 [01:27<14:14,  7.84it/s]                                                                 [593] language -> language_bilingual_town_names (now 21)
-Fine-tuning:   8%|▊         | 590/7289 [01:27<14:14,  7.84it/s]                                                                 [599] sign -> pedestrian_signs_finnish (now 1)
-Fine-tuning:   8%|▊         | 590/7289 [01:27<14:14,  7.84it/s]                                                                 [591] tile -> architecture_tiles (now 1)
-Fine-tuning:   8%|▊         | 590/7289 [01:27<14:14,  7.84it/s]                                                                 [594] road -> roadlines (now 16)
-Fine-tuning:   8%|▊         | 590/7289 [01:27<14:14,  7.84it/s]Fine-tuning:   8%|▊         | 600/7289 [01:27<14:25,  7.73it/s]  Checkpoint saved: 600 rows
-                                                                 Unique new concepts: 239
-Fine-tuning:   8%|▊         | 600/7289 [01:27<14:25,  7.73it/s]                                                                 [602] landscape -> landscape_red_fields (now 8)
-Fine-tuning:   8%|▊         | 600/7289 [01:29<14:25,  7.73it/s]                                                                 [607] object -> political_logos_pasco (now 1)
-Fine-tuning:   8%|▊         | 600/7289 [01:29<14:25,  7.73it/s]                                                                 [603] sign -> minnesota_highway_sign (now 1)
-Fine-tuning:   8%|▊         | 600/7289 [01:29<14:25,  7.73it/s]Fine-tuning:   8%|▊         | 610/7289 [01:29<15:17,  7.28it/s]                                                                 [612] field -> landscape_hilly (now 23)
-Fine-tuning:   8%|▊         | 610/7289 [01:30<15:17,  7.28it/s]                                                                 [613] license_plate -> license_plate_yellow (now 10)
-Fine-tuning:   8%|▊         | 610/7289 [01:30<15:17,  7.28it/s]                                                                 [619] sign -> infrastructure_road_sign_tab_short_arrow (now 10)
-Fine-tuning:   8%|▊         | 610/7289 [01:30<15:17,  7.28it/s]                                                                 [618] architecture -> architecture_ankara (now 5)
-Fine-tuning:   8%|▊         | 610/7289 [01:30<15:17,  7.28it/s]Fine-tuning:   9%|▊         | 620/7289 [01:30<16:57,  6.55it/s]                                                                 [627] person -> person_detailed_man (now 1)
-Fine-tuning:   9%|▊         | 620/7289 [01:34<16:57,  6.55it/s]                                                                 [623] sign -> unique_street_sign (now 1)
-Fine-tuning:   9%|▊         | 620/7289 [01:34<16:57,  6.55it/s]                                                                 [622] object -> architecture_timbers (now 1)
-Fine-tuning:   9%|▊         | 620/7289 [01:34<16:57,  6.55it/s]                                                                 [620] grass -> landscape_grass_tufts (now 1)
-Fine-tuning:   9%|▊         | 620/7289 [01:34<16:57,  6.55it/s]                                                                 [628] field -> landscape_red_fields (now 9)
-Fine-tuning:   9%|▊         | 620/7289 [01:34<16:57,  6.55it/s]                                                                 [621] pole -> infrastructure_hyderabad_mesh_pole (now 1)
-Fine-tuning:   9%|▊         | 620/7289 [01:34<16:57,  6.55it/s]Fine-tuning:   9%|▊         | 630/7289 [01:34<22:06,  5.02it/s][2025-12-04T21:12:33.892] error: *** JOB 17202331 ON gcn2 CANCELLED AT 2025-12-04T21:12:33 DUE to SIGNAL Terminated ***

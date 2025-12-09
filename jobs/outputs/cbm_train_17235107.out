@@ -1,112 +1,0 @@
-============================================================================================== 
-Warning! Mixing Conda and module environments may lead to corruption of the
-user environment. 
-We do not recommend users mixing those two environments unless absolutely
-necessary. Note that 
-SURF does not provide any support for Conda environment.
-For more information, please refer to our software policy page:
-https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
-
-Remember that many packages have already been installed on the system and can
-be loaded using 
-the 'module load <package__name>' command. If you are uncertain if a package is
-already available 
-on the system, please use 'module avail' or 'module spider' to search for it.
-============================================================================================== 
-============================================================
-Starting Phase 1: Concept Training
-============================================================
-Loading datasets...
-Loaded S2 vocabulary: 12524 cells (Level 8)
-Loading pooled embeddings from /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/train_pooled_embeddings.pt
-Loaded 34028 pooled embeddings
-Warning: Patch tokens not found at /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/train_patch_tokens.pt, skipping.
-Loaded S2 vocabulary: 12524 cells (Level 8)
-Filtered dataset: 4254 -> 4247 samples (7 samples with unknown concepts)
-Loading pooled embeddings from /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/val_pooled_embeddings.pt
-Loaded 4254 pooled embeddings
-Warning: Patch tokens not found at /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/val_patch_tokens.pt, skipping.
-Initializing CBM...
-Computing concept class weights...
-Phase 1: Concept Training
-
-Epoch 1/20
-Train:   0%|          | 0/133 [00:00<?, ?it/s]Train:   0%|          | 0/133 [00:00<?, ?it/s, C_Loss=5.5307]Train:   1%|          | 1/133 [00:00<01:05,  2.03it/s, C_Loss=5.5307]Train:   1%|          | 1/133 [00:00<01:05,  2.03it/s, C_Loss=5.5269]Train:   1%|          | 1/133 [00:00<01:05,  2.03it/s, C_Loss=5.5072]Train:   1%|          | 1/133 [00:00<01:05,  2.03it/s, C_Loss=5.4960]Train:   1%|          | 1/133 [00:00<01:05,  2.03it/s, C_Loss=5.4853]Train:   1%|          | 1/133 [00:00<01:05,  2.03it/s, C_Loss=5.4596]Train:   1%|          | 1/133 [00:00<01:05,  2.03it/s, C_Loss=5.4498]Train:   1%|          | 1/133 [00:00<01:05,  2.03it/s, C_Loss=5.4212]Train:   1%|          | 1/133 [00:00<01:05,  2.03it/s, C_Loss=5.4271]Train:   1%|          | 1/133 [00:00<01:05,  2.03it/s, C_Loss=5.3700]Train:   1%|          | 1/133 [00:00<01:05,  2.03it/s, C_Loss=5.3688]Train:   1%|          | 1/133 [00:00<01:05,  2.03it/s, C_Loss=5.2867]Train:   1%|          | 1/133 [00:00<01:05,  2.03it/s, C_Loss=5.2076]Train:   1%|          | 1/133 [00:00<01:05,  2.03it/s, C_Loss=5.2632]Train:   1%|          | 1/133 [00:00<01:05,  2.03it/s, C_Loss=5.2560]Train:   1%|          | 1/133 [00:00<01:05,  2.03it/s, C_Loss=5.0895]Train:   1%|          | 1/133 [00:00<01:05,  2.03it/s, C_Loss=4.9381]Train:   1%|          | 1/133 [00:00<01:05,  2.03it/s, C_Loss=5.0619]Train:   1%|          | 1/133 [00:00<01:05,  2.03it/s, C_Loss=5.0033]Train:   1%|          | 1/133 [00:00<01:05,  2.03it/s, C_Loss=4.9637]Train:  15%|█▌        | 20/133 [00:00<00:02, 44.11it/s, C_Loss=4.9637]Train:  15%|█▌        | 20/133 [00:00<00:02, 44.11it/s, C_Loss=5.0404]Train:  15%|█▌        | 20/133 [00:00<00:02, 44.11it/s, C_Loss=5.0930]Train:  15%|█▌        | 20/133 [00:00<00:02, 44.11it/s, C_Loss=4.8055]Train:  15%|█▌        | 20/133 [00:00<00:02, 44.11it/s, C_Loss=4.8502]Train:  15%|█▌        | 20/133 [00:00<00:02, 44.11it/s, C_Loss=4.8217]Train:  15%|█▌        | 20/133 [00:00<00:02, 44.11it/s, C_Loss=4.5573]Train:  15%|█▌        | 20/133 [00:00<00:02, 44.11it/s, C_Loss=4.8926]Train:  15%|█▌        | 20/133 [00:00<00:02, 44.11it/s, C_Loss=4.8140]Train:  15%|█▌        | 20/133 [00:00<00:02, 44.11it/s, C_Loss=4.3395]Train:  15%|█▌        | 20/133 [00:00<00:02, 44.11it/s, C_Loss=4.8735]Train:  15%|█▌        | 20/133 [00:00<00:02, 44.11it/s, C_Loss=4.8651]Train:  15%|█▌        | 20/133 [00:00<00:02, 44.11it/s, C_Loss=4.8234]Train:  15%|█▌        | 20/133 [00:00<00:02, 44.11it/s, C_Loss=4.7161]Train:  15%|█▌        | 20/133 [00:00<00:02, 44.11it/s, C_Loss=4.6675]Train:  15%|█▌        | 20/133 [00:00<00:02, 44.11it/s, C_Loss=5.0975]Train:  15%|█▌        | 20/133 [00:00<00:02, 44.11it/s, C_Loss=4.8358]Train:  15%|█▌        | 20/133 [00:00<00:02, 44.11it/s, C_Loss=4.7611]Train:  15%|█▌        | 20/133 [00:00<00:02, 44.11it/s, C_Loss=4.7286]Train:  15%|█▌        | 20/133 [00:00<00:02, 44.11it/s, C_Loss=5.1167]Train:  29%|██▉       | 39/133 [00:00<00:01, 78.28it/s, C_Loss=5.1167]Train:  29%|██▉       | 39/133 [00:00<00:01, 78.28it/s, C_Loss=5.1787]Train:  29%|██▉       | 39/133 [00:00<00:01, 78.28it/s, C_Loss=5.0821]Train:  29%|██▉       | 39/133 [00:00<00:01, 78.28it/s, C_Loss=4.2597]Train:  29%|██▉       | 39/133 [00:00<00:01, 78.28it/s, C_Loss=4.7144]Train:  29%|██▉       | 39/133 [00:00<00:01, 78.28it/s, C_Loss=4.8695]Train:  29%|██▉       | 39/133 [00:00<00:01, 78.28it/s, C_Loss=5.1053]Train:  29%|██▉       | 39/133 [00:00<00:01, 78.28it/s, C_Loss=4.9252]Train:  29%|██▉       | 39/133 [00:00<00:01, 78.28it/s, C_Loss=4.7643]Train:  29%|██▉       | 39/133 [00:00<00:01, 78.28it/s, C_Loss=4.8465]Train:  29%|██▉       | 39/133 [00:00<00:01, 78.28it/s, C_Loss=4.7909]Train:  29%|██▉       | 39/133 [00:00<00:01, 78.28it/s, C_Loss=4.6701]Train:  29%|██▉       | 39/133 [00:00<00:01, 78.28it/s, C_Loss=4.5560]Train:  29%|██▉       | 39/133 [00:00<00:01, 78.28it/s, C_Loss=5.1724]Train:  29%|██▉       | 39/133 [00:00<00:01, 78.28it/s, C_Loss=4.7993]Train:  29%|██▉       | 39/133 [00:00<00:01, 78.28it/s, C_Loss=4.8977]Train:  29%|██▉       | 39/133 [00:00<00:01, 78.28it/s, C_Loss=4.7525]Train:  41%|████▏     | 55/133 [00:00<00:00, 98.68it/s, C_Loss=4.7525]Train:  41%|████▏     | 55/133 [00:00<00:00, 98.68it/s, C_Loss=4.7849]Train:  41%|████▏     | 55/133 [00:00<00:00, 98.68it/s, C_Loss=5.0521]Train:  41%|████▏     | 55/133 [00:00<00:00, 98.68it/s, C_Loss=4.5558]Train:  41%|████▏     | 55/133 [00:00<00:00, 98.68it/s, C_Loss=5.1286]Train:  41%|████▏     | 55/133 [00:00<00:00, 98.68it/s, C_Loss=4.6789]Train:  41%|████▏     | 55/133 [00:00<00:00, 98.68it/s, C_Loss=4.8577]Train:  41%|████▏     | 55/133 [00:00<00:00, 98.68it/s, C_Loss=4.4188]Train:  41%|████▏     | 55/133 [00:00<00:00, 98.68it/s, C_Loss=4.8936]Train:  41%|████▏     | 55/133 [00:00<00:00, 98.68it/s, C_Loss=4.7581]Train:  41%|████▏     | 55/133 [00:00<00:00, 98.68it/s, C_Loss=4.6799]Train:  41%|████▏     | 55/133 [00:00<00:00, 98.68it/s, C_Loss=4.4847]Train:  41%|████▏     | 55/133 [00:00<00:00, 98.68it/s, C_Loss=4.7999]Train:  41%|████▏     | 55/133 [00:00<00:00, 98.68it/s, C_Loss=4.5452]Train:  41%|████▏     | 55/133 [00:00<00:00, 98.68it/s, C_Loss=4.8832]Train:  41%|████▏     | 55/133 [00:00<00:00, 98.68it/s, C_Loss=4.7427]Train:  41%|████▏     | 55/133 [00:00<00:00, 98.68it/s, C_Loss=4.6365]Train:  41%|████▏     | 55/133 [00:00<00:00, 98.68it/s, C_Loss=4.3016]Train:  41%|████▏     | 55/133 [00:00<00:00, 98.68it/s, C_Loss=4.5441]Train:  41%|████▏     | 55/133 [00:00<00:00, 98.68it/s, C_Loss=4.6261]Train:  56%|█████▌    | 74/133 [00:00<00:00, 122.51it/s, C_Loss=4.6261]Train:  56%|█████▌    | 74/133 [00:00<00:00, 122.51it/s, C_Loss=4.7825]Train:  56%|█████▌    | 74/133 [00:00<00:00, 122.51it/s, C_Loss=4.7156]Train:  56%|█████▌    | 74/133 [00:00<00:00, 122.51it/s, C_Loss=4.6013]Train:  56%|█████▌    | 74/133 [00:00<00:00, 122.51it/s, C_Loss=4.4380]Train:  56%|█████▌    | 74/133 [00:00<00:00, 122.51it/s, C_Loss=4.7061]Train:  56%|█████▌    | 74/133 [00:00<00:00, 122.51it/s, C_Loss=4.9698]Train:  56%|█████▌    | 74/133 [00:00<00:00, 122.51it/s, C_Loss=4.7557]Train:  56%|█████▌    | 74/133 [00:00<00:00, 122.51it/s, C_Loss=4.9402]Train:  56%|█████▌    | 74/133 [00:00<00:00, 122.51it/s, C_Loss=4.5214]Train:  56%|█████▌    | 74/133 [00:00<00:00, 122.51it/s, C_Loss=4.1496]Train:  56%|█████▌    | 74/133 [00:00<00:00, 122.51it/s, C_Loss=4.7594]Train:  56%|█████▌    | 74/133 [00:00<00:00, 122.51it/s, C_Loss=4.4692]Train:  56%|█████▌    | 74/133 [00:00<00:00, 122.51it/s, C_Loss=4.6753]Train:  56%|█████▌    | 74/133 [00:00<00:00, 122.51it/s, C_Loss=4.5963]Train:  56%|█████▌    | 74/133 [00:00<00:00, 122.51it/s, C_Loss=4.4230]Train:  56%|█████▌    | 74/133 [00:00<00:00, 122.51it/s, C_Loss=4.5645]Train:  56%|█████▌    | 74/133 [00:01<00:00, 122.51it/s, C_Loss=4.5176]Train:  68%|██████▊   | 91/133 [00:01<00:00, 134.79it/s, C_Loss=4.5176]Train:  68%|██████▊   | 91/133 [00:01<00:00, 134.79it/s, C_Loss=4.6752]Train:  68%|██████▊   | 91/133 [00:01<00:00, 134.79it/s, C_Loss=4.6634]Train:  68%|██████▊   | 91/133 [00:01<00:00, 134.79it/s, C_Loss=4.4519]Train:  68%|██████▊   | 91/133 [00:01<00:00, 134.79it/s, C_Loss=4.5654]Train:  68%|██████▊   | 91/133 [00:01<00:00, 134.79it/s, C_Loss=5.0762]Train:  68%|██████▊   | 91/133 [00:01<00:00, 134.79it/s, C_Loss=4.6561]Train:  68%|██████▊   | 91/133 [00:01<00:00, 134.79it/s, C_Loss=4.2999]Train:  68%|██████▊   | 91/133 [00:01<00:00, 134.79it/s, C_Loss=4.8278]Train:  68%|██████▊   | 91/133 [00:01<00:00, 134.79it/s, C_Loss=4.3010]Train:  68%|██████▊   | 91/133 [00:01<00:00, 134.79it/s, C_Loss=4.3109]Train:  68%|██████▊   | 91/133 [00:01<00:00, 134.79it/s, C_Loss=4.7466]Train:  68%|██████▊   | 91/133 [00:01<00:00, 134.79it/s, C_Loss=4.7202]Train:  68%|██████▊   | 91/133 [00:01<00:00, 134.79it/s, C_Loss=4.5325]Train:  68%|██████▊   | 91/133 [00:01<00:00, 134.79it/s, C_Loss=4.8028]Train:  68%|██████▊   | 91/133 [00:01<00:00, 134.79it/s, C_Loss=4.3338]Train:  68%|██████▊   | 91/133 [00:01<00:00, 134.79it/s, C_Loss=4.7446]Train:  68%|██████▊   | 91/133 [00:01<00:00, 134.79it/s, C_Loss=4.5135]Train:  81%|████████  | 108/133 [00:01<00:00, 144.33it/s, C_Loss=4.5135]Train:  81%|████████  | 108/133 [00:01<00:00, 144.33it/s, C_Loss=4.3576]Train:  81%|████████  | 108/133 [00:01<00:00, 144.33it/s, C_Loss=4.5407]Train:  81%|████████  | 108/133 [00:01<00:00, 144.33it/s, C_Loss=4.6274]Train:  81%|████████  | 108/133 [00:01<00:00, 144.33it/s, C_Loss=4.5332]Train:  81%|████████  | 108/133 [00:01<00:00, 144.33it/s, C_Loss=4.4269]Train:  81%|████████  | 108/133 [00:01<00:00, 144.33it/s, C_Loss=4.3381]Train:  81%|████████  | 108/133 [00:01<00:00, 144.33it/s, C_Loss=4.7671]Train:  81%|████████  | 108/133 [00:01<00:00, 144.33it/s, C_Loss=4.7360]Train:  81%|████████  | 108/133 [00:01<00:00, 144.33it/s, C_Loss=4.5414]Train:  81%|████████  | 108/133 [00:01<00:00, 144.33it/s, C_Loss=4.7296]Train:  81%|████████  | 108/133 [00:01<00:00, 144.33it/s, C_Loss=4.3032]Train:  81%|████████  | 108/133 [00:01<00:00, 144.33it/s, C_Loss=4.2849]Train:  81%|████████  | 108/133 [00:01<00:00, 144.33it/s, C_Loss=4.3831]Train:  81%|████████  | 108/133 [00:01<00:00, 144.33it/s, C_Loss=4.5522]Train:  81%|████████  | 108/133 [00:01<00:00, 144.33it/s, C_Loss=3.9024]Train:  81%|████████  | 108/133 [00:01<00:00, 144.33it/s, C_Loss=4.7849]Train:  81%|████████  | 108/133 [00:01<00:00, 144.33it/s, C_Loss=4.4089]Train:  81%|████████  | 108/133 [00:01<00:00, 144.33it/s, C_Loss=4.7894]Train:  95%|█████████▍| 126/133 [00:01<00:00, 153.93it/s, C_Loss=4.7894]Train:  95%|█████████▍| 126/133 [00:01<00:00, 153.93it/s, C_Loss=4.3553]Train:  95%|█████████▍| 126/133 [00:01<00:00, 153.93it/s, C_Loss=4.4077]Train:  95%|█████████▍| 126/133 [00:01<00:00, 153.93it/s, C_Loss=4.1902]Train:  95%|█████████▍| 126/133 [00:01<00:00, 153.93it/s, C_Loss=4.8668]Train:  95%|█████████▍| 126/133 [00:01<00:00, 153.93it/s, C_Loss=4.5786]Train:  95%|█████████▍| 126/133 [00:01<00:00, 153.93it/s, C_Loss=4.6796]Train:  95%|█████████▍| 126/133 [00:01<00:00, 153.93it/s, C_Loss=4.7999]Train: 100%|██████████| 133/133 [00:01<00:00, 104.71it/s, C_Loss=4.7999]
-Eval:   0%|          | 0/17 [00:00<?, ?it/s]Eval:  12%|█▏        | 2/17 [00:00<00:00, 18.56it/s]Eval: 100%|██████████| 17/17 [00:00<00:00, 85.53it/s]
-Train Loss: 4.7689 | Acc: 0.1415
-Val   Loss: 4.3479   | Acc: 0.1853
-Generating visualizations...
-Traceback (most recent call last):
-  File "/gpfs/home4/igodzwon/Project_AI/scripts/training/train_cbm.py", line 445, in <module>
-    main()
-  File "/gpfs/home4/igodzwon/Project_AI/scripts/training/train_cbm.py", line 430, in main
-    visualize_predictions(model, val_ds, device, epoch, output_dir, args.phase)
-  File "/gpfs/home4/igodzwon/Project_AI/scripts/training/train_cbm.py", line 105, in visualize_predictions
-    top5_concepts = [dataset.get_concept_name(idx.item()) for idx in top5_idx]
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/gpfs/home4/igodzwon/Project_AI/scripts/training/train_cbm.py", line 105, in <listcomp>
-    top5_concepts = [dataset.get_concept_name(idx.item()) for idx in top5_idx]
-                     ^^^^^^^^^^^^^^^^^^^^^^^^
-AttributeError: 'ConceptDataset' object has no attribute 'get_concept_name'
-============================================================
-Starting Phase 2: Geo Training (resuming from Phase 1)
-============================================================
-Loading datasets...
-Loaded S2 vocabulary: 12524 cells (Level 8)
-Loading pooled embeddings from /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/train_pooled_embeddings.pt
-Loaded 34028 pooled embeddings
-Warning: Patch tokens not found at /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/train_patch_tokens.pt, skipping.
-Loaded S2 vocabulary: 12524 cells (Level 8)
-Filtered dataset: 4254 -> 4247 samples (7 samples with unknown concepts)
-Loading pooled embeddings from /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/val_pooled_embeddings.pt
-Loaded 4254 pooled embeddings
-Warning: Patch tokens not found at /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/val_patch_tokens.pt, skipping.
-Initializing CBM...
-Loading checkpoint from checkpoints/cbm_v1/best_phase1.pt
-Traceback (most recent call last):
-  File "/gpfs/home4/igodzwon/Project_AI/scripts/training/train_cbm.py", line 445, in <module>
-    main()
-  File "/gpfs/home4/igodzwon/Project_AI/scripts/training/train_cbm.py", line 374, in main
-    checkpoint = torch.load(args.resume_checkpoint, map_location=device)
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/igodzwon/.conda/envs/streetview/lib/python3.11/site-packages/torch/serialization.py", line 1484, in load
-    with _open_file_like(f, "rb") as opened_file:
-         ^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/igodzwon/.conda/envs/streetview/lib/python3.11/site-packages/torch/serialization.py", line 759, in _open_file_like
-    return _open_file(name_or_buffer, mode)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/igodzwon/.conda/envs/streetview/lib/python3.11/site-packages/torch/serialization.py", line 740, in __init__
-    super().__init__(open(name, mode))
-                     ^^^^^^^^^^^^^^^^
-FileNotFoundError: [Errno 2] No such file or directory: 'checkpoints/cbm_v1/best_phase1.pt'
-============================================================
-Starting Phase 3: Joint Training (fine-tuning)
-============================================================
-Loading datasets...
-Loaded S2 vocabulary: 12524 cells (Level 8)
-Loading pooled embeddings from /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/train_pooled_embeddings.pt
-Loaded 34028 pooled embeddings
-Warning: Patch tokens not found at /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/train_patch_tokens.pt, skipping.
-Loaded S2 vocabulary: 12524 cells (Level 8)
-Filtered dataset: 4254 -> 4247 samples (7 samples with unknown concepts)
-Loading pooled embeddings from /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/val_pooled_embeddings.pt
-Loaded 4254 pooled embeddings
-Warning: Patch tokens not found at /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/val_patch_tokens.pt, skipping.
-Initializing CBM...
-Loading checkpoint from checkpoints/cbm_v1/best_phase2.pt
-Traceback (most recent call last):
-  File "/gpfs/home4/igodzwon/Project_AI/scripts/training/train_cbm.py", line 445, in <module>
-    main()
-  File "/gpfs/home4/igodzwon/Project_AI/scripts/training/train_cbm.py", line 374, in main
-    checkpoint = torch.load(args.resume_checkpoint, map_location=device)
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/igodzwon/.conda/envs/streetview/lib/python3.11/site-packages/torch/serialization.py", line 1484, in load
-    with _open_file_like(f, "rb") as opened_file:
-         ^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/igodzwon/.conda/envs/streetview/lib/python3.11/site-packages/torch/serialization.py", line 759, in _open_file_like
-    return _open_file(name_or_buffer, mode)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/igodzwon/.conda/envs/streetview/lib/python3.11/site-packages/torch/serialization.py", line 740, in __init__
-    super().__init__(open(name, mode))
-                     ^^^^^^^^^^^^^^^^
-FileNotFoundError: [Errno 2] No such file or directory: 'checkpoints/cbm_v1/best_phase2.pt'
