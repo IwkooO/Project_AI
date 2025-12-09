@@ -1,1079 +1,0 @@
-============================================================================================== 
-Warning! Mixing Conda and module environments may lead to corruption of the
-user environment. 
-We do not recommend users mixing those two environments unless absolutely
-necessary. Note that 
-SURF does not provide any support for Conda environment.
-For more information, please refer to our software policy page:
-https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
-
-Remember that many packages have already been installed on the system and can
-be loaded using 
-the 'module load <package__name>' command. If you are uncertain if a package is
-already available 
-on the system, please use 'module avail' or 'module spider' to search for it.
-============================================================================================== 
-
-[notice] A new release of pip is available: 25.1.1 -> 25.3
-[notice] To update, run: pip install --upgrade pip
-
-[notice] A new release of pip is available: 25.1.1 -> 25.3
-[notice] To update, run: pip install --upgrade pip
-========================================================================
-Fine-tune Concepts Job
-========================================================================
-Job started at: Thu Dec  4 21:13:02 CET 2025
-Refining overly frequent or rare concepts into more fine-grained concepts
-Checkpoints saved every 100 refinements
-========================================================================
-Loading generalized concepts from /gpfs/home4/igodzwon/Project_AI/data/generalized_concepts.csv
-Total rows: 7,289
-Valid rows (after filtering errors): 7,289
-Unique existing concepts: 354
-Loaded checkpoint: 600 rows already processed
-Rows remaining to process: 6,689
-
-Setting up Agno agent...
-
-Processing 6689 rows in batches of 10...
-Using 10 parallel workers
-Counts updated after each batch
-
-Fine-tuning:   0%|          | 0/6689 [00:00<?, ?it/s]                                                       [602] landscape -> landscape_red_fields (now 8)
-Fine-tuning:   0%|          | 0/6689 [00:01<?, ?it/s]                                                       [600] object -> electricity_counters_punjab (now 1)
-Fine-tuning:   0%|          | 0/6689 [00:01<?, ?it/s]                                                       [607] object -> political_logo_pasco (now 1)
-Fine-tuning:   0%|          | 0/6689 [00:01<?, ?it/s]Fine-tuning:   0%|          | 10/6689 [00:01<18:07,  6.14it/s]                                                                [618] architecture -> architecture_blue_walls_tiles (now 1)
-Fine-tuning:   0%|          | 10/6689 [00:03<18:07,  6.14it/s]                                                                [615] tent -> object (now 14)
-Fine-tuning:   0%|          | 10/6689 [00:03<18:07,  6.14it/s]                                                                [612] field -> landscape_hilly (now 23)
-Fine-tuning:   0%|          | 10/6689 [00:03<18:07,  6.14it/s]Fine-tuning:   0%|          | 20/6689 [00:03<19:43,  5.64it/s]                                                                [623] sign -> sign_unique (now 1)
-Fine-tuning:   0%|          | 20/6689 [00:05<19:43,  5.64it/s]                                                                [627] person -> person_finnish_icon (now 1)
-Fine-tuning:   0%|          | 20/6689 [00:05<19:43,  5.64it/s]                                                                [622] object -> architecture (now 6)
-Fine-tuning:   0%|          | 20/6689 [00:05<19:43,  5.64it/s]                                                                [621] pole -> pole_hyderabad_mesh (now 1)
-Fine-tuning:   0%|          | 20/6689 [00:05<19:43,  5.64it/s]                                                                [624] object -> political_logo_la_libertad (now 1)
-Fine-tuning:   0%|          | 20/6689 [00:05<19:43,  5.64it/s]                                                                [628] field -> plantation (now 6)
-Fine-tuning:   0%|          | 20/6689 [00:05<19:43,  5.64it/s]Fine-tuning:   0%|          | 30/6689 [00:05<21:17,  5.21it/s]                                                                [631] pole -> pole_tacna_moquegua (now 1)
-Fine-tuning:   0%|          | 30/6689 [00:07<21:17,  5.21it/s]                                                                [630] mountain -> snow_covered_mountain (now 1)
-Fine-tuning:   0%|          | 30/6689 [00:07<21:17,  5.21it/s]Fine-tuning:   1%|          | 40/6689 [00:07<20:40,  5.36it/s]                                                                [645] road -> landscape_dry_mountainous_road (now 1)
-Fine-tuning:   1%|          | 40/6689 [00:09<20:40,  5.36it/s]                                                                [647] license_plate -> license_plate_yellow (now 10)
-Fine-tuning:   1%|          | 40/6689 [00:09<20:40,  5.36it/s]                                                                [640] antenna -> car_antenna (now 1)
-Fine-tuning:   1%|          | 40/6689 [00:09<20:40,  5.36it/s]Fine-tuning:   1%|          | 50/6689 [00:09<22:29,  4.92it/s]ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 652. Please try again in 1.304s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 652. Please try again in 1.304s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 674. Please try again in 1.348s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 660. Please try again in 1.32s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 676. Please try again in 1.352s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 674. Please try again in 1.348s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 671. Please try again in 1.342s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 658. Please try again in 1.316s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 646. Please try again in 1.292s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 660. Please try again in 1.32s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 676. Please try again in 1.352s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 689. Please try again in 1.378s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 671. Please try again in 1.342s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 658. Please try again in 1.316s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 646. Please try again in 1.292s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 689. Please try again in 1.378s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 712. Please try again in 1.424s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 712. Please try again in 1.424s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 764. Please try again in 1.528s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 764. Please try again in 1.528s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29893, Requested 676. Please try again in 1.138s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29893, Requested 676. Please try again in 1.138s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29910, Requested 646. Please try again in 1.112s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29910, Requested 646. Please try again in 1.112s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29893, Requested 652. Please try again in 1.09s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29893, Requested 652. Please try again in 1.09s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 764. Please try again in 1.528s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 764. Please try again in 1.528s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29783, Requested 646. Please try again in 858ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29743, Requested 652. Please try again in 790ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29783, Requested 646. Please try again in 858ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29725, Requested 676. Please try again in 802ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29743, Requested 652. Please try again in 790ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29725, Requested 676. Please try again in 802ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-                                                                [657] vegetation -> vegetation_calotropis_procera (now 1)
-Fine-tuning:   1%|          | 50/6689 [00:29<22:29,  4.92it/s]                                                                [651] guardrail -> infrastructure (now 1)
-Fine-tuning:   1%|          | 50/6689 [00:29<22:29,  4.92it/s]                                                                [653] sign -> sticker (now 1)
-Fine-tuning:   1%|          | 50/6689 [00:29<22:29,  4.92it/s]                                                                [655] lamp_post -> lamp_posts_unique (now 1)
-Fine-tuning:   1%|          | 50/6689 [00:29<22:29,  4.92it/s]                                                                [654] car -> vehicle (now 4)
-Fine-tuning:   1%|          | 50/6689 [00:29<22:29,  4.92it/s]                                                                [650] object -> political_logo_junin (now 1)
-Fine-tuning:   1%|          | 50/6689 [00:29<22:29,  4.92it/s]                                                                [656] language -> language_gujarati (now 1)
-Fine-tuning:   1%|          | 50/6689 [00:29<22:29,  4.92it/s]Fine-tuning:   1%|          | 60/6689 [00:29<1:30:44,  1.22it/s]ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 731. Please try again in 1.462s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 731. Please try again in 1.462s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 679. Please try again in 1.358s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 676. Please try again in 1.352s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 679. Please try again in 1.358s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 669. Please try again in 1.338s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 676. Please try again in 1.352s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 669. Please try again in 1.338s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 741. Please try again in 1.482s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 741. Please try again in 1.482s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 681. Please try again in 1.362s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 681. Please try again in 1.362s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29420, Requested 731. Please try again in 302ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29420, Requested 731. Please try again in 302ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29864, Requested 681. Please try again in 1.09s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29918, Requested 741. Please try again in 1.318s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29864, Requested 681. Please try again in 1.09s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29918, Requested 741. Please try again in 1.318s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29505, Requested 741. Please try again in 492ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29505, Requested 741. Please try again in 492ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-                                                                  [667] truck -> vehicle (now 5)
-Fine-tuning:   1%|          | 60/6689 [00:48<1:30:44,  1.22it/s]                                                                  [665] pole -> pole_extra_attachment (now 1)
-Fine-tuning:   1%|          | 60/6689 [00:48<1:30:44,  1.22it/s]                                                                  [669] house -> architecture_brick_tile_roof (now 1)
-Fine-tuning:   1%|          | 60/6689 [00:48<1:30:44,  1.22it/s]                                                                  [666] rockiness -> landscape_rocky (now 1)
-Fine-tuning:   1%|          | 60/6689 [00:48<1:30:44,  1.22it/s]Fine-tuning:   1%|          | 70/6689 [00:48<2:08:21,  1.16s/it]                                                                  [672] roof -> architecture (now 7)
-Fine-tuning:   1%|          | 70/6689 [00:50<2:08:21,  1.16s/it]Fine-tuning:   1%|          | 80/6689 [00:50<1:33:46,  1.17it/s]ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 703. Please try again in 1.406s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 664. Please try again in 1.328s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 659. Please try again in 1.318s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 703. Please try again in 1.406s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 668. Please try again in 1.336s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 663. Please try again in 1.326s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 664. Please try again in 1.328s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 659. Please try again in 1.318s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 668. Please try again in 1.336s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 663. Please try again in 1.326s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 710. Please try again in 1.42s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 733. Please try again in 1.466s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 685. Please try again in 1.37s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 710. Please try again in 1.42s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 733. Please try again in 1.466s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 733. Please try again in 1.466s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 685. Please try again in 1.37s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 733. Please try again in 1.466s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 825. Please try again in 1.65s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 825. Please try again in 1.65s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 663. Please try again in 1.326s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 664. Please try again in 1.328s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 663. Please try again in 1.326s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 664. Please try again in 1.328s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 703. Please try again in 1.406s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 710. Please try again in 1.42s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 668. Please try again in 1.336s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 703. Please try again in 1.406s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 685. Please try again in 1.37s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 710. Please try again in 1.42s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 668. Please try again in 1.336s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 685. Please try again in 1.37s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 659. Please try again in 1.318s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 733. Please try again in 1.466s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 733. Please try again in 1.466s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 659. Please try again in 1.318s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 733. Please try again in 1.466s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 733. Please try again in 1.466s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 825. Please try again in 1.65s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 825. Please try again in 1.65s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 733. Please try again in 1.466s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 733. Please try again in 1.466s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 663. Please try again in 1.326s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 663. Please try again in 1.326s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 703. Please try again in 1.406s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 710. Please try again in 1.42s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 703. Please try again in 1.406s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 668. Please try again in 1.336s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 710. Please try again in 1.42s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 668. Please try again in 1.336s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 825. Please try again in 1.65s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 825. Please try again in 1.65s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29877, Requested 703. Please try again in 1.16s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29877, Requested 703. Please try again in 1.16s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-                                                                  [688] language -> language_punjabi (now 1)
-Fine-tuning:   1%|          | 80/6689 [01:20<1:33:46,  1.17it/s]                                                                  [687] car -> unique_car (now 9)
-Fine-tuning:   1%|          | 80/6689 [01:20<1:33:46,  1.17it/s]                                                                  [684] fence -> infrastructure_fence_wooden (now 1)
-Fine-tuning:   1%|          | 80/6689 [01:20<1:33:46,  1.17it/s]Fine-tuning:   1%|▏         | 90/6689 [01:20<2:48:35,  1.53s/it]                                                                  [697] roof -> architecture (now 8)
-Fine-tuning:   1%|▏         | 90/6689 [01:22<2:48:35,  1.53s/it]                                                                  [698] car -> unique_car (now 10)
-Fine-tuning:   1%|▏         | 90/6689 [01:22<2:48:35,  1.53s/it]                                                                  [695] sign -> sign_clasps (now 1)
-Fine-tuning:   1%|▏         | 90/6689 [01:22<2:48:35,  1.53s/it]                                                                  [699] cactus -> vegetation (now 4)
-Fine-tuning:   1%|▏         | 90/6689 [01:22<2:48:35,  1.53s/it]Fine-tuning:   1%|▏         | 100/6689 [01:22<2:02:48,  1.12s/it]  Checkpoint saved: 700 rows
-                                                                   Unique new concepts: 267
-Fine-tuning:   1%|▏         | 100/6689 [01:22<2:02:48,  1.12s/it]ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 656. Please try again in 1.312s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 641. Please try again in 1.282s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 656. Please try again in 1.312s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 641. Please try again in 1.282s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 684. Please try again in 1.368s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 645. Please try again in 1.29s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 665. Please try again in 1.33s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 684. Please try again in 1.368s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 645. Please try again in 1.29s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 674. Please try again in 1.348s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 665. Please try again in 1.33s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 674. Please try again in 1.348s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 723. Please try again in 1.446s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 723. Please try again in 1.446s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 704. Please try again in 1.408s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 704. Please try again in 1.408s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 737. Please try again in 1.474s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 737. Please try again in 1.474s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 801. Please try again in 1.602s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 801. Please try again in 1.602s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29668, Requested 645. Please try again in 626ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29645, Requested 656. Please try again in 602ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29666, Requested 641. Please try again in 614ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29668, Requested 645. Please try again in 626ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29630, Requested 674. Please try again in 608ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29640, Requested 665. Please try again in 610ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29645, Requested 656. Please try again in 602ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29623, Requested 684. Please try again in 614ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29666, Requested 641. Please try again in 614ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29630, Requested 674. Please try again in 608ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29640, Requested 665. Please try again in 610ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29623, Requested 684. Please try again in 614ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29348, Requested 723. Please try again in 142ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29348, Requested 723. Please try again in 142ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29333, Requested 704. Please try again in 74ms. Visit                  
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29333, Requested 704. Please try again in 74ms. Visit                  
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29887, Requested 665. Please try again in 1.104s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29887, Requested 665. Please try again in 1.104s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29901, Requested 641. Please try again in 1.084s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29901, Requested 641. Please try again in 1.084s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29778, Requested 665. Please try again in 886ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29778, Requested 665. Please try again in 886ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29558, Requested 641. Please try again in 398ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29558, Requested 641. Please try again in 398ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-                                                                   [707] pole -> infrastructure_concrete_holey_poles (now 1)
-Fine-tuning:   1%|▏         | 100/6689 [01:52<2:02:48,  1.12s/it]                                                                   [700] vegetation -> vegetation_bhutan_white_pine (now 1)
-Fine-tuning:   1%|▏         | 100/6689 [01:52<2:02:48,  1.12s/it]                                                                   [708] landscape -> landscape_rolling (now 1)
-Fine-tuning:   1%|▏         | 100/6689 [01:52<2:02:48,  1.12s/it]Fine-tuning:   2%|▏         | 110/6689 [01:52<3:05:00,  1.69s/it]                                                                   [717] signpost -> sign (now 23)
-Fine-tuning:   2%|▏         | 110/6689 [01:54<3:05:00,  1.69s/it]                                                                   [716] road -> road_highway (now 1)
-Fine-tuning:   2%|▏         | 110/6689 [01:54<3:05:00,  1.69s/it]                                                                   [713] pole -> pole_plate_leicestershire (now 1)
-Fine-tuning:   2%|▏         | 110/6689 [01:54<3:05:00,  1.69s/it]                                                                   [719] vehicle -> vehicle_yellow_tuk_tuk (now 1)
-Fine-tuning:   2%|▏         | 110/6689 [01:54<3:05:00,  1.69s/it]                                                                   [714] vegetation -> vegetation_stone_pine (now 1)
-Fine-tuning:   2%|▏         | 110/6689 [01:54<3:05:00,  1.69s/it]                                                                   [715] weather -> cloudy_weather (now 1)
-Fine-tuning:   2%|▏         | 110/6689 [01:54<3:05:00,  1.69s/it]Fine-tuning:   2%|▏         | 120/6689 [01:54<2:15:18,  1.24s/it]ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 656. Please try again in 1.312s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 658. Please try again in 1.316s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 649. Please try again in 1.298s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 656. Please try again in 1.312s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 662. Please try again in 1.324s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 660. Please try again in 1.32s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 658. Please try again in 1.316s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 649. Please try again in 1.298s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 662. Please try again in 1.324s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 660. Please try again in 1.32s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 674. Please try again in 1.348s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 679. Please try again in 1.358s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 647. Please try again in 1.294s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 674. Please try again in 1.348s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 664. Please try again in 1.328s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 679. Please try again in 1.358s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 702. Please try again in 1.404s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 647. Please try again in 1.294s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 664. Please try again in 1.328s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         30000, Requested 702. Please try again in 1.404s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29823, Requested 658. Please try again in 962ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29823, Requested 658. Please try again in 962ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29839, Requested 660. Please try again in 998ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29839, Requested 660. Please try again in 998ms. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29882, Requested 674. Please try again in 1.112s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Rate limit error from OpenAI API: Error code: 429 - {'error':          
-         {'message': 'Rate limit reached for gpt-4o in organization             
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29861, Requested 649. Please try again in 1.02s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.',       
-         'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}       
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29882, Requested 674. Please try again in 1.112s. Visit                
-         https://platform.openai.com/account/rate-limits to learn more.         
-WARNING  Attempt 1/1 failed: Rate limit reached for gpt-4o in organization      
-         org-IywtcqEdEs89IiZ2W2IXotEk on tokens per min (TPM): Limit 30000, Used
-         29861, Requested 649. Please try again in 1.02s. Visit                 
-         https://platform.openai.com/account/rate-limits to learn more.         
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-ERROR    Failed after 1 attempts. Last error using OpenAIChat(gpt-4o)           
-[2025-12-04T21:15:06.552] error: *** JOB 17202467 ON gcn2 CANCELLED AT 2025-12-04T21:15:06 DUE to SIGNAL Terminated ***

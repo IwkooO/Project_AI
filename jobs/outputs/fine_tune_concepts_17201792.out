@@ -1,399 +1,0 @@
-============================================================================================== 
-Warning! Mixing Conda and module environments may lead to corruption of the
-user environment. 
-We do not recommend users mixing those two environments unless absolutely
-necessary. Note that 
-SURF does not provide any support for Conda environment.
-For more information, please refer to our software policy page:
-https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
-
-Remember that many packages have already been installed on the system and can
-be loaded using 
-the 'module load <package__name>' command. If you are uncertain if a package is
-already available 
-on the system, please use 'module avail' or 'module spider' to search for it.
-============================================================================================== 
-
-[notice] A new release of pip is available: 25.1.1 -> 25.3
-[notice] To update, run: pip install --upgrade pip
-
-[notice] A new release of pip is available: 25.1.1 -> 25.3
-[notice] To update, run: pip install --upgrade pip
-========================================================================
-Fine-tune Concepts Job
-========================================================================
-Job started at: Thu Dec  4 20:12:32 CET 2025
-Refining overly frequent or rare concepts into more fine-grained concepts
-Checkpoints saved every 100 refinements
-========================================================================
-Loading generalized concepts from /gpfs/home4/igodzwon/Project_AI/data/generalized_concepts.csv
-Total rows: 7,289
-Valid rows (after filtering errors): 7,289
-
-Grouping by unique concepts...
-Found 354 unique concepts to evaluate
-Concepts remaining to process: 354
-
-Setting up Agno agent...
-
-Processing 354 concepts in batches of 10...
-Using 10 parallel workers
-Counts updated after each batch
-
-Evaluating:   0%|          | 0/354 [00:00<?, ?it/s]                                                     architecture (163, 2.2%) -> architecture_unique (now 163)
-Evaluating:   0%|          | 0/354 [00:02<?, ?it/s]                                                     badlands (1, 0.0%) -> badlands_stretch (now 1)
-Evaluating:   0%|          | 0/354 [00:02<?, ?it/s]                                                     agricultural_field (1, 0.0%) -> agricultural_field_red (now 1)
-Evaluating:   0%|          | 0/354 [00:02<?, ?it/s]                                                     auto (1, 0.0%) -> infrastructure_auto_rickshaw (now 1)
-Evaluating:   0%|          | 0/354 [00:02<?, ?it/s]                                                     alleyway (1, 0.0%) -> alleyway_coverage (now 1)
-Evaluating:   0%|          | 0/354 [00:02<?, ?it/s]                                                     arrow (2, 0.0%) -> arrow_chugoku (now 2)
-Evaluating:   0%|          | 0/354 [00:02<?, ?it/s]                                                     antenna (37, 0.5%) -> antenna_short_tilted (now 37)
-Evaluating:   0%|          | 0/354 [00:02<?, ?it/s]                                                     airport (1, 0.0%) -> airport_geographical (now 1)
-Evaluating:   0%|          | 0/354 [00:02<?, ?it/s]                                                     backboard (1, 0.0%) -> infrastructure_yellow_backboards (now 1)
-Evaluating:   0%|          | 0/354 [00:02<?, ?it/s]                                                     agriculture (12, 0.2%) -> agriculture_cotton_sugarcane (now 12)
-Evaluating:   0%|          | 0/354 [00:02<?, ?it/s]Evaluating:   3%|▎         | 10/354 [00:02<01:20,  4.28it/s]                                                              bay (1, 0.0%) -> bay_mountain (now 1)
-Evaluating:   3%|▎         | 10/354 [00:03<01:20,  4.28it/s]                                                              belt (1, 0.0%) -> infrastructure_auto_rickshaw (now 2)
-Evaluating:   3%|▎         | 10/354 [00:03<01:20,  4.28it/s]                                                              barrier (3, 0.0%) -> infrastructure_unique (now 3)
-Evaluating:   3%|▎         | 10/354 [00:03<01:20,  4.28it/s]                                                              bamboo (1, 0.0%) -> agriculture_cotton_sugarcane (now 13)
-Evaluating:   3%|▎         | 10/354 [00:03<01:20,  4.28it/s]                                                              bandana (1, 0.0%) -> infrastructure_auto_rickshaw (now 3)
-Evaluating:   3%|▎         | 10/354 [00:03<01:20,  4.28it/s]                                                              bar (1, 0.0%) -> infrastructure_yellow_backboards (now 2)
-Evaluating:   3%|▎         | 10/354 [00:03<01:20,  4.28it/s]                                                              beach (3, 0.0%) -> beach_resort (now 3)
-Evaluating:   3%|▎         | 10/354 [00:03<01:20,  4.28it/s]                                                              band (1, 0.0%) -> infrastructure_yellow_backboards (now 3)
-Evaluating:   3%|▎         | 10/354 [00:03<01:20,  4.28it/s]                                                              beige bricks (1, 0.0%) -> architecture_unique (now 164)
-Evaluating:   3%|▎         | 10/354 [00:03<01:20,  4.28it/s]                                                              barn (1, 0.0%) -> agriculture_cotton_sugarcane (now 14)
-Evaluating:   3%|▎         | 10/354 [00:03<01:20,  4.28it/s]Evaluating:   6%|▌         | 20/354 [00:03<01:01,  5.44it/s]                                                              bridge (7, 0.1%) -> infrastructure_unique (now 10)
-Evaluating:   6%|▌         | 20/354 [00:04<01:01,  5.44it/s]                                                              block (1, 0.0%) -> infrastructure_unique (now 11)
-Evaluating:   6%|▌         | 20/354 [00:04<01:01,  5.44it/s]                                                              bollard (201, 2.8%) -> infrastructure_unique (now 212)
-Evaluating:   6%|▌         | 20/354 [00:04<01:01,  5.44it/s]                                                              blur (1, 0.0%) -> infrastructure_unique (now 213)
-Evaluating:   6%|▌         | 20/354 [00:04<01:01,  5.44it/s]                                                              bricks (2, 0.0%) -> architecture_unique_bricks (now 2)
-Evaluating:   6%|▌         | 20/354 [00:04<01:01,  5.44it/s]                                                              boat (2, 0.0%) -> infrastructure_unique (now 215)
-Evaluating:   6%|▌         | 20/354 [00:04<01:01,  5.44it/s]                                                              buggy (1, 0.0%) -> infrastructure_unique (now 216)
-Evaluating:   6%|▌         | 20/354 [00:04<01:01,  5.44it/s]                                                              bin (32, 0.4%) -> infrastructure_unique (now 248)
-Evaluating:   6%|▌         | 20/354 [00:04<01:01,  5.44it/s]                                                              big blur (1, 0.0%) -> infrastructure_unique (now 249)
-Evaluating:   6%|▌         | 20/354 [00:04<01:01,  5.44it/s]                                                              brick (15, 0.2%) -> architecture_unique (now 179)
-Evaluating:   6%|▌         | 20/354 [00:04<01:01,  5.44it/s]Evaluating:   8%|▊         | 30/354 [00:04<00:46,  6.92it/s]                                                              bungalow (1, 0.0%) -> architecture_unique (now 180)
-Evaluating:   8%|▊         | 30/354 [00:10<00:46,  6.92it/s]                                                              bus stop (2, 0.0%) -> infrastructure_unique (now 251)
-Evaluating:   8%|▊         | 30/354 [00:10<00:46,  6.92it/s]                                                              bus (28, 0.4%) -> infrastructure_unique (now 279)
-Evaluating:   8%|▊         | 30/354 [00:10<00:46,  6.92it/s]                                                              bushes (1, 0.0%) -> agriculture_cotton_sugarcane (now 15)
-Evaluating:   8%|▊         | 30/354 [00:10<00:46,  6.92it/s]                                                              bump (1, 0.0%) -> infrastructure_unique (now 280)
-Evaluating:   8%|▊         | 30/354 [00:10<00:46,  6.92it/s]                                                              bush (1, 0.0%) -> agriculture_cotton_sugarcane (now 16)
-Evaluating:   8%|▊         | 30/354 [00:10<00:46,  6.92it/s]                                                              building (60, 0.8%) -> architecture_unique (now 240)
-Evaluating:   8%|▊         | 30/354 [00:10<00:46,  6.92it/s]                                                              bus_stop (7, 0.1%) -> infrastructure_unique (now 287)
-Evaluating:   8%|▊         | 30/354 [00:10<00:46,  6.92it/s]                                                              butte (1, 0.0%) -> agriculture_cotton_sugarcane (now 17)
-Evaluating:   8%|▊         | 30/354 [00:10<00:46,  6.92it/s]                                                              buildings (2, 0.0%) -> architecture_unique (now 242)
-Evaluating:   8%|▊         | 30/354 [00:10<00:46,  6.92it/s]Evaluating:  11%|█▏        | 40/354 [00:10<01:35,  3.27it/s]                                                              cactus (8, 0.1%) -> agriculture_cotton_sugarcane (now 25)
-Evaluating:  11%|█▏        | 40/354 [00:11<01:35,  3.27it/s]                                                              camera (9, 0.1%) -> infrastructure_unique (now 296)
-Evaluating:  11%|█▏        | 40/354 [00:11<01:35,  3.27it/s]                                                              cars (1, 0.0%) -> infrastructure_auto_rickshaw (now 4)
-Evaluating:  11%|█▏        | 40/354 [00:11<01:35,  3.27it/s]                                                              canyon (3, 0.0%) -> badlands_stretch (now 4)
-Evaluating:  11%|█▏        | 40/354 [00:11<01:35,  3.27it/s]                                                              cable (1, 0.0%) -> infrastructure_unique (now 297)
-Evaluating:  11%|█▏        | 40/354 [00:11<01:35,  3.27it/s]                                                              car blur (2, 0.0%) -> infrastructure_unique (now 299)
-Evaluating:  11%|█▏        | 40/354 [00:11<01:35,  3.27it/s]                                                              cacti (1, 0.0%) -> agriculture_unique_cacti (now 1)
-Evaluating:  11%|█▏        | 40/354 [00:11<01:35,  3.27it/s]                                                              car (255, 3.5%) -> infrastructure_unique (now 554)
-Evaluating:  11%|█▏        | 40/354 [00:11<01:35,  3.27it/s]                                                              canal (3, 0.0%) -> infrastructure_unique (now 557)
-Evaluating:  11%|█▏        | 40/354 [00:11<01:35,  3.27it/s]                                                              cap (1, 0.0%) -> infrastructure_unique (now 558)
-Evaluating:  11%|█▏        | 40/354 [00:11<01:35,  3.27it/s]Evaluating:  14%|█▍        | 50/354 [00:11<01:11,  4.24it/s]                                                              cliffs (3, 0.0%) -> badlands_stretch (now 7)
-Evaluating:  14%|█▍        | 50/354 [00:12<01:11,  4.24it/s]                                                              chevron (57, 0.8%) -> infrastructure_unique (now 615)
-Evaluating:  14%|█▍        | 50/354 [00:12<01:11,  4.24it/s]                                                              clothing (1, 0.0%) -> agriculture_unique_cacti (now 2)
-Evaluating:  14%|█▍        | 50/354 [00:12<01:11,  4.24it/s]                                                              coastline (59, 0.8%) -> beach_resort (now 62)
-Evaluating:  14%|█▍        | 50/354 [00:12<01:11,  4.24it/s]                                                              coast (1, 0.0%) -> beach_resort (now 63)
-Evaluating:  14%|█▍        | 50/354 [00:12<01:11,  4.24it/s]                                                              city (15, 0.2%) -> infrastructure_unique (now 630)
-Evaluating:  14%|█▍        | 50/354 [00:12<01:11,  4.24it/s]                                                              cityscape (4, 0.1%) -> infrastructure_unique (now 634)
-Evaluating:  14%|█▍        | 50/354 [00:12<01:11,  4.24it/s]                                                              cloth (1, 0.0%) -> agriculture_cotton_sugarcane (now 26)
-Evaluating:  14%|█▍        | 50/354 [00:12<01:11,  4.24it/s]                                                              chimney (4, 0.1%) -> architecture_unique (now 246)
-Evaluating:  14%|█▍        | 50/354 [00:12<01:11,  4.24it/s]                                                              church (1, 0.0%) -> architecture_unique_bricks (now 3)
-Evaluating:  14%|█▍        | 50/354 [00:12<01:11,  4.24it/s]Evaluating:  17%|█▋        | 60/354 [00:12<00:56,  5.17it/s]                                                              cobblestone (1, 0.0%) -> infrastructure_unique (now 635)
-Evaluating:  17%|█▋        | 60/354 [00:13<00:56,  5.17it/s]                                                              curb (11, 0.2%) -> infrastructure_unique (now 646)
-Evaluating:  17%|█▋        | 60/354 [00:13<00:56,  5.17it/s]                                                              decoration (1, 0.0%) -> infrastructure_unique (now 647)
-Evaluating:  17%|█▋        | 60/354 [00:13<00:56,  5.17it/s]                                                              cone (2, 0.0%) -> infrastructure_unique (now 649)
-Evaluating:  17%|█▋        | 60/354 [00:13<00:56,  5.17it/s]                                                              crop_fields (1, 0.0%) -> agriculture_cotton_sugarcane (now 27)
-Evaluating:  17%|█▋        | 60/354 [00:13<00:56,  5.17it/s]                                                              crossbar (2, 0.0%) -> infrastructure_unique (now 651)
-Evaluating:  17%|█▋        | 60/354 [00:13<00:56,  5.17it/s]                                                              courtyard (1, 0.0%) -> architecture_unique (now 247)
-Evaluating:  17%|█▋        | 60/354 [00:13<00:56,  5.17it/s]                                                              crater (1, 0.0%) -> landscape_unique_crater (now 1)
-Evaluating:  17%|█▋        | 60/354 [00:13<00:56,  5.17it/s]                                                              crops (1, 0.0%) -> agriculture_cotton_sugarcane (now 28)
-Evaluating:  17%|█▋        | 60/354 [00:13<00:56,  5.17it/s]                                                              cornfield (1, 0.0%) -> agriculture_unique_cacti (now 3)
-Evaluating:  17%|█▋        | 60/354 [00:13<00:56,  5.17it/s]Evaluating:  20%|█▉        | 70/354 [00:13<00:48,  5.84it/s]                                                              dirt road (2, 0.0%) -> infrastructure_unique (now 653)
-Evaluating:  20%|█▉        | 70/354 [00:15<00:48,  5.84it/s]                                                              dome (1, 0.0%) -> architecture_unique (now 248)
-Evaluating:  20%|█▉        | 70/354 [00:15<00:48,  5.84it/s]                                                              farmhouse (2, 0.0%) -> architecture_unique (now 250)
-Evaluating:  20%|█▉        | 70/354 [00:15<00:48,  5.84it/s]                                                              dunes (3, 0.0%) -> landscape_unique_crater (now 4)
-Evaluating:  20%|█▉        | 70/354 [00:15<00:48,  5.84it/s]                                                              dirt barrier (1, 0.0%) -> infrastructure_unique (now 654)
-Evaluating:  20%|█▉        | 70/354 [00:15<00:48,  5.84it/s]                                                              dust (2, 0.0%) -> infrastructure_unique (now 656)
-Evaluating:  20%|█▉        | 70/354 [00:15<00:48,  5.84it/s]                                                              dot (1, 0.0%) -> infrastructure_unique (now 657)
-Evaluating:  20%|█▉        | 70/354 [00:15<00:48,  5.84it/s]                                                              desert (111, 1.5%) -> landscape_unique_crater (now 115)
-Evaluating:  20%|█▉        | 70/354 [00:15<00:48,  5.84it/s]                                                              eucalyptus (1, 0.0%) -> agriculture_unique_cacti (now 4)
-Evaluating:  20%|█▉        | 70/354 [00:15<00:48,  5.84it/s]                                                              dirt (6, 0.1%) -> agriculture_unique_cacti (now 10)
-Evaluating:  20%|█▉        | 70/354 [00:15<00:48,  5.84it/s]Evaluating:  23%|██▎       | 80/354 [00:15<00:49,  5.53it/s]                                                              flat_landscape (2, 0.0%) -> landscape_unique_crater (now 117)
-Evaluating:  23%|██▎       | 80/354 [00:17<00:49,  5.53it/s]                                                              fence (16, 0.2%) -> architecture_unique (now 266)
-Evaluating:  23%|██▎       | 80/354 [00:17<00:49,  5.53it/s]                                                              flatland (8, 0.1%) -> landscape_unique_flatland (now 8)
-Evaluating:  23%|██▎       | 80/354 [00:17<00:49,  5.53it/s]                                                              fern (1, 0.0%) -> landscape_unique_crater (now 118)
-Evaluating:  23%|██▎       | 80/354 [00:17<00:49,  5.53it/s]                                                              flag (5, 0.1%) -> infrastructure_unique (now 662)
-Evaluating:  23%|██▎       | 80/354 [00:17<00:49,  5.53it/s]                                                              farmland (5, 0.1%) -> agriculture_unique_cacti (now 15)
-Evaluating:  23%|██▎       | 80/354 [00:17<00:49,  5.53it/s]                                                              fjord (5, 0.1%) -> landscape_unique_fjord (now 5)
-Evaluating:  23%|██▎       | 80/354 [00:17<00:49,  5.53it/s]                                                              field (10, 0.1%) -> agriculture_cotton_sugarcane (now 38)
-Evaluating:  23%|██▎       | 80/354 [00:17<00:49,  5.53it/s]                                                              fields (3, 0.0%) -> agriculture_cotton_sugarcane (now 41)
-Evaluating:  23%|██▎       | 80/354 [00:17<00:49,  5.53it/s]                                                              ferry (1, 0.0%) -> infrastructure_unique (now 663)
-Evaluating:  23%|██▎       | 80/354 [00:17<00:49,  5.53it/s]Evaluating:  25%|██▌       | 90/354 [00:17<00:47,  5.56it/s]                                                              flower (6, 0.1%) -> agriculture_unique_cacti (now 21)
-Evaluating:  25%|██▌       | 90/354 [00:18<00:47,  5.56it/s]                                                              gate (5, 0.1%) -> infrastructure_unique (now 668)
-Evaluating:  25%|██▌       | 90/354 [00:18<00:47,  5.56it/s]                                                              gas_station (1, 0.0%) -> infrastructure_unique (now 669)
-Evaluating:  25%|██▌       | 90/354 [00:18<00:47,  5.56it/s]                                                              gas station (2, 0.0%) -> infrastructure_unique (now 671)
-Evaluating:  25%|██▌       | 90/354 [00:18<00:47,  5.56it/s]                                                              forest (51, 0.7%) -> landscape_unique_flatland (now 59)
-Evaluating:  25%|██▌       | 90/354 [00:18<00:47,  5.56it/s]                                                              garden (1, 0.0%) -> landscape_unique_flatland (now 60)
-Evaluating:  25%|██▌       | 90/354 [00:18<00:47,  5.56it/s]                                                              fog (3, 0.0%) -> landscape_unique_fjord (now 8)
-Evaluating:  25%|██▌       | 90/354 [00:18<00:47,  5.56it/s]                                                              flatlands (1, 0.0%) -> landscape_unique_flatland (now 61)
-Evaluating:  25%|██▌       | 90/354 [00:18<00:47,  5.56it/s]                                                              flora (1, 0.0%) -> agriculture_unique_cacti (now 22)
-Evaluating:  25%|██▌       | 90/354 [00:18<00:47,  5.56it/s]                                                              garbage_bin (2, 0.0%) -> infrastructure_unique (now 673)
-Evaluating:  25%|██▌       | 90/354 [00:18<00:47,  5.56it/s]Evaluating:  28%|██▊       | 100/354 [00:18<00:41,  6.19it/s]  Saved checkpoint: 100 concepts
-                                                               Unique concepts: 18
-Evaluating:  28%|██▊       | 100/354 [00:18<00:41,  6.19it/s]                                                               glacier (3, 0.0%) -> landscape_unique_fjord (now 11)
-Evaluating:  28%|██▊       | 100/354 [00:22<00:41,  6.19it/s]                                                               grass-steppe (1, 0.0%) -> landscape_unique_flatland (now 62)
-Evaluating:  28%|██▊       | 100/354 [00:22<00:41,  6.19it/s]                                                               gorge (1, 0.0%) -> landscape_unique_fjord (now 12)
-Evaluating:  28%|██▊       | 100/354 [00:22<00:41,  6.19it/s]                                                               grass (14, 0.2%) -> agriculture_unique_cacti (now 36)
-Evaluating:  28%|██▊       | 100/354 [00:22<00:41,  6.19it/s]                                                               grass hills (1, 0.0%) -> landscape_unique_flatland (now 63)
-Evaluating:  28%|██▊       | 100/354 [00:22<00:41,  6.19it/s]                                                               green plains (1, 0.0%) -> landscape_unique_flatland (now 64)
-Evaluating:  28%|██▊       | 100/354 [00:22<00:41,  6.19it/s]                                                               ground (1, 0.0%) -> landscape_unique_flatland (now 65)
-Evaluating:  28%|██▊       | 100/354 [00:22<00:41,  6.19it/s]                                                               grassland (19, 0.3%) -> landscape_unique_flatland (now 84)
-Evaluating:  28%|██▊       | 100/354 [00:22<00:41,  6.19it/s]                                                               guardrail (45, 0.6%) -> infrastructure_unique (now 718)
-Evaluating:  28%|██▊       | 100/354 [00:22<00:41,  6.19it/s]                                                               greenhouse (4, 0.1%) -> agriculture_unique_cacti (now 40)
-Evaluating:  28%|██▊       | 100/354 [00:22<00:41,  6.19it/s]Evaluating:  31%|███       | 110/354 [00:22<00:58,  4.20it/s]                                                               highlands (72, 1.0%) -> landscape_unique_flatland (now 156)
-Evaluating:  31%|███       | 110/354 [00:23<00:58,  4.20it/s]                                                               harbour (2, 0.0%) -> infrastructure_unique (now 720)
-Evaluating:  31%|███       | 110/354 [00:23<00:58,  4.20it/s]                                                               gutter (1, 0.0%) -> infrastructure_unique (now 721)
-Evaluating:  31%|███       | 110/354 [00:23<00:58,  4.20it/s]                                                               haystack (1, 0.0%) -> agriculture_unique_cacti (now 41)
-Evaluating:  31%|███       | 110/354 [00:23<00:58,  4.20it/s]                                                               highland (1, 0.0%) -> landscape_unique_flatland (now 157)
-Evaluating:  31%|███       | 110/354 [00:23<00:58,  4.20it/s]                                                               halo (1, 0.0%) -> landscape_unique_flatland (now 158)
-Evaluating:  31%|███       | 110/354 [00:23<00:58,  4.20it/s]                                                               highway (64, 0.9%) -> infrastructure_unique (now 785)
-Evaluating:  31%|███       | 110/354 [00:23<00:58,  4.20it/s]                                                               hat (2, 0.0%) -> infrastructure_unique (now 787)
-Evaluating:  31%|███       | 110/354 [00:23<00:58,  4.20it/s]                                                               halloween (1, 0.0%) -> agriculture_unique_cacti (now 42)
-Evaluating:  31%|███       | 110/354 [00:23<00:58,  4.20it/s]                                                               hill (7, 0.1%) -> landscape_unique_fjord (now 19)
-Evaluating:  31%|███       | 110/354 [00:23<00:58,  4.20it/s]Evaluating:  34%|███▍      | 120/354 [00:23<00:45,  5.09it/s]                                                               hills (64, 0.9%) -> landscape_unique_flatland (now 222)
-Evaluating:  34%|███▍      | 120/354 [00:25<00:45,  5.09it/s]                                                               hilly landscape (1, 0.0%) -> landscape_unique_flatland (now 223)
-Evaluating:  34%|███▍      | 120/354 [00:25<00:45,  5.09it/s]                                                               home (1, 0.0%) -> architecture_unique (now 267)
-Evaluating:  34%|███▍      | 120/354 [00:25<00:45,  5.09it/s]                                                               hillside (1, 0.0%) -> landscape_unique_hillside (now 1)
-Evaluating:  34%|███▍      | 120/354 [00:25<00:45,  5.09it/s]                                                               horse (1, 0.0%) -> agriculture_unique_cacti (now 43)
-Evaluating:  34%|███▍      | 120/354 [00:25<00:45,  5.09it/s]                                                               hilliness (1, 0.0%) -> landscape_unique_fjord (now 20)
-Evaluating:  34%|███▍      | 120/354 [00:25<00:45,  5.09it/s]                                                               houses (6, 0.1%) -> architecture_unique (now 273)
-Evaluating:  34%|███▍      | 120/354 [00:25<00:45,  5.09it/s]                                                               hilly_landscape (1, 0.0%) -> landscape_unique_flatland (now 224)
-Evaluating:  34%|███▍      | 120/354 [00:25<00:45,  5.09it/s]                                                               hostel (1, 0.0%) -> infrastructure_unique (now 788)
-Evaluating:  34%|███▍      | 120/354 [00:25<00:45,  5.09it/s]                                                               house (70, 1.0%) -> architecture_unique (now 343)
-Evaluating:  34%|███▍      | 120/354 [00:25<00:45,  5.09it/s]Evaluating:  37%|███▋      | 130/354 [00:25<00:40,  5.57it/s]                                                               jungle (2, 0.0%) -> landscape_unique_flatland (now 226)
-Evaluating:  37%|███▋      | 130/354 [00:27<00:40,  5.57it/s]                                                               jacket (1, 0.0%) -> infrastructure_unique (now 789)
-Evaluating:  37%|███▋      | 130/354 [00:27<00:40,  5.57it/s]                                                               infrastructure (37, 0.5%) -> infrastructure_unique (now 826)
-Evaluating:  37%|███▋      | 130/354 [00:27<00:40,  5.57it/s]                                                               insulator (15, 0.2%) -> infrastructure_unique (now 841)
-Evaluating:  37%|███▋      | 130/354 [00:27<00:40,  5.57it/s]                                                               island (87, 1.2%) -> landscape_unique_fjord (now 107)
-Evaluating:  37%|███▋      | 130/354 [00:27<00:40,  5.57it/s]                                                               inselberg (2, 0.0%) -> landscape_unique_hillside (now 3)
-Evaluating:  37%|███▋      | 130/354 [00:27<00:40,  5.57it/s]                                                               hydrant (63, 0.9%) -> infrastructure_unique (now 904)
-Evaluating:  37%|███▋      | 130/354 [00:27<00:40,  5.57it/s]                                                               image (1, 0.0%) -> landscape_unique_hillside (now 4)
-Evaluating:  37%|███▋      | 130/354 [00:27<00:40,  5.57it/s]                                                               kerb (3, 0.0%) -> infrastructure_unique (now 907)
-Evaluating:  37%|███▋      | 130/354 [00:27<00:40,  5.57it/s]                                                               hut (4, 0.1%) -> architecture_unique (now 347)
-Evaluating:  37%|███▋      | 130/354 [00:27<00:40,  5.57it/s]Evaluating:  40%|███▉      | 140/354 [00:27<00:41,  5.19it/s]                                                               lamppost (6, 0.1%) -> infrastructure_unique (now 913)
-Evaluating:  40%|███▉      | 140/354 [00:28<00:41,  5.19it/s]                                                               landmark (1, 0.0%) -> architecture_unique (now 348)
-Evaluating:  40%|███▉      | 140/354 [00:28<00:41,  5.19it/s]                                                               lamp (93, 1.3%) -> infrastructure_unique (now 1006)
-Evaluating:  40%|███▉      | 140/354 [00:28<00:41,  5.19it/s]                                                               lake (33, 0.5%) -> landscape_unique_flatland (now 259)
-Evaluating:  40%|███▉      | 140/354 [00:28<00:41,  5.19it/s]                                                               lamp post (3, 0.0%) -> infrastructure_unique (now 1009)
-Evaluating:  40%|███▉      | 140/354 [00:28<00:41,  5.19it/s]                                                               kilometre_marker (1, 0.0%) -> infrastructure_unique (now 1010)
-Evaluating:  40%|███▉      | 140/354 [00:28<00:41,  5.19it/s]                                                               lamp_post (6, 0.1%) -> infrastructure_unique (now 1016)
-Evaluating:  40%|███▉      | 140/354 [00:28<00:41,  5.19it/s]                                                               km_marker (2, 0.0%) -> infrastructure_unique (now 1018)
-Evaluating:  40%|███▉      | 140/354 [00:28<00:41,  5.19it/s]                                                               landscape (927, 12.7%) -> landscape_unique_flatland (now 1186)
-Evaluating:  40%|███▉      | 140/354 [00:28<00:41,  5.19it/s]                                                               lamp arm (1, 0.0%) -> infrastructure_unique (now 1019)
-Evaluating:  40%|███▉      | 140/354 [00:28<00:41,  5.19it/s]Evaluating:  42%|████▏     | 150/354 [00:28<00:34,  5.88it/s]                                                               lowland (1, 0.0%) -> landscape_unique_flatland (now 1187)
-Evaluating:  42%|████▏     | 150/354 [00:30<00:34,  5.88it/s]                                                               license_plate (157, 2.2%) -> infrastructure_unique (now 1176)
-Evaluating:  42%|████▏     | 150/354 [00:30<00:34,  5.88it/s]                                                               map (1, 0.0%) -> area_codes_israel_west_bank (now 1)
-Evaluating:  42%|████▏     | 150/354 [00:30<00:34,  5.88it/s]                                                               lodge (1, 0.0%) -> infrastructure_unique (now 1177)
-Evaluating:  42%|████▏     | 150/354 [00:30<00:34,  5.88it/s]                                                               limestone (1, 0.0%) -> architecture_unique_bricks (now 4)
-Evaluating:  42%|████▏     | 150/354 [00:30<00:34,  5.88it/s]                                                               lighthouse (1, 0.0%) -> infrastructure_unique (now 1178)
-Evaluating:  42%|████▏     | 150/354 [00:30<00:34,  5.88it/s]                                                               manhole (1, 0.0%) -> infrastructure_unique (now 1179)
-Evaluating:  42%|████▏     | 150/354 [00:30<00:34,  5.88it/s]                                                               line (4, 0.1%) -> infrastructure_unique (now 1183)
-Evaluating:  42%|████▏     | 150/354 [00:30<00:34,  5.88it/s]                                                               leaf (3, 0.0%) -> agriculture_unique_cacti (now 46)
-Evaluating:  42%|████▏     | 150/354 [00:30<00:34,  5.88it/s]                                                               language (357, 4.9%) -> language_unique (now 357)
-Evaluating:  42%|████▏     | 150/354 [00:30<00:34,  5.88it/s]Evaluating:  45%|████▌     | 160/354 [00:30<00:31,  6.07it/s]                                                               mesa (2, 0.0%) -> landscape_unique_flatland (now 1189)
-Evaluating:  45%|████▌     | 160/354 [00:32<00:31,  6.07it/s]                                                               men (1, 0.0%) -> infrastructure_unique (now 1184)
-Evaluating:  45%|████▌     | 160/354 [00:32<00:31,  6.07it/s]                                                               median (2, 0.0%) -> infrastructure_unique (now 1186)
-Evaluating:  45%|████▌     | 160/354 [00:32<00:31,  6.07it/s]                                                               mortar (1, 0.0%) -> architecture_unique_bricks (now 5)
-Evaluating:  45%|████▌     | 160/354 [00:32<00:31,  6.07it/s]                                                               moorland (1, 0.0%) -> landscape_unique_flatland (now 1190)
-Evaluating:  45%|████▌     | 160/354 [00:32<00:31,  6.07it/s]                                                               mirror (2, 0.0%) -> infrastructure_unique (now 1188)
-Evaluating:  45%|████▌     | 160/354 [00:32<00:31,  6.07it/s]                                                               mountain (47, 0.6%) -> landscape_unique_hillside (now 51)
-Evaluating:  45%|████▌     | 160/354 [00:32<00:31,  6.07it/s]                                                               marker (9, 0.1%) -> infrastructure_unique (now 1197)
-Evaluating:  45%|████▌     | 160/354 [00:32<00:31,  6.07it/s]                                                               mountain pass (1, 0.0%) -> landscape_unique_hillside (now 52)
-Evaluating:  45%|████▌     | 160/354 [00:32<00:31,  6.07it/s]                                                               minaret (1, 0.0%) -> architecture_unique (now 349)
-Evaluating:  45%|████▌     | 160/354 [00:32<00:31,  6.07it/s]Evaluating:  48%|████▊     | 170/354 [00:32<00:32,  5.68it/s]                                                               net (1, 0.0%) -> infrastructure_yellow_backboards (now 4)
-Evaluating:  48%|████▊     | 170/354 [00:33<00:32,  5.68it/s]                                                               palm (9, 0.1%) -> agriculture_unique_cacti (now 55)
-Evaluating:  48%|████▊     | 170/354 [00:33<00:32,  5.68it/s]                                                               mushroom (2, 0.0%) -> infrastructure_unique (now 1199)
-Evaluating:  48%|████▊     | 170/354 [00:33<00:32,  5.68it/s]                                                               mountainous landscape (1, 0.0%) -> landscape_unique_hillside (now 53)
-Evaluating:  48%|████▊     | 170/354 [00:33<00:32,  5.68it/s]                                                               orchard (1, 0.0%) -> agriculture_unique_cacti (now 56)
-Evaluating:  48%|████▊     | 170/354 [00:33<00:32,  5.68it/s]                                                               mountain range (2, 0.0%) -> landscape_unique_hillside (now 55)
-Evaluating:  48%|████▊     | 170/354 [00:33<00:32,  5.68it/s]                                                               object (227, 3.1%) -> infrastructure_unique (now 1426)
-Evaluating:  48%|████▊     | 170/354 [00:33<00:32,  5.68it/s]                                                               paint (1, 0.0%) -> infrastructure_unique (now 1427)
-Evaluating:  48%|████▊     | 170/354 [00:33<00:32,  5.68it/s]                                                               mountainous (4, 0.1%) -> landscape_unique_hillside (now 59)
-Evaluating:  48%|████▊     | 170/354 [00:33<00:32,  5.68it/s]                                                               mountains (363, 5.0%) -> landscape_unique_hillside (now 422)
-Evaluating:  48%|████▊     | 170/354 [00:33<00:32,  5.68it/s]Evaluating:  51%|█████     | 180/354 [00:33<00:27,  6.25it/s]                                                               people (1, 0.0%) -> people_unique_afro_colombians (now 1)
-Evaluating:  51%|█████     | 180/354 [00:34<00:27,  6.25it/s]                                                               pavement (23, 0.3%) -> infrastructure_unique (now 1450)
-Evaluating:  51%|█████     | 180/354 [00:34<00:27,  6.25it/s]                                                               pipe (1, 0.0%) -> infrastructure_unique (now 1451)
-Evaluating:  51%|█████     | 180/354 [00:34<00:27,  6.25it/s]                                                               pattern (2, 0.0%) -> architecture_unique (now 351)
-Evaluating:  51%|█████     | 180/354 [00:34<00:27,  6.25it/s]                                                               palms (2, 0.0%) -> landscape_unique_palms (now 2)
-Evaluating:  51%|█████     | 180/354 [00:34<00:27,  6.25it/s]                                                               pines (1, 0.0%) -> landscape_unique_flatland (now 1191)
-Evaluating:  51%|█████     | 180/354 [00:34<00:27,  6.25it/s]                                                               pickup (1, 0.0%) -> infrastructure_unique (now 1452)
-Evaluating:  51%|█████     | 180/354 [00:34<00:27,  6.25it/s]                                                               plain (19, 0.3%) -> landscape_unique_flatland (now 1210)
-Evaluating:  51%|█████     | 180/354 [00:34<00:27,  6.25it/s]                                                               person (1, 0.0%) -> landscape_unique_flatland (now 1211)
-Evaluating:  51%|█████     | 180/354 [00:34<00:27,  6.25it/s]                                                               palm_tree (3, 0.0%) -> landscape_unique_flatland (now 1214)
-Evaluating:  51%|█████     | 180/354 [00:34<00:27,  6.25it/s]Evaluating:  54%|█████▎    | 190/354 [00:34<00:23,  6.96it/s]                                                               pole (734, 10.1%) -> infrastructure_unique (now 2186)
-Evaluating:  54%|█████▎    | 190/354 [00:35<00:23,  6.96it/s]                                                               poletop (1, 0.0%) -> infrastructure_unique (now 2187)
-Evaluating:  54%|█████▎    | 190/354 [00:35<00:23,  6.96it/s]                                                               post (2, 0.0%) -> infrastructure_yellow_backboards (now 6)
-Evaluating:  54%|█████▎    | 190/354 [00:35<00:23,  6.96it/s]                                                               plant (16, 0.2%) -> agriculture_unique_cacti (now 72)
-Evaluating:  54%|█████▎    | 190/354 [00:35<00:23,  6.96it/s]                                                               plains (8, 0.1%) -> landscape_unique_flatland (now 1222)
-Evaluating:  54%|█████▎    | 190/354 [00:35<00:23,  6.96it/s]                                                               plate (1, 0.0%) -> landscape_unique_flatland (now 1223)
-Evaluating:  54%|█████▎    | 190/354 [00:35<00:23,  6.96it/s]                                                               power_plant (1, 0.0%) -> infrastructure_unique (now 2188)
-Evaluating:  54%|█████▎    | 190/354 [00:35<00:23,  6.96it/s]                                                               power_line (1, 0.0%) -> infrastructure_unique (now 2189)
-Evaluating:  54%|█████▎    | 190/354 [00:35<00:23,  6.96it/s]                                                               plateau (6, 0.1%) -> landscape_unique_flatland (now 1229)
-Evaluating:  54%|█████▎    | 190/354 [00:35<00:23,  6.96it/s]                                                               plantation (19, 0.3%) -> agriculture_cotton_sugarcane (now 60)
-Evaluating:  54%|█████▎    | 190/354 [00:35<00:23,  6.96it/s]Evaluating:  56%|█████▋    | 200/354 [00:35<00:21,  7.25it/s]  Saved checkpoint: 200 concepts
-                                                               Unique concepts: 23
-Evaluating:  56%|█████▋    | 200/354 [00:35<00:21,  7.25it/s]                                                               powerline (1, 0.0%) -> infrastructure_unique (now 2190)
-Evaluating:  56%|█████▋    | 200/354 [00:36<00:21,  7.25it/s]                                                               rail (1, 0.0%) -> infrastructure_unique (now 2191)
-Evaluating:  56%|█████▋    | 200/354 [00:36<00:21,  7.25it/s]                                                               red_white_black (1, 0.0%) -> agriculture_unique_cacti (now 73)
-Evaluating:  56%|█████▋    | 200/354 [00:36<00:21,  7.25it/s]                                                               railroad (1, 0.0%) -> infrastructure_unique (now 2192)
-Evaluating:  56%|█████▋    | 200/354 [00:36<00:21,  7.25it/s]                                                               pylon (3, 0.0%) -> infrastructure_unique (now 2195)
-Evaluating:  56%|█████▋    | 200/354 [00:36<00:21,  7.25it/s]                                                               red area (1, 0.0%) -> agricultural_field_red (now 2)
-Evaluating:  56%|█████▋    | 200/354 [00:36<00:21,  7.25it/s]                                                               red (2, 0.0%) -> agricultural_field_red (now 4)
-Evaluating:  56%|█████▋    | 200/354 [00:36<00:21,  7.25it/s]                                                               red bricks (1, 0.0%) -> architecture_unique_bricks (now 6)
-Evaluating:  56%|█████▋    | 200/354 [00:36<00:21,  7.25it/s]                                                               rainforest (6, 0.1%) -> landscape_unique_fjord (now 113)
-Evaluating:  56%|█████▋    | 200/354 [00:36<00:21,  7.25it/s]                                                               pyramid (1, 0.0%) -> architecture_unique (now 352)
-Evaluating:  56%|█████▋    | 200/354 [00:36<00:21,  7.25it/s]Evaluating:  59%|█████▉    | 210/354 [00:36<00:18,  7.92it/s]                                                               ridge (4, 0.1%) -> landscape_unique_hillside (now 426)
-Evaluating:  59%|█████▉    | 210/354 [00:38<00:18,  7.92it/s]                                                               rock_wall (2, 0.0%) -> infrastructure_unique (now 2197)
-Evaluating:  59%|█████▉    | 210/354 [00:38<00:18,  7.92it/s]                                                               roadlines (1, 0.0%) -> infrastructure_unique (now 2198)
-Evaluating:  59%|█████▉    | 210/354 [00:38<00:18,  7.92it/s]                                                               rock wall (2, 0.0%) -> architecture_unique (now 354)
-Evaluating:  59%|█████▉    | 210/354 [00:38<00:18,  7.92it/s]                                                               reflector (10, 0.1%) -> infrastructure_unique (now 2208)
-Evaluating:  59%|█████▉    | 210/354 [00:38<00:18,  7.92it/s]                                                               reservoir (1, 0.0%) -> infrastructure_unique (now 2209)
-Evaluating:  59%|█████▉    | 210/354 [00:38<00:18,  7.92it/s]                                                               road (790, 10.8%) -> infrastructure_unique (now 2999)
-Evaluating:  59%|█████▉    | 210/354 [00:38<00:18,  7.92it/s]                                                               rock (10, 0.1%) -> landscape_unique_hillside (now 436)
-Evaluating:  59%|█████▉    | 210/354 [00:38<00:18,  7.92it/s]                                                               regency (1, 0.0%) -> landscape_unique_fjord (now 114)
-Evaluating:  59%|█████▉    | 210/354 [00:38<00:18,  7.92it/s]                                                               river (11, 0.2%) -> landscape_unique_flatland (now 1240)
-Evaluating:  59%|█████▉    | 210/354 [00:38<00:18,  7.92it/s]Evaluating:  62%|██████▏   | 220/354 [00:38<00:17,  7.46it/s]                                                               ruin (1, 0.0%) -> architecture_unique_ruin (now 1)
-Evaluating:  62%|██████▏   | 220/354 [00:39<00:17,  7.46it/s]                                                               rockiness (1, 0.0%) -> landscape_unique_hillside (now 437)
-Evaluating:  62%|██████▏   | 220/354 [00:39<00:17,  7.46it/s]                                                               rocky cliffs (1, 0.0%) -> landscape_unique_hillside (now 438)
-Evaluating:  62%|██████▏   | 220/354 [00:39<00:17,  7.46it/s]                                                               roofs (1, 0.0%) -> architecture_unique (now 355)
-Evaluating:  62%|██████▏   | 220/354 [00:39<00:17,  7.46it/s]                                                               roof (51, 0.7%) -> architecture_unique (now 406)
-Evaluating:  62%|██████▏   | 220/354 [00:39<00:17,  7.46it/s]                                                               rocks (6, 0.1%) -> landscape_unique_crater (now 124)
-Evaluating:  62%|██████▏   | 220/354 [00:39<00:17,  7.46it/s]                                                               roof rack (2, 0.0%) -> infrastructure_unique (now 3001)
-Evaluating:  62%|██████▏   | 220/354 [00:39<00:17,  7.46it/s]                                                               roof_tile (1, 0.0%) -> architecture_unique (now 407)
-Evaluating:  62%|██████▏   | 220/354 [00:39<00:17,  7.46it/s]                                                               rolling hills (2, 0.0%) -> landscape_unique_hillside (now 440)
-Evaluating:  62%|██████▏   | 220/354 [00:39<00:17,  7.46it/s]                                                               rocky_landscape (1, 0.0%) -> landscape_unique_crater (now 125)
-Evaluating:  62%|██████▏   | 220/354 [00:39<00:17,  7.46it/s]Evaluating:  65%|██████▍   | 230/354 [00:39<00:16,  7.70it/s]                                                               savannah (10, 0.1%) -> landscape_unique_flatland (now 1250)
-Evaluating:  65%|██████▍   | 230/354 [00:43<00:16,  7.70it/s]                                                               salt flat (1, 0.0%) -> landscape_unique_flatland (now 1251)
-Evaluating:  65%|██████▍   | 230/354 [00:43<00:16,  7.70it/s]                                                               ruins (1, 0.0%) -> architecture_unique_ruin (now 2)
-Evaluating:  65%|██████▍   | 230/354 [00:43<00:16,  7.70it/s]                                                               savannah-desert (1, 0.0%) -> landscape_unique_flatland (now 1252)
-Evaluating:  65%|██████▍   | 230/354 [00:43<00:16,  7.70it/s]                                                               runway (1, 0.0%) -> airport_geographical (now 2)
-Evaluating:  65%|██████▍   | 230/354 [00:43<00:16,  7.70it/s]                                                               sand dune (1, 0.0%) -> landscape_unique_hillside (now 441)
-Evaluating:  65%|██████▍   | 230/354 [00:43<00:16,  7.70it/s]                                                               sandy landscape (1, 0.0%) -> beach_resort (now 64)
-Evaluating:  65%|██████▍   | 230/354 [00:43<00:16,  7.70it/s]                                                               scarf (1, 0.0%) -> people_unique_afro_colombians (now 2)
-Evaluating:  65%|██████▍   | 230/354 [00:43<00:16,  7.70it/s]                                                               savanna (1, 0.0%) -> landscape_unique_flatland (now 1253)
-Evaluating:  65%|██████▍   | 230/354 [00:43<00:16,  7.70it/s]                                                               sand (2, 0.0%) -> landscape_unique_flatland (now 1255)
-Evaluating:  65%|██████▍   | 230/354 [00:43<00:16,  7.70it/s]Evaluating:  68%|██████▊   | 240/354 [00:43<00:24,  4.68it/s]                                                               scooter (1, 0.0%) -> infrastructure_unique (now 3002)
-Evaluating:  68%|██████▊   | 240/354 [00:44<00:24,  4.68it/s]                                                               shed (2, 0.0%) -> architecture_unique (now 409)
-Evaluating:  68%|██████▊   | 240/354 [00:44<00:24,  4.68it/s]                                                               scene (66, 0.9%) -> architecture_unique (now 475)
-Evaluating:  68%|██████▊   | 240/354 [00:44<00:24,  4.68it/s]                                                               seagull (1, 0.0%) -> beach_resort (now 65)
-Evaluating:  68%|██████▊   | 240/354 [00:44<00:24,  4.68it/s]                                                               shoe (1, 0.0%) -> infrastructure_unique (now 3003)
-Evaluating:  68%|██████▊   | 240/354 [00:44<00:24,  4.68it/s]                                                               sea (1, 0.0%) -> beach_resort (now 66)
-Evaluating:  68%|██████▊   | 240/354 [00:44<00:24,  4.68it/s]                                                               sheep (1, 0.0%) -> agriculture_unique_cacti (now 74)
-Evaluating:  68%|██████▊   | 240/354 [00:44<00:24,  4.68it/s]                                                               shelter (2, 0.0%) -> infrastructure_unique (now 3005)
-Evaluating:  68%|██████▊   | 240/354 [00:44<00:24,  4.68it/s]                                                               ship (1, 0.0%) -> infrastructure_unique (now 3006)
-Evaluating:  68%|██████▊   | 240/354 [00:44<00:24,  4.68it/s]                                                               season (1, 0.0%) -> landscape_unique_flatland (now 1256)
-Evaluating:  68%|██████▊   | 240/354 [00:44<00:24,  4.68it/s]Evaluating:  71%|███████   | 250/354 [00:44<00:18,  5.53it/s]                                                               shutter (2, 0.0%) -> architecture_unique (now 477)
-Evaluating:  71%|███████   | 250/354 [00:45<00:18,  5.53it/s]                                                               signpost (1, 0.0%) -> infrastructure_unique (now 3007)
-Evaluating:  71%|███████   | 250/354 [00:45<00:18,  5.53it/s]                                                               silo (1, 0.0%) -> infrastructure_unique (now 3008)
-Evaluating:  71%|███████   | 250/354 [00:45<00:18,  5.53it/s]                                                               sign (662, 9.1%) -> infrastructure_unique (now 3670)
-Evaluating:  71%|███████   | 250/354 [00:45<00:18,  5.53it/s]                                                               shrub-steppe (2, 0.0%) -> landscape_unique_flatland (now 1258)
-Evaluating:  71%|███████   | 250/354 [00:45<00:18,  5.53it/s]                                                               simple logo (1, 0.0%) -> infrastructure_unique (now 3671)
-Evaluating:  71%|███████   | 250/354 [00:45<00:18,  5.53it/s]                                                               shrubland (5, 0.1%) -> landscape_unique_flatland (now 1263)
-Evaluating:  71%|███████   | 250/354 [00:45<00:18,  5.53it/s]                                                               simple object (3, 0.0%) -> infrastructure_unique (now 3674)
-Evaluating:  71%|███████   | 250/354 [00:45<00:18,  5.53it/s]                                                               shrub (1, 0.0%) -> agriculture_unique_cacti (now 75)
-Evaluating:  71%|███████   | 250/354 [00:45<00:18,  5.53it/s]                                                               sidewalk (7, 0.1%) -> infrastructure_unique (now 3681)
-Evaluating:  71%|███████   | 250/354 [00:45<00:18,  5.53it/s]Evaluating:  73%|███████▎  | 260/354 [00:45<00:14,  6.36it/s]                                                               simple visual (1, 0.0%) -> architecture_unique (now 478)
-Evaluating:  73%|███████▎  | 260/354 [00:47<00:14,  6.36it/s]                                                               snow pole (1, 0.0%) -> landscape_unique_flatland (now 1264)
-Evaluating:  73%|███████▎  | 260/354 [00:47<00:14,  6.36it/s]                                                               smokestack (1, 0.0%) -> infrastructure_unique (now 3682)
-Evaluating:  73%|███████▎  | 260/354 [00:47<00:14,  6.36it/s]                                                               snow (4, 0.1%) -> landscape_unique_crater (now 129)
-Evaluating:  73%|███████▎  | 260/354 [00:47<00:14,  6.36it/s]                                                               snowy (1, 0.0%) -> landscape_unique_hillside (now 442)
-Evaluating:  73%|███████▎  | 260/354 [00:47<00:14,  6.36it/s]                                                               snowmobile (2, 0.0%) -> landscape_unique_flatland (now 1266)
-Evaluating:  73%|███████▎  | 260/354 [00:47<00:14,  6.36it/s]                                                               simplest visual object (2, 0.0%) -> infrastructure_unique (now 3684)
-Evaluating:  73%|███████▎  | 260/354 [00:47<00:14,  6.36it/s]                                                               sky (7, 0.1%) -> landscape_unique_flatland (now 1273)
-Evaluating:  73%|███████▎  | 260/354 [00:47<00:14,  6.36it/s]                                                               simple scene (3, 0.0%) -> landscape_unique_flatland (now 1276)
-Evaluating:  73%|███████▎  | 260/354 [00:47<00:14,  6.36it/s]                                                               simple_scene (4, 0.1%) -> landscape_unique_flatland (now 1280)
-Evaluating:  73%|███████▎  | 260/354 [00:47<00:14,  6.36it/s]Evaluating:  76%|███████▋  | 270/354 [00:47<00:14,  5.98it/s]                                                               stone (7, 0.1%) -> architecture_unique_stone (now 7)
-Evaluating:  76%|███████▋  | 270/354 [00:48<00:14,  5.98it/s]                                                               stone_wall (1, 0.0%) -> architecture_unique_bricks (now 7)
-Evaluating:  76%|███████▋  | 270/354 [00:48<00:14,  5.98it/s]                                                               stone bricks (1, 0.0%) -> architecture_unique_bricks (now 8)
-Evaluating:  76%|███████▋  | 270/354 [00:48<00:14,  5.98it/s]                                                               stilt (1, 0.0%) -> architecture_unique (now 479)
-Evaluating:  76%|███████▋  | 270/354 [00:48<00:14,  5.98it/s]                                                               stone block (1, 0.0%) -> infrastructure_unique (now 3685)
-Evaluating:  76%|███████▋  | 270/354 [00:48<00:14,  5.98it/s]                                                               stick (1, 0.0%) -> infrastructure_unique (now 3686)
-Evaluating:  76%|███████▋  | 270/354 [00:48<00:14,  5.98it/s]                                                               steppe (4, 0.1%) -> landscape_unique_flatland (now 1284)
-Evaluating:  76%|███████▋  | 270/354 [00:48<00:14,  5.98it/s]                                                               soil (7, 0.1%) -> agriculture_unique_cacti (now 82)
-Evaluating:  76%|███████▋  | 270/354 [00:48<00:14,  5.98it/s]                                                               sticker (19, 0.3%) -> infrastructure_yellow_backboards (now 25)
-Evaluating:  76%|███████▋  | 270/354 [00:48<00:14,  5.98it/s]                                                               snowy landscape (1, 0.0%) -> landscape_unique_flatland (now 1285)
-Evaluating:  76%|███████▋  | 270/354 [00:48<00:14,  5.98it/s]Evaluating:  79%|███████▉  | 280/354 [00:48<00:11,  6.52it/s]                                                               street_light (1, 0.0%) -> infrastructure_unique (now 3687)
-Evaluating:  79%|███████▉  | 280/354 [00:49<00:11,  6.52it/s]                                                               swamp (2, 0.0%) -> landscape_unique_swamp (now 2)
-Evaluating:  79%|███████▉  | 280/354 [00:49<00:11,  6.52it/s]                                                               supermarket (1, 0.0%) -> infrastructure_unique (now 3688)
-Evaluating:  79%|███████▉  | 280/354 [00:49<00:11,  6.52it/s]                                                               stripe (1, 0.0%) -> architecture_unique_bricks (now 9)
-Evaluating:  79%|███████▉  | 280/354 [00:49<00:11,  6.52it/s]                                                               street (2, 0.0%) -> infrastructure_unique (now 3690)
-Evaluating:  79%|███████▉  | 280/354 [00:49<00:11,  6.52it/s]                                                               structure (1, 0.0%) -> architecture_unique(479) (now 1)
-Evaluating:  79%|███████▉  | 280/354 [00:49<00:11,  6.52it/s]                                                               strap (2, 0.0%) -> infrastructure_unique (now 3692)
-Evaluating:  79%|███████▉  | 280/354 [00:49<00:11,  6.52it/s]                                                               tableland (1, 0.0%) -> landscape_unique_flatland (now 1286)
-Evaluating:  79%|███████▉  | 280/354 [00:49<00:11,  6.52it/s]                                                               sunset (4, 0.1%) -> landscape_unique_hillside (now 446)
-Evaluating:  79%|███████▉  | 280/354 [00:49<00:11,  6.52it/s]                                                               sun (1, 0.0%) -> landscape_unique_crater (now 130)
-Evaluating:  79%|███████▉  | 280/354 [00:49<00:11,  6.52it/s]Evaluating:  82%|████████▏ | 290/354 [00:49<00:09,  7.01it/s]                                                               tape (4, 0.1%) -> infrastructure_unique (now 3696)
-Evaluating:  82%|████████▏ | 290/354 [00:52<00:09,  7.01it/s]                                                               thatched_roof (3, 0.0%) -> architecture_unique (now 482)
-Evaluating:  82%|████████▏ | 290/354 [00:52<00:09,  7.01it/s]                                                               tag (1, 0.0%) -> architecture_unique (now 483)
-Evaluating:  82%|████████▏ | 290/354 [00:52<00:09,  7.01it/s]                                                               taxi (16, 0.2%) -> infrastructure_unique (now 3712)
-Evaluating:  82%|████████▏ | 290/354 [00:52<00:09,  7.01it/s]                                                               tent (15, 0.2%) -> infrastructure_unique (now 3727)
-Evaluating:  82%|████████▏ | 290/354 [00:52<00:09,  7.01it/s]                                                               temple (1, 0.0%) -> architecture_unique (now 484)
-Evaluating:  82%|████████▏ | 290/354 [00:52<00:09,  7.01it/s]                                                               taxi_bus (1, 0.0%) -> infrastructure_unique (now 3728)
-Evaluating:  82%|████████▏ | 290/354 [00:52<00:09,  7.01it/s]                                                               tank (1, 0.0%) -> infrastructure_unique (now 3729)
-Evaluating:  82%|████████▏ | 290/354 [00:52<00:09,  7.01it/s]                                                               tensioner (1, 0.0%) -> infrastructure_unique (now 3730)
-Evaluating:  82%|████████▏ | 290/354 [00:52<00:09,  7.01it/s]                                                               tactile_pavement (1, 0.0%) -> infrastructure_unique (now 3731)
-Evaluating:  82%|████████▏ | 290/354 [00:52<00:09,  7.01it/s]Evaluating:  85%|████████▍ | 300/354 [00:52<00:10,  5.39it/s]  Saved checkpoint: 300 concepts
-                                                               Unique concepts: 27
-Evaluating:  85%|████████▍ | 300/354 [00:52<00:10,  5.39it/s]                                                               tiles (6, 0.1%) -> architecture_unique_tiles (now 6)
-Evaluating:  85%|████████▍ | 300/354 [00:54<00:10,  5.39it/s]                                                               transport (1, 0.0%) -> infrastructure_unique (now 3732)
-Evaluating:  85%|████████▍ | 300/354 [00:54<00:10,  5.39it/s]                                                               transformer (1, 0.0%) -> infrastructure_unique (now 3733)
-Evaluating:  85%|████████▍ | 300/354 [00:54<00:10,  5.39it/s]                                                               tram (2, 0.0%) -> infrastructure_unique (now 3735)
-Evaluating:  85%|████████▍ | 300/354 [00:54<00:10,  5.39it/s]                                                               traffic light (2, 0.0%) -> infrastructure_unique (now 3737)
-Evaluating:  85%|████████▍ | 300/354 [00:54<00:10,  5.39it/s]                                                               tower (2, 0.0%) -> infrastructure_unique (now 3739)
-Evaluating:  85%|████████▍ | 300/354 [00:54<00:10,  5.39it/s]                                                               tile (12, 0.2%) -> architecture_unique (now 496)
-Evaluating:  85%|████████▍ | 300/354 [00:54<00:10,  5.39it/s]                                                               train (2, 0.0%) -> infrastructure_unique (now 3741)
-Evaluating:  85%|████████▍ | 300/354 [00:54<00:10,  5.39it/s]                                                               track (1, 0.0%) -> infrastructure_unique (now 3742)
-Evaluating:  85%|████████▍ | 300/354 [00:54<00:10,  5.39it/s]                                                               traffic_light (11, 0.2%) -> infrastructure_unique (now 3753)
-Evaluating:  85%|████████▍ | 300/354 [00:54<00:10,  5.39it/s]Evaluating:  88%|████████▊ | 310/354 [00:54<00:07,  5.81it/s]                                                               truck (12, 0.2%) -> infrastructure_unique (now 3765)
-Evaluating:  88%|████████▊ | 310/354 [00:55<00:07,  5.81it/s]                                                               trashbin (1, 0.0%) -> infrastructure_unique (now 3766)
-Evaluating:  88%|████████▊ | 310/354 [00:55<00:07,  5.81it/s]                                                               trees (6, 0.1%) -> landscape_unique_fjord (now 120)
-Evaluating:  88%|████████▊ | 310/354 [00:55<00:07,  5.81it/s]                                                               tropical plants (1, 0.0%) -> landscape_unique_palms (now 3)
-Evaluating:  88%|████████▊ | 310/354 [00:55<00:07,  5.81it/s]                                                               triangle (1, 0.0%) -> architecture_unique_triangles (now 1)
-Evaluating:  88%|████████▊ | 310/354 [00:55<00:07,  5.81it/s]                                                               trash_container (1, 0.0%) -> infrastructure_unique (now 3767)
-Evaluating:  88%|████████▊ | 310/354 [00:55<00:07,  5.81it/s]                                                               trashcan (2, 0.0%) -> infrastructure_unique (now 3769)
-Evaluating:  88%|████████▊ | 310/354 [00:55<00:07,  5.81it/s]                                                               trash_bin (7, 0.1%) -> infrastructure_unique (now 3776)
-Evaluating:  88%|████████▊ | 310/354 [00:55<00:07,  5.81it/s]                                                               trolleybus (1, 0.0%) -> infrastructure_unique (now 3777)
-Evaluating:  88%|████████▊ | 310/354 [00:55<00:07,  5.81it/s]                                                               tree (52, 0.7%) -> landscape_unique_palms (now 55)
-Evaluating:  88%|████████▊ | 310/354 [00:55<00:07,  5.81it/s]Evaluating:  90%|█████████ | 320/354 [00:55<00:05,  6.45it/s]                                                               vegetation (142, 1.9%) -> landscape_unique_palms (now 197)
-Evaluating:  90%|█████████ | 320/354 [00:56<00:05,  6.45it/s]                                                               vehicle (24, 0.3%) -> infrastructure_auto_rickshaw (now 28)
-Evaluating:  90%|█████████ | 320/354 [00:56<00:05,  6.45it/s]                                                               tundra (2, 0.0%) -> landscape_unique_flatland (now 1288)
-Evaluating:  90%|█████████ | 320/354 [00:56<00:05,  6.45it/s]                                                               valley (36, 0.5%) -> landscape_unique_hillside (now 482)
-Evaluating:  90%|█████████ | 320/354 [00:56<00:05,  6.45it/s]                                                               urban (3, 0.0%) -> architecture_unique (now 499)
-Evaluating:  90%|█████████ | 320/354 [00:56<00:05,  6.45it/s]                                                               villa (1, 0.0%) -> architecture_unique (now 500)
-Evaluating:  90%|█████████ | 320/354 [00:56<00:05,  6.45it/s]                                                               turbine (1, 0.0%) -> infrastructure_unique (now 3778)
-Evaluating:  90%|█████████ | 320/354 [00:56<00:05,  6.45it/s]                                                               trunk (1, 0.0%) -> infrastructure_unique (now 3779)
-Evaluating:  90%|█████████ | 320/354 [00:56<00:05,  6.45it/s]                                                               twig (1, 0.0%) -> landscape_unique_hillside (now 483)
-Evaluating:  90%|█████████ | 320/354 [00:56<00:05,  6.45it/s]                                                               vineyard (6, 0.1%) -> agriculture_unique_vineyards (now 6)
-Evaluating:  90%|█████████ | 320/354 [00:56<00:05,  6.45it/s]Evaluating:  93%|█████████▎| 330/354 [00:56<00:03,  7.04it/s]                                                               walls (1, 0.0%) -> architecture_unique_walls (now 1)
-Evaluating:  93%|█████████▎| 330/354 [00:58<00:03,  7.04it/s]                                                               water (1, 0.0%) -> landscape_unique_swamp (now 3)
-Evaluating:  93%|█████████▎| 330/354 [00:58<00:03,  7.04it/s]                                                               volcanoes (1, 0.0%) -> landscape_unique_crater (now 131)
-Evaluating:  93%|█████████▎| 330/354 [00:58<00:03,  7.04it/s]                                                               visual (5, 0.1%) -> architecture_unique (now 505)
-Evaluating:  93%|█████████▎| 330/354 [00:58<00:03,  7.04it/s]                                                               volcano (6, 0.1%) -> landscape_unique_crater (now 137)
-Evaluating:  93%|█████████▎| 330/354 [00:58<00:03,  7.04it/s]                                                               water droplet (1, 0.0%) -> landscape_unique_swamp (now 4)
-Evaluating:  93%|█████████▎| 330/354 [00:58<00:03,  7.04it/s]                                                               walkway (1, 0.0%) -> infrastructure_unique (now 3780)
-Evaluating:  93%|█████████▎| 330/354 [00:58<00:03,  7.04it/s]                                                               visual object (16, 0.2%) -> architecture_unique (now 521)
-Evaluating:  93%|█████████▎| 330/354 [00:58<00:03,  7.04it/s]                                                               water tank (1, 0.0%) -> infrastructure_unique (now 3781)
-Evaluating:  93%|█████████▎| 330/354 [00:58<00:03,  7.04it/s]                                                               wall (12, 0.2%) -> architecture_unique_bricks (now 21)
-Evaluating:  93%|█████████▎| 330/354 [00:58<00:03,  7.04it/s]Evaluating:  96%|█████████▌| 340/354 [00:58<00:02,  6.45it/s]                                                               window (6, 0.1%) -> architecture_unique_windows (now 6)
-Evaluating:  96%|█████████▌| 340/354 [00:59<00:02,  6.45it/s]                                                               weather (1, 0.0%) -> landscape_unique_flatland (now 1289)
-Evaluating:  96%|█████████▌| 340/354 [00:59<00:02,  6.45it/s]                                                               wildlife (1, 0.0%) -> landscape_unique_hillside (now 484)
-Evaluating:  96%|█████████▌| 340/354 [00:59<00:02,  6.45it/s]                                                               wire (7, 0.1%) -> infrastructure_unique (now 3788)
-Evaluating:  96%|█████████▌| 340/354 [00:59<00:02,  6.45it/s]                                                               wetland (4, 0.1%) -> landscape_unique_swamp (now 8)
-Evaluating:  96%|█████████▌| 340/354 [00:59<00:02,  6.45it/s]                                                               yurt (1, 0.0%) -> architecture_unique (now 522)
-Evaluating:  96%|█████████▌| 340/354 [00:59<00:02,  6.45it/s]                                                               water_tank (1, 0.0%) -> infrastructure_unique (now 3789)
-Evaluating:  96%|█████████▌| 340/354 [00:59<00:02,  6.45it/s]                                                               waystone (2, 0.0%) -> infrastructure_unique (now 3791)
-Evaluating:  96%|█████████▌| 340/354 [00:59<00:02,  6.45it/s]                                                               wind farm (1, 0.0%) -> infrastructure_unique (now 3792)
-Evaluating:  96%|█████████▌| 340/354 [00:59<00:02,  6.45it/s]                                                               wind turbine (1, 0.0%) -> infrastructure_unique (now 3793)
-Evaluating:  96%|█████████▌| 340/354 [00:59<00:02,  6.45it/s]Evaluating:  99%|█████████▉| 350/354 [00:59<00:00,  6.42it/s][2025-12-04T20:13:35.882] error: *** JOB 17201792 ON gcn2 CANCELLED AT 2025-12-04T20:13:35 DUE to SIGNAL Terminated ***

@@ -7,3 +7,6 @@ results/
 .cursor/
 visualizations/
 visualzations/cbm
+wandb/
+jobs/outputs/
+jobs/logs/
