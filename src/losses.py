@@ -413,6 +413,190 @@ def concept_prototype_contrastive_loss(
     return loss
 
 
+def hierarchical_consistency_loss(
+    meta_logits: torch.Tensor,
+    parent_logits: torch.Tensor,
+    meta_to_parent_idx: torch.Tensor,
+    temperature: float = 1.0,
+) -> torch.Tensor:
+    """
+    Hierarchical consistency loss that enforces agreement between meta and parent predictions.
+    
+    Key insight: If the model predicts meta concept X with high probability, it should also
+    predict the parent concept that X belongs to. This loss penalizes inconsistent predictions.
+    
+    For each sample:
+    1. Compute expected parent distribution from meta predictions: P(parent_j) = Σ_{i ∈ children(j)} P(meta_i)
+    2. Compute KL divergence between this expected parent distribution and actual parent predictions
+    
+    Args:
+        meta_logits: Meta concept logits [batch, num_metas]
+        parent_logits: Parent concept logits [batch, num_parents]
+        meta_to_parent_idx: Mapping from meta index to parent index [num_metas]
+        temperature: Temperature for softening distributions (higher = softer)
+        
+    Returns:
+        Scalar loss (KL divergence)
+    """
+    batch_size = meta_logits.size(0)
+    num_metas = meta_logits.size(1)
+    num_parents = parent_logits.size(1)
+    device = meta_logits.device
+    
+    # Get meta probabilities (softened by temperature)
+    meta_probs = F.softmax(meta_logits / temperature, dim=1)  # [batch, num_metas]
+    
+    # Compute expected parent distribution from meta predictions
+    # For each parent j: P(parent_j | meta) = Σ_{i: parent(i)=j} P(meta_i)
+    # Create one-hot mapping: [num_metas, num_parents] where M[i,j] = 1 if meta i belongs to parent j
+    meta_to_parent_onehot = F.one_hot(meta_to_parent_idx, num_classes=num_parents).float()  # [num_metas, num_parents]
+    
+    # Expected parent distribution: [batch, num_parents]
+    expected_parent_probs = torch.matmul(meta_probs, meta_to_parent_onehot)  # [batch, num_parents]
+    
+    # Get actual parent probabilities
+    actual_parent_probs = F.softmax(parent_logits / temperature, dim=1)  # [batch, num_parents]
+    
+    # KL divergence: KL(expected || actual) = Σ expected * log(expected / actual)
+    # Use log_softmax for numerical stability
+    actual_parent_log_probs = F.log_softmax(parent_logits / temperature, dim=1)
+    
+    # Add small epsilon to avoid log(0)
+    eps = 1e-8
+    expected_parent_probs = expected_parent_probs + eps
+    expected_parent_probs = expected_parent_probs / expected_parent_probs.sum(dim=1, keepdim=True)
+    
+    # KL divergence
+    kl_div = F.kl_div(actual_parent_log_probs, expected_parent_probs, reduction='batchmean')
+    
+    return kl_div
+
+
+def parent_guided_meta_loss(
+    meta_logits: torch.Tensor,
+    parent_logits: torch.Tensor,
+    meta_labels: torch.Tensor,
+    parent_labels: torch.Tensor,
+    meta_to_parent_idx: torch.Tensor,
+    hard_mask: bool = False,
+    soft_temperature: float = 2.0,
+) -> torch.Tensor:
+    """
+    Parent-guided meta classification loss.
+    
+    Instead of predicting over all meta classes equally, this loss:
+    1. Uses parent predictions to create a soft mask over meta concepts
+    2. Upweights meta concepts belonging to the predicted/correct parent
+    3. Downweights meta concepts from other parents
+    
+    This effectively reduces the problem from 1-of-N to a hierarchical decision.
+    
+    Args:
+        meta_logits: Meta concept logits [batch, num_metas]
+        parent_logits: Parent concept logits [batch, num_parents]
+        meta_labels: Ground truth meta labels [batch]
+        parent_labels: Ground truth parent labels [batch]
+        meta_to_parent_idx: Mapping from meta index to parent index [num_metas]
+        hard_mask: If True, use hard gating (only concepts from predicted parent)
+                   If False, use soft gating based on parent probabilities
+        soft_temperature: Temperature for soft gating (lower = sharper)
+        
+    Returns:
+        Scalar loss
+    """
+    batch_size = meta_logits.size(0)
+    num_metas = meta_logits.size(1)
+    num_parents = parent_logits.size(1)
+    device = meta_logits.device
+    
+    # Create mapping matrix: [num_metas, num_parents]
+    meta_to_parent_onehot = F.one_hot(meta_to_parent_idx, num_classes=num_parents).float()
+    
+    if hard_mask:
+        # Hard gating: use ground truth parent to mask
+        # Only allow meta concepts that belong to the correct parent
+        parent_mask = meta_to_parent_onehot[:, parent_labels].T  # [batch, num_metas]
+        # Apply mask: set logits of non-matching metas to -inf
+        masked_logits = meta_logits + (1 - parent_mask) * (-1e9)
+    else:
+        # Soft gating: weight meta logits by parent probabilities
+        parent_probs = F.softmax(parent_logits / soft_temperature, dim=1)  # [batch, num_parents]
+        
+        # For each meta concept, get the probability of its parent
+        # meta_parent_probs[b, i] = P(parent of meta i | image b)
+        meta_parent_probs = torch.matmul(meta_to_parent_onehot, parent_probs.T).T  # [batch, num_metas]
+        
+        # Use these as soft weights (log-space for numerical stability)
+        # Higher parent prob -> higher weight for that meta concept
+        log_weights = torch.log(meta_parent_probs + 1e-8)
+        masked_logits = meta_logits + log_weights
+    
+    # Standard cross-entropy on masked/weighted logits
+    loss = F.cross_entropy(masked_logits, meta_labels)
+    
+    return loss
+
+
+def inter_parent_contrastive_loss(
+    embeddings: torch.Tensor,
+    parent_labels: torch.Tensor,
+    temperature: float = 0.1,
+) -> torch.Tensor:
+    """
+    Contrastive loss that pulls together samples from the same parent concept
+    and pushes apart samples from different parents.
+    
+    This encourages the model to learn parent-level structure in the embedding space.
+    
+    Args:
+        embeddings: Concept embeddings [batch, dim]
+        parent_labels: Parent concept labels [batch]
+        temperature: Temperature for contrastive loss
+        
+    Returns:
+        Scalar loss
+    """
+    batch_size = embeddings.size(0)
+    device = embeddings.device
+    
+    # Normalize embeddings
+    embeddings_norm = F.normalize(embeddings, p=2, dim=1)
+    
+    # Compute similarity matrix
+    sim = torch.matmul(embeddings_norm, embeddings_norm.T) / temperature  # [batch, batch]
+    
+    # Create positive mask: same parent
+    pos_mask = (parent_labels.unsqueeze(0) == parent_labels.unsqueeze(1)).float()
+    
+    # Remove self-similarity from positives
+    pos_mask.fill_diagonal_(0)
+    
+    # Check if there are any positive pairs
+    num_positives = pos_mask.sum(dim=1)
+    
+    # For samples with no positive pairs, skip them
+    valid_mask = num_positives > 0
+    if not valid_mask.any():
+        return torch.tensor(0.0, device=device)
+    
+    # Compute log-sum-exp over all (for denominator)
+    # Mask out self-similarity with large negative value
+    self_mask = torch.eye(batch_size, device=device)
+    sim_masked = sim - self_mask * 1e9
+    log_sum_exp_all = torch.logsumexp(sim_masked, dim=1)
+    
+    # Compute log-sum-exp over positives only
+    neg_inf_mask = (1 - pos_mask) * (-1e9)
+    sim_pos_only = sim + neg_inf_mask
+    log_sum_exp_pos = torch.logsumexp(sim_pos_only, dim=1)
+    
+    # Loss: -log(pos_sum / all_sum) for valid samples
+    loss_per_sample = log_sum_exp_all - log_sum_exp_pos
+    loss = loss_per_sample[valid_mask].mean()
+    
+    return loss
+
+
 def combined_loss(
     concept_logits: torch.Tensor,
     country_logits: torch.Tensor,

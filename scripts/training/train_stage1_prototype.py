@@ -32,12 +32,11 @@ from torch.utils.data import DataLoader, Dataset
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from tqdm import tqdm
 import numpy as np
-
-try:
-    import wandb
-    HAS_WANDB = True
-except ImportError:
-    HAS_WANDB = False
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from PIL import Image
+import wandb
 
 from src.dataset import (
     PanoramaCBMDataset,
@@ -52,7 +51,7 @@ from src.models.concept_aware_cbm import (
     DEFAULT_CONCEPT_TEMPLATES,
     DEFAULT_PARENT_TEMPLATES,
 )
-from src.losses import FocalLoss, concept_prototype_contrastive_loss
+from src.losses import FocalLoss, concept_prototype_contrastive_loss, hierarchical_consistency_loss, parent_guided_meta_loss, inter_parent_contrastive_loss
 from src.concepts.utils import extract_concepts_from_dataset
 
 logging.basicConfig(level=logging.INFO)
@@ -68,37 +67,150 @@ class PrecomputedEmbeddingsDataset(Dataset):
     
     def __init__(
         self,
-        embeddings: torch.Tensor,
+        embeddings: Optional[torch.Tensor],
         concept_indices: torch.Tensor,
         parent_indices: torch.Tensor,
         country_indices: torch.Tensor,
         coordinates: torch.Tensor,
         cell_labels: Optional[torch.Tensor] = None,
+        metadata: Optional[List[Dict]] = None,
+        embedding_dir: Optional[Path] = None,
     ):
         self.embeddings = embeddings
         self.concept_indices = concept_indices
         self.parent_indices = parent_indices
         self.country_indices = country_indices
         self.coordinates = coordinates
-        self.cell_labels = cell_labels if cell_labels is not None else torch.zeros(len(embeddings), dtype=torch.long)
+        self.cell_labels = cell_labels if cell_labels is not None else torch.zeros(len(concept_indices), dtype=torch.long)
+        self.metadata = metadata if metadata is not None else [{} for _ in range(len(concept_indices))]
+        self.embedding_dir = Path(embedding_dir) if embedding_dir is not None else None
+        
+        expected_len = len(concept_indices)
+        for name, arr in [
+            ("parent_indices", parent_indices),
+            ("country_indices", country_indices),
+            ("coordinates", coordinates),
+            ("cell_labels", self.cell_labels),
+            ("metadata", self.metadata),
+        ]:
+            if len(arr) != expected_len:
+                raise ValueError(f"{name} length {len(arr)} != expected {expected_len}")
+        if embeddings is not None and len(embeddings) != expected_len:
+            raise ValueError(f"embeddings length {len(embeddings)} != expected {expected_len}")
     
     def __len__(self):
-        return len(self.embeddings)
+        return len(self.concept_indices)
+    
+    def _load_embedding(self, idx: int) -> torch.Tensor:
+        if self.embeddings is not None:
+            return self.embeddings[idx]
+        if self.embedding_dir is None:
+            raise ValueError("No embeddings in memory and no embedding_dir provided.")
+        
+        entry = self.metadata[idx] if isinstance(self.metadata, list) else {}
+        emb_file = entry.get("embedding_file")
+        if emb_file is None:
+            raise ValueError("Missing embedding_file in metadata for disk-backed dataset.")
+        emb_path = self.embedding_dir / emb_file
+        loaded = torch.load(emb_path, weights_only=True)
+        if isinstance(loaded, dict) and "embedding" in loaded:
+            return loaded["embedding"]
+        return loaded
+    
+    @staticmethod
+    def _to_tensor(val, dtype=torch.long):
+        if torch.is_tensor(val):
+            return val
+        return torch.tensor(val, dtype=dtype)
     
     def __getitem__(self, idx):
+        embedding = self._load_embedding(idx)
+        concept_idx = self._to_tensor(self.concept_indices[idx], dtype=torch.long)
+        parent_idx = self._to_tensor(self.parent_indices[idx], dtype=torch.long)
+        country_idx = self._to_tensor(self.country_indices[idx], dtype=torch.long)
+        coords = self.coordinates[idx]
+        if not torch.is_tensor(coords):
+            coords = torch.tensor(coords, dtype=torch.float32)
+        cell_label = self._to_tensor(self.cell_labels[idx], dtype=torch.long)
+        meta = self.metadata[idx] if isinstance(self.metadata, list) else {}
         return (
-            self.embeddings[idx],
-            self.concept_indices[idx],
-            self.parent_indices[idx],
-            self.country_indices[idx],
-            self.coordinates[idx],
-            self.cell_labels[idx],
+            embedding,
+            concept_idx,
+            parent_idx,
+            country_idx,
+            coords,
+            cell_label,
+            meta,
+        )
+    
+    @classmethod
+    def from_cache_dir(cls, cache_dir: Path):
+        cache_dir = Path(cache_dir)
+        manifest_path = cache_dir / "manifest.pt"
+        if not manifest_path.exists():
+            raise FileNotFoundError(f"Manifest not found at {manifest_path}")
+        
+        manifest = torch.load(manifest_path, weights_only=True)
+        entries = manifest.get("entries", manifest)
+        
+        concept_idx = torch.tensor([e.get("concept_idx", 0) for e in entries], dtype=torch.long)
+        parent_idx = torch.tensor([e.get("parent_idx", 0) for e in entries], dtype=torch.long)
+        country_idx = torch.tensor([e.get("country_idx", 0) for e in entries], dtype=torch.long)
+        coords = torch.tensor([e.get("coords", [float("nan"), float("nan")]) for e in entries], dtype=torch.float32)
+        cell_labels = torch.tensor([e.get("cell_label", 0) for e in entries], dtype=torch.long)
+        metadata = []
+        for e in entries:
+            metadata.append({
+                "pano_id": e.get("pano_id"),
+                "image_path": e.get("image_path"),
+                "meta_name": e.get("meta_name"),
+                "parent_concept": e.get("parent_concept"),
+                "country": e.get("country"),
+                "embedding_file": e.get("embedding_file"),
+            })
+        
+        return cls(
+            embeddings=None,
+            concept_indices=concept_idx,
+            parent_indices=parent_idx,
+            country_indices=country_idx,
+            coordinates=coords,
+            cell_labels=cell_labels,
+            metadata=metadata,
+            embedding_dir=cache_dir,
         )
 
 
 # ============================================================================
 # UTILITY FUNCTIONS
 # ============================================================================
+
+def sanitize_for_filename(name: str) -> str:
+    """Sanitize a string so it can be safely used as a filename."""
+    safe = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in str(name))
+    return safe[:120] if safe else "unknown"
+
+
+def split_metadata_batch(metadata, batch_size: int) -> List[Dict]:
+    """
+    Convert a collated metadata batch (dict of lists) into a list of dicts.
+    """
+    if isinstance(metadata, list):
+        return metadata
+    if not isinstance(metadata, dict):
+        return [{} for _ in range(batch_size)]
+    
+    result = []
+    for i in range(batch_size):
+        entry = {}
+        for k, v in metadata.items():
+            try:
+                entry[k] = v[i]
+            except Exception:
+                entry[k] = v
+        result.append(entry)
+    return result
+
 
 def compute_class_weights(
     samples: List[Dict],
@@ -191,9 +303,21 @@ def get_embedding_cache_path(
     return cache_dir / f"{split}.pt"
 
 
+def get_embedding_cache_dir(
+    checkpoint_path: Optional[str],
+    encoder_model: str,
+    data_root: str,
+    split: str,
+) -> Path:
+    """Directory to store per-pano cached embeddings."""
+    cache_path = get_embedding_cache_path(checkpoint_path, encoder_model, data_root, split)
+    return cache_path.parent / cache_path.stem
+
+
 def save_cached_embeddings(
     cache_path: Path,
     embeddings: Tuple[torch.Tensor, ...],
+    metadata: Optional[List[Dict]] = None,
 ) -> None:
     """Save precomputed embeddings to cache."""
     cache_path.parent.mkdir(parents=True, exist_ok=True)
@@ -206,14 +330,53 @@ def save_cached_embeddings(
         'coords': embeddings[4],
         'cell_labels': embeddings[5],
     }
+    if metadata is not None:
+        cache_data['metadata'] = metadata
     
     torch.save(cache_data, cache_path)
     logger.info(f"Saved cached embeddings to {cache_path}")
 
 
+def save_embeddings_per_pano(
+    cache_dir: Path,
+    embeddings: Tuple[torch.Tensor, ...],
+    metadata: Optional[List[Dict]] = None,
+) -> None:
+    """Save per-pano embeddings and a manifest for disk-backed loading."""
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    entries = []
+    
+    total = len(embeddings[0])
+    for i in range(total):
+        meta_entry = metadata[i] if metadata is not None and i < len(metadata) else {}
+        pano_id = meta_entry.get("pano_id", f"idx_{i}")
+        filename = f"{sanitize_for_filename(pano_id)}.pt"
+        emb_path = cache_dir / filename
+        
+        torch.save({"embedding": embeddings[0][i]}, emb_path)
+        
+        entries.append({
+            "pano_id": pano_id,
+            "embedding_file": filename,
+            "concept_idx": int(embeddings[1][i]),
+            "parent_idx": int(embeddings[2][i]),
+            "country_idx": int(embeddings[3][i]),
+            "coords": embeddings[4][i].tolist(),
+            "cell_label": int(embeddings[5][i]) if embeddings[5] is not None else 0,
+            "image_path": str(meta_entry.get("image_path")) if meta_entry.get("image_path") is not None else None,
+            "meta_name": meta_entry.get("meta_name"),
+            "parent_concept": meta_entry.get("parent_concept"),
+            "country": meta_entry.get("country"),
+        })
+    
+    manifest = {"entries": entries}
+    torch.save(manifest, cache_dir / "manifest.pt")
+    logger.info(f"Saved per-pano embeddings to {cache_dir} (n={len(entries)})")
+
+
 def load_cached_embeddings(
     cache_path: Path,
-) -> Optional[Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]]:
+) -> Optional[Tuple[Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor], Optional[List[Dict]]]]:
     """Load precomputed embeddings from cache if available."""
     if not cache_path.exists():
         return None
@@ -222,12 +385,15 @@ def load_cached_embeddings(
         cache_data = torch.load(cache_path, weights_only=True)
         logger.info(f"Loaded cached embeddings from {cache_path}")
         return (
-            cache_data['embeddings'],
-            cache_data['concept_idx'],
-            cache_data['parent_idx'],
-            cache_data['country_idx'],
-            cache_data['coords'],
-            cache_data['cell_labels'],
+            (
+                cache_data['embeddings'],
+                cache_data['concept_idx'],
+                cache_data['parent_idx'],
+                cache_data['country_idx'],
+                cache_data['coords'],
+                cache_data['cell_labels'],
+            ),
+            cache_data.get('metadata'),
         )
     except Exception as e:
         logger.warning(f"Failed to load cached embeddings: {e}")
@@ -238,7 +404,7 @@ def precompute_embeddings(
     model: nn.Module,
     dataloader: DataLoader,
     device: torch.device,
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+) -> Tuple[Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor], List[Dict]]:
     """Precompute image embeddings using frozen image encoder."""
     model.eval()
     
@@ -248,6 +414,7 @@ def precompute_embeddings(
     all_country_idx = []
     all_coords = []
     all_cell_labels = []
+    all_metadata = []
     
     for batch in tqdm(dataloader, desc="Precomputing embeddings"):
         images, concept_idx, parent_idx, country_idx, coords, metadata = batch
@@ -267,8 +434,21 @@ def precompute_embeddings(
             all_cell_labels.append(torch.tensor(metadata['cell_label']))
         else:
             all_cell_labels.append(torch.zeros(len(concept_idx), dtype=torch.long))
+        
+        # Store per-sample metadata (pano_id, image_path, etc.)
+        batch_meta = split_metadata_batch(metadata, len(concept_idx))
+        all_metadata.extend([
+            {
+                "pano_id": m.get("pano_id"),
+                "image_path": m.get("image_path"),
+                "meta_name": m.get("meta_name"),
+                "parent_concept": m.get("parent_concept"),
+                "country": m.get("country"),
+            }
+            for m in batch_meta
+        ])
     
-    return (
+    embeddings_tuple = (
         torch.cat(all_embeddings, dim=0),
         torch.cat(all_concept_idx, dim=0),
         torch.cat(all_parent_idx, dim=0),
@@ -276,6 +456,7 @@ def precompute_embeddings(
         torch.cat(all_coords, dim=0),
         torch.cat(all_cell_labels, dim=0),
     )
+    return embeddings_tuple, all_metadata
 
 
 def save_checkpoint(
@@ -364,7 +545,10 @@ def validate(
     
     for batch in dataloader:
         if use_precomputed:
-            embeddings, concept_idx, parent_idx, country_idx, coords, cell_labels = batch
+            if len(batch) == 7:
+                embeddings, concept_idx, parent_idx, country_idx, coords, cell_labels, _ = batch
+            else:
+                embeddings, concept_idx, parent_idx, country_idx, coords, cell_labels = batch
             embeddings = embeddings.to(device)
         else:
             images, concept_idx, parent_idx, country_idx, coords, _ = batch
@@ -403,6 +587,311 @@ def validate(
         "parent_acc": total_parent_correct / total_count,
     }
 
+# ============================================================================
+# VISUALIZATION
+# ============================================================================
+
+# Visualization constants
+VIZ_NUM_SAMPLES = 4
+VIZ_TOP_K_CONCEPTS = 5
+VIZ_FIGSIZE = (10, 8)
+VIZ_DPI = 150
+WAND_TABLE_MAX_ROWS = 200
+
+# CLIP normalization constants
+CLIP_MEAN = [0.48145466, 0.4578275, 0.40821073]
+CLIP_STD = [0.26862954, 0.26130258, 0.27577711]
+
+
+@torch.no_grad()
+def visualize_concept_predictions(
+    model: Stage1ConceptModel,
+    image_dataloader: DataLoader,
+    device: torch.device,
+    idx_to_concept: Dict[int, str],
+    idx_to_parent: Dict[int, str],
+    output_dir: Path,
+    epoch: int,
+    num_samples: int = VIZ_NUM_SAMPLES,
+    log_to_wandb: bool = True,
+    wandb_step: Optional[int] = None,
+    use_precomputed: bool = False,
+):
+    """
+    Visualize concept predictions as a 2x2 grid with top 5 concepts as bar plots.
+    
+    Creates a single figure with 4 samples in a 2x2 grid, each showing:
+    - Image with title (pano_id, GT Concept vs Pred Concept)
+    - Bar chart of top-5 concept probabilities (GT = orange, others = blue)
+    
+    Args:
+        model: Stage1ConceptModel
+        image_dataloader: DataLoader that returns images (or precomputed embeddings)
+        device: Device to run inference on
+        idx_to_concept: Mapping from concept index to concept name
+        idx_to_parent: Mapping from parent index to parent concept name
+        output_dir: Directory to save visualizations
+        epoch: Current epoch number
+        num_samples: Number of samples to visualize (will use min(num_samples, 4) for 2x2 grid)
+        log_to_wandb: Whether to log to wandb
+        wandb_step: Optional step for wandb logging
+        use_precomputed: If True, expects embeddings + metadata and calls forward_from_features
+    """
+    model.eval()
+    viz_dir = output_dir / "visualizations"
+    viz_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Get a batch from the image dataloader
+    batch = next(iter(image_dataloader))
+    
+    if use_precomputed:
+        if len(batch) == 7:
+            embeddings, concept_idx, parent_idx, country_idx, coords, cell_labels, metadata = batch
+        else:
+            embeddings, concept_idx, parent_idx, country_idx, coords, cell_labels = batch
+            metadata = {}
+        embeddings = embeddings.to(device)
+    else:
+        images, concept_idx, parent_idx, country_idx, coords, metadata = batch
+        images = images.to(device)
+    concept_idx = concept_idx.to(device)
+    parent_idx = parent_idx.to(device)
+    sample_metadata = split_metadata_batch(metadata, len(concept_idx)) if metadata is not None else [{} for _ in range(len(concept_idx))]
+    
+    # Get predictions
+    if use_precomputed:
+        outputs = model.forward_from_features(embeddings)
+    else:
+        outputs = model(images)
+    meta_logits = outputs["meta_logits"]
+    meta_probs = outputs["meta_probs"]
+    parent_logits = outputs.get("parent_logits")
+    parent_probs = outputs.get("parent_probs")
+    if parent_probs is None and parent_logits is not None:
+        parent_probs = F.softmax(parent_logits, dim=1)
+    
+    # Process up to 4 samples for 2x2 grid
+    batch_size = len(embeddings) if use_precomputed else len(images)
+    n_samples = min(4, num_samples, batch_size)  # Max 4 for 2x2 grid
+    
+    # Create 2x2 grid figure (each cell has image on top, bar chart on bottom)
+    # Use gridspec for better control: 2 rows x 2 cols, each cell subdivided into 2 rows
+    fig = plt.figure(figsize=(16, 16))
+    
+    # Create outer grid (2x2)
+    outer_grid = fig.add_gridspec(2, 2, hspace=0.3, wspace=0.2)
+    
+    for i in range(n_samples):
+        row, col = i // 2, i % 2
+        
+        # Create inner grid for this sample (2 rows: image + bar chart)
+        inner_grid = outer_grid[row, col].subgridspec(2, 1, height_ratios=[1.5, 1], hspace=0.15)
+        ax_img = fig.add_subplot(inner_grid[0])
+        ax_bar = fig.add_subplot(inner_grid[1])
+        
+        # ====== Top: Image ======
+        img_display = None
+        if use_precomputed:
+            meta_entry = sample_metadata[i] if i < len(sample_metadata) else {}
+            img_path = meta_entry.get("image_path")
+            if img_path and Path(img_path).exists():
+                img_display = np.array(Image.open(img_path).convert("RGB"))
+        else:
+            img = images[i].cpu()
+            # Denormalize for display (CLIP normalization)
+            img_denorm = img.clone()
+            mean = torch.tensor(CLIP_MEAN).view(3, 1, 1)
+            std = torch.tensor(CLIP_STD).view(3, 1, 1)
+            img_denorm = img_denorm * std + mean
+            img_denorm = torch.clamp(img_denorm, 0, 1)
+            img_display = img_denorm.permute(1, 2, 0).numpy()
+        
+        if img_display is None:
+            img_display = np.zeros((10, 10, 3))
+        
+        ax_img.imshow(img_display)
+        ax_img.axis("off")
+
+        # Get ground truth and predicted CHILD concepts
+        true_concept_idx = concept_idx[i].item()
+        true_concept = idx_to_concept.get(true_concept_idx, f"Unknown_{true_concept_idx}")
+        true_concept_prob = meta_probs[i][true_concept_idx].item()
+        
+        pred_concept_idx = meta_logits[i].argmax().item()
+        pred_concept = idx_to_concept.get(pred_concept_idx, f"Unknown_{pred_concept_idx}")
+        pred_concept_prob = meta_probs[i][pred_concept_idx].item()
+
+        # Get ground truth and predicted PARENT concepts
+        true_parent_str = ""
+        pred_parent_str = ""
+        if parent_logits is not None and parent_probs is not None:
+            true_parent_idx = parent_idx[i].item()
+            true_parent = idx_to_parent.get(true_parent_idx, f"Unknown_{true_parent_idx}")
+            true_parent_prob = parent_probs[i][true_parent_idx].item()
+            pred_parent_idx = parent_logits[i].argmax().item()
+            pred_parent = idx_to_parent.get(pred_parent_idx, f"Unknown_{pred_parent_idx}")
+            pred_parent_prob = parent_probs[i][pred_parent_idx].item()
+            true_parent_str = f"Parent: {true_parent}"
+            pred_parent_str = f"→ {pred_parent}"
+        
+        meta_entry = sample_metadata[i] if i < len(sample_metadata) else {}
+        pano_id = meta_entry.get('pano_id', 'unknown')
+        
+        # Compact title for grid layout
+        is_correct = "✓" if pred_concept_idx == true_concept_idx else "✗"
+        title = f"{is_correct} {pano_id[:12]}...\n"
+        title += f"GT: {true_concept[:20]}... | Pred: {pred_concept[:20]}..."
+        if true_parent_str:
+            title += f"\n{true_parent_str} {pred_parent_str}"
+        ax_img.set_title(title, fontsize=8, loc='left')
+        
+        # ====== Bottom: Top K concepts bar plot ======
+        top5_probs, top5_indices = torch.topk(meta_probs[i], k=VIZ_TOP_K_CONCEPTS)
+        top5_concepts = [idx_to_concept.get(idx.item(), f"Unknown_{idx.item()}") for idx in top5_indices]
+        top5_probs_np = top5_probs.cpu().numpy()
+        
+        # Check if ground truth is in top 5
+        true_in_top5 = true_concept_idx in top5_indices.cpu().numpy()
+        
+        # Reverse arrays to show highest probability at top (horizontal bar chart)
+        top5_concepts_reversed = list(reversed(top5_concepts))
+        top5_probs_np_reversed = top5_probs_np[::-1]
+        top5_indices_reversed = list(reversed(top5_indices.cpu().numpy()))
+        
+        # Color bars: highlight ground truth if in top 5, otherwise use default color
+        bar_colors = [
+            "orange" if idx == true_concept_idx else "steelblue"
+            for idx in top5_indices_reversed
+        ]
+        
+        bars = ax_bar.barh(
+            range(len(top5_concepts_reversed)),
+            top5_probs_np_reversed,
+            color=bar_colors,
+        )
+        ax_bar.set_yticks(range(len(top5_concepts_reversed)))
+        
+        # Add (GT) label to ground truth concept in y-axis labels (truncate for grid)
+        yticklabels = []
+        for concept, idx in zip(top5_concepts_reversed, top5_indices_reversed):
+            label = concept[:18] + "..." if len(concept) > 18 else concept
+            if idx == true_concept_idx:
+                label = f"{label} (GT)"
+            yticklabels.append(label)
+        ax_bar.set_yticklabels(yticklabels, fontsize=7)
+        
+        ax_bar.set_xlabel("Probability", fontsize=8)
+        bar_title = "Top 5 Concepts"
+        if not true_in_top5:
+            bar_title += f" | GT not in top5"
+        ax_bar.set_title(bar_title, fontsize=8)
+        ax_bar.set_xlim(0, 1)
+        
+        # Add value labels on bars
+        for j, (bar, prob) in enumerate(zip(bars, top5_probs_np_reversed)):
+            ax_bar.text(prob + 0.01, j, f"{prob:.2f}", va="center", fontsize=7)
+    
+    # Add overall title
+    fig.suptitle(f"Epoch {epoch}", fontsize=12, fontweight='bold')
+    
+    # Save the combined grid figure
+    save_path = viz_dir / f"epoch_{epoch}_grid.png"
+    plt.savefig(save_path, dpi=VIZ_DPI, bbox_inches="tight")
+    plt.close(fig)
+    
+    logger.info(f"Saved 2x2 grid visualization to {viz_dir} for epoch {epoch}")
+    
+    if log_to_wandb:
+        step = wandb_step if wandb_step is not None else epoch
+        # Log single grid image to wandb under predictions/ panel
+        wandb.log({
+            "predictions/concept_grid": wandb.Image(str(save_path), caption=f"Epoch {epoch} - Concept Predictions Grid")
+        }, step=step)
+
+
+@torch.no_grad()
+def log_validation_predictions_table(
+    model: Stage1ConceptModel,
+    dataloader: DataLoader,
+    device: torch.device,
+    idx_to_concept: Dict[int, str],
+    idx_to_parent: Dict[int, str],
+    use_precomputed: bool = False,
+    max_rows: int = WAND_TABLE_MAX_ROWS,
+    step: Optional[int] = None,
+):
+    """
+    Log a compact table of validation predictions to wandb.
+    
+    Columns: pano_id, gt child concept, predicted child concept,
+    gt parent concept, predicted parent concept, child_correct, parent_correct.
+    """
+    rows = []
+    for batch in dataloader:
+        if use_precomputed:
+            if len(batch) == 7:
+                embeddings, concept_idx, parent_idx, country_idx, coords, cell_labels, metadata = batch
+            else:
+                embeddings, concept_idx, parent_idx, country_idx, coords, cell_labels = batch
+                metadata = {}
+            embeddings = embeddings.to(device)
+        else:
+            images, concept_idx, parent_idx, country_idx, coords, metadata = batch
+            images = images.to(device)
+        
+        concept_idx_dev = concept_idx.to(device)
+        parent_idx_dev = parent_idx.to(device)
+        
+        outputs = model.forward_from_features(embeddings) if use_precomputed else model(images)
+        meta_logits = outputs["meta_logits"]
+        parent_logits = outputs["parent_logits"]
+        
+        pred_meta = meta_logits.argmax(dim=1).cpu()
+        pred_parent = parent_logits.argmax(dim=1).cpu()
+        
+        meta_list = split_metadata_batch(metadata, len(pred_meta))
+        
+        for i in range(len(pred_meta)):
+            gt_child = int(concept_idx[i])
+            gt_parent = int(parent_idx[i])
+            pred_child = int(pred_meta[i])
+            pred_parent_val = int(pred_parent[i])
+            
+            child_correct = gt_child == pred_child
+            parent_correct = gt_parent == pred_parent_val
+            
+            rows.append([
+                str(meta_list[i].get("pano_id", "unknown")),
+                idx_to_concept.get(gt_child, f"meta_{gt_child}"),
+                idx_to_concept.get(pred_child, f"meta_{pred_child}"),
+                idx_to_parent.get(gt_parent, f"parent_{gt_parent}"),
+                idx_to_parent.get(pred_parent_val, f"parent_{pred_parent_val}"),
+                child_correct,
+                parent_correct,
+            ])
+            if len(rows) >= max_rows:
+                break
+        if len(rows) >= max_rows:
+            break
+    
+    if not rows:
+        return
+    
+    table = wandb.Table(
+        columns=[
+            "pano_id",
+            "gt_child_concept",
+            "pred_child_concept",
+            "gt_parent_concept",
+            "pred_parent_concept",
+            "child_correct",
+            "parent_correct",
+        ],
+        data=rows,
+    )
+    # Log under diagnostics/ panel for proper organization in wandb
+    wandb.log({"diagnostics/predictions_table": table}, step=step)
+
 
 # ============================================================================
 # TRAINING
@@ -420,7 +909,9 @@ def train(args):
     if args.output_dir:
         output_dir = Path(args.output_dir)
     else:
-        output_dir = Path("results") / "stage1-prototype" / timestamp
+        # Default: results/<model-name>/<date>/
+        encoder_name = args.encoder_model.replace("/", "_").replace(" ", "_")
+        output_dir = Path("results") / "stage1-prototype" / f"{encoder_name}" / timestamp
     
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "checkpoints").mkdir(exist_ok=True)
@@ -584,14 +1075,26 @@ def train(args):
         train_cache_path = get_embedding_cache_path(
             args.resume_from_checkpoint, args.encoder_model, args.data_root, "train"
         )
+        train_cache_dir = get_embedding_cache_dir(
+            args.resume_from_checkpoint, args.encoder_model, args.data_root, "train"
+        )
         val_cache_path = get_embedding_cache_path(
+            args.resume_from_checkpoint, args.encoder_model, args.data_root, "val"
+        )
+        val_cache_dir = get_embedding_cache_dir(
             args.resume_from_checkpoint, args.encoder_model, args.data_root, "val"
         )
         
         # Try to load cached train embeddings
         train_embeddings = None
+        train_metadata = None
         if args.use_embedding_cache:
-            train_embeddings = load_cached_embeddings(train_cache_path)
+            cached = load_cached_embeddings(train_cache_path)
+            if cached is not None:
+                train_embeddings, train_metadata = cached
+                logger.info(f"Loaded train embeddings from bulk cache: {train_cache_path}")
+            # NOTE: We do NOT use from_cache_dir for training - it's too slow (loads each embedding from disk)
+            # Per-pano cache is only used for visualization (to get image_path for display)
         
         if train_embeddings is None:
             # Use larger batch size for precomputation
@@ -602,14 +1105,15 @@ def train(args):
                 num_workers=4,
                 pin_memory=True,
             )
-            train_embeddings = precompute_embeddings(model, precompute_loader, device)
+            train_embeddings, train_metadata = precompute_embeddings(model, precompute_loader, device)
             
-            # Save to cache
+            # Save to cache (both bulk .pt and per-pano for visualization)
             if args.use_embedding_cache:
-                save_cached_embeddings(train_cache_path, train_embeddings)
+                save_cached_embeddings(train_cache_path, train_embeddings, metadata=train_metadata)
+                save_embeddings_per_pano(train_cache_dir, train_embeddings, train_metadata)
         
         train_loader = DataLoader(
-            PrecomputedEmbeddingsDataset(*train_embeddings),
+            PrecomputedEmbeddingsDataset(*train_embeddings, metadata=train_metadata),
             batch_size=args.batch_size,
             shuffle=True,
             num_workers=2,
@@ -619,8 +1123,13 @@ def train(args):
         
         # Try to load cached val embeddings
         val_embeddings = None
+        val_metadata = None
         if args.use_embedding_cache:
-            val_embeddings = load_cached_embeddings(val_cache_path)
+            cached = load_cached_embeddings(val_cache_path)
+            if cached is not None:
+                val_embeddings, val_metadata = cached
+                logger.info(f"Loaded val embeddings from bulk cache: {val_cache_path}")
+            # NOTE: We do NOT use from_cache_dir for validation - it's too slow
         
         if val_embeddings is None:
             precompute_val_loader = DataLoader(
@@ -630,21 +1139,24 @@ def train(args):
                 num_workers=4,
                 pin_memory=True,
             )
-            val_embeddings = precompute_embeddings(model, precompute_val_loader, device)
+            val_embeddings, val_metadata = precompute_embeddings(model, precompute_val_loader, device)
             
-            # Save to cache
+            # Save to cache (both bulk .pt and per-pano for visualization)
             if args.use_embedding_cache:
-                save_cached_embeddings(val_cache_path, val_embeddings)
+                save_cached_embeddings(val_cache_path, val_embeddings, metadata=val_metadata)
+                save_embeddings_per_pano(val_cache_dir, val_embeddings, val_metadata)
         
         val_loader = DataLoader(
-            PrecomputedEmbeddingsDataset(*val_embeddings),
+            PrecomputedEmbeddingsDataset(*val_embeddings, metadata=val_metadata),
             batch_size=args.batch_size,
             shuffle=False,
             num_workers=2,
             pin_memory=True,
         )
         
-        logger.info(f"Precomputed {len(train_embeddings[0])} train and {len(val_embeddings[0])} val embeddings")
+        num_train = len(train_loader.dataset) if train_loader is not None else (len(train_embeddings[0]) if train_embeddings is not None else 0)
+        num_val = len(val_loader.dataset) if val_loader is not None else (len(val_embeddings[0]) if val_embeddings is not None else 0)
+        logger.info(f"Precomputed {num_train} train and {num_val} val embeddings")
     
     # ========================================================================
     # SETUP LOSSES
@@ -681,12 +1193,19 @@ def train(args):
     # ========================================================================
     # WANDB INIT
     # ========================================================================
-    if args.use_wandb and HAS_WANDB:
+    if args.use_wandb:
         wandb.init(
             project="geolocation-cbm-stage1",
             config=vars(args),
             name=f"stage1-prototype-{timestamp}",
         )
+        # Define metrics for proper panel organization
+        wandb.define_metric("epoch")
+        wandb.define_metric("train/*", step_metric="epoch")
+        wandb.define_metric("val/*", step_metric="epoch")
+        wandb.define_metric("batch/*", step_metric="epoch")
+        wandb.define_metric("predictions/*", step_metric="epoch")
+        wandb.define_metric("diagnostics/*", step_metric="epoch")
     
     # ========================================================================
     # TRAINING LOOP
@@ -698,8 +1217,25 @@ def train(args):
     best_val_acc = 0.0
     patience_counter = 0
     
+    # Temperature annealing setup
+    if args.use_temp_annealing:
+        logger.info(f"Using temperature annealing: logit_scale {args.init_logit_scale_low} → {args.init_logit_scale_high}")
+        # Start with low logit scale (high temperature = soft predictions)
+        with torch.no_grad():
+            model.logit_scale_meta.fill_(args.init_logit_scale_low)
+            model.logit_scale_parent.fill_(args.init_logit_scale_low)
+    
     for epoch in range(args.stage1_epochs):
         model.train()
+        
+        # Temperature annealing: linearly increase logit scale
+        if args.use_temp_annealing:
+            progress = epoch / max(args.stage1_epochs - 1, 1)
+            target_scale = args.init_logit_scale_low + progress * (args.init_logit_scale_high - args.init_logit_scale_low)
+            with torch.no_grad():
+                # Gently push towards target (allow some learning)
+                model.logit_scale_meta.data = 0.9 * model.logit_scale_meta.data + 0.1 * target_scale
+                model.logit_scale_parent.data = 0.9 * model.logit_scale_parent.data + 0.1 * target_scale
         
         total_loss = 0
         total_meta_correct = 0
@@ -710,7 +1246,10 @@ def train(args):
         
         for batch_idx, batch in enumerate(pbar):
             if use_precomputed:
-                embeddings, concept_idx, parent_idx, country_idx, coords, cell_labels = batch
+                if len(batch) == 7:
+                    embeddings, concept_idx, parent_idx, country_idx, coords, cell_labels, _ = batch
+                else:
+                    embeddings, concept_idx, parent_idx, country_idx, coords, cell_labels = batch
                 embeddings = embeddings.to(device)
             else:
                 images, concept_idx, parent_idx, country_idx, coords, _ = batch
@@ -730,11 +1269,48 @@ def train(args):
                 parent_logits = outputs["parent_logits"]
                 concept_emb = outputs["concept_emb"]
                 
-                # Compute losses
+                # ============ COMPUTE LOSSES ============
+                
+                # 1. Standard classification losses
                 loss_meta = focal_loss_meta(meta_logits, concept_idx)
                 loss_parent = focal_loss_parent(parent_logits, parent_idx)
                 
-                # Optional: contrastive loss
+                # 2. NEW: Parent-guided meta loss (use parent info to guide meta prediction)
+                if args.use_parent_guided_meta:
+                    loss_meta_guided = parent_guided_meta_loss(
+                        meta_logits=meta_logits,
+                        parent_logits=parent_logits,
+                        meta_labels=concept_idx,
+                        parent_labels=parent_idx,
+                        meta_to_parent_idx=model.meta_to_parent_idx,
+                        hard_mask=False,
+                        soft_temperature=args.parent_guide_temperature,
+                    )
+                    # Blend guided loss with standard loss
+                    loss_meta = 0.5 * loss_meta + 0.5 * loss_meta_guided
+                
+                # 3. NEW: Hierarchical consistency loss
+                if args.lambda_consistency > 0:
+                    loss_consistency = hierarchical_consistency_loss(
+                        meta_logits=meta_logits,
+                        parent_logits=parent_logits,
+                        meta_to_parent_idx=model.meta_to_parent_idx,
+                        temperature=args.consistency_temperature,
+                    )
+                else:
+                    loss_consistency = 0.0
+                
+                # 4. NEW: Inter-parent contrastive loss
+                if args.lambda_parent_contrastive > 0:
+                    loss_parent_contrastive = inter_parent_contrastive_loss(
+                        embeddings=concept_emb,
+                        parent_labels=parent_idx,
+                        temperature=0.1,
+                    )
+                else:
+                    loss_parent_contrastive = 0.0
+                
+                # 5. Prototype contrastive loss
                 if args.lambda_contrastive > 0:
                     loss_contrastive = concept_prototype_contrastive_loss(
                         concept_emb,
@@ -745,18 +1321,27 @@ def train(args):
                 else:
                     loss_contrastive = 0.0
                 
-                # Optional: prototype regularization
+                # 6. Prototype regularization
                 if args.lambda_reg > 0:
                     loss_reg = model.get_prototype_regularization_loss(args.lambda_reg)
                 else:
                     loss_reg = 0.0
                 
-                # Total loss
+                # 7. NEW: Intra-parent prototype consistency
+                if args.lambda_intra_parent > 0:
+                    loss_intra = model.get_intra_parent_consistency_loss(args.lambda_intra_parent)
+                else:
+                    loss_intra = 0.0
+                
+                # ============ TOTAL LOSS ============
                 loss = (
                     args.lambda_meta * loss_meta +
                     args.lambda_parent * loss_parent +
+                    args.lambda_consistency * loss_consistency +
+                    args.lambda_parent_contrastive * loss_parent_contrastive +
                     args.lambda_contrastive * loss_contrastive +
-                    loss_reg
+                    loss_reg +
+                    loss_intra
                 )
                 
                 loss = loss / args.gradient_accumulation_steps
@@ -786,15 +1371,15 @@ def train(args):
                 "parent_acc": f"{total_parent_correct/total_count:.3f}",
             })
             
-            # Log to wandb
-            if args.use_wandb and HAS_WANDB and batch_idx % 50 == 0:
+            # Log to wandb (use commit=False for batch logs to avoid step issues)
+            if args.use_wandb and batch_idx % 50 == 0:
                 wandb.log({
-                    "batch_loss": loss.item(),
-                    "batch_meta_acc": (pred_meta == concept_idx).float().mean().item(),
-                    "batch_parent_acc": (pred_parent == parent_idx).float().mean().item(),
-                    "logit_scale_meta": model.logit_scale_meta.item(),
-                    "logit_scale_parent": model.logit_scale_parent.item(),
-                })
+                    "batch/loss": loss.item(),
+                    "batch/meta_acc": (pred_meta == concept_idx).float().mean().item(),
+                    "batch/parent_acc": (pred_parent == parent_idx).float().mean().item(),
+                    "train/logit_scale_meta": model.logit_scale_meta.item(),
+                    "train/logit_scale_parent": model.logit_scale_parent.item(),
+                }, commit=False)
         
         # Epoch metrics
         train_metrics = {
@@ -812,21 +1397,49 @@ def train(args):
         )
         log_metrics(val_metrics, prefix="Val", stage=1)
         
-        scheduler.step()
+        if args.use_wandb:
+            log_validation_predictions_table(
+                model=model,
+                dataloader=val_loader,
+                device=device,
+                idx_to_concept=full_dataset.idx_to_concept,
+                idx_to_parent=full_dataset.idx_to_parent,
+                use_precomputed=use_precomputed,
+                max_rows=WAND_TABLE_MAX_ROWS,
+                step=epoch + 1,
+            )
+    
+        # Visualization
+        if args.viz_interval > 0 and (epoch + 1) % args.viz_interval == 0:
+            visualize_concept_predictions(
+                model=model,
+                image_dataloader=val_loader,
+                device=device,
+                idx_to_concept=full_dataset.idx_to_concept,
+                idx_to_parent=full_dataset.idx_to_parent,
+                output_dir=output_dir,
+                epoch=epoch + 1,
+                num_samples=VIZ_NUM_SAMPLES,
+                log_to_wandb=args.use_wandb,
+                wandb_step=epoch + 1,
+                use_precomputed=use_precomputed,
+            )
         
-        # Wandb logging
-        if args.use_wandb and HAS_WANDB:
+        scheduler.step()
+    
+        # Wandb logging - use consistent key prefixes for panel organization
+        if args.use_wandb:
             wandb.log({
                 "epoch": epoch + 1,
-                "train_loss": train_metrics["loss"],
-                "train_meta_acc": train_metrics["meta_acc"],
-                "train_parent_acc": train_metrics["parent_acc"],
-                "val_loss": val_metrics["loss"],
-                "val_meta_acc": val_metrics["meta_acc"],
-                "val_parent_acc": val_metrics["parent_acc"],
-                "lr": scheduler.get_last_lr()[0],
-            })
-        
+                "train/loss": train_metrics["loss"],
+                "train/meta_acc": train_metrics["meta_acc"],
+                "train/parent_acc": train_metrics["parent_acc"],
+                "val/loss": val_metrics["loss"],
+                "val/meta_acc": val_metrics["meta_acc"],
+                "val/parent_acc": val_metrics["parent_acc"],
+                "train/lr": scheduler.get_last_lr()[0],
+            }, step=epoch + 1)
+    
         # Checkpointing
         val_metric = val_metrics["meta_acc"]
         if val_metric > best_val_acc:
@@ -856,8 +1469,13 @@ def train(args):
             patience_counter += 1
             if args.early_stopping_patience > 0 and patience_counter >= args.early_stopping_patience:
                 logger.info(f"Early stopping at epoch {epoch+1}")
-                break
-        
+                logger.info(f"\n{'='*74}")
+                logger.info(f"Training complete! Best Meta Acc: {best_val_acc:.4f}")
+                logger.info(f"{'='*74}")
+                if args.use_wandb:
+                    wandb.finish()
+                return
+    
         # Periodic checkpoint
         if (epoch + 1) % args.save_interval == 0:
             save_checkpoint(
@@ -874,12 +1492,12 @@ def train(args):
                 scheduler=scheduler,
                 epoch=epoch,
             )
-    
+
     logger.info(f"\n{'='*74}")
     logger.info(f"Training complete! Best Meta Acc: {best_val_acc:.4f}")
     logger.info(f"{'='*74}")
     
-    if args.use_wandb and HAS_WANDB:
+    if args.use_wandb:
         wandb.finish()
 
 
@@ -920,10 +1538,25 @@ if __name__ == "__main__":
 
     # Loss weights
     parser.add_argument("--lambda_meta", type=float, default=1.0)
-    parser.add_argument("--lambda_parent", type=float, default=0.3)
+    parser.add_argument("--lambda_parent", type=float, default=0.5, help="Weight for parent classification loss (increased from 0.3)")
     parser.add_argument("--lambda_contrastive", type=float, default=0.5)
     parser.add_argument("--lambda_reg", type=float, default=0.001, help="Prototype regularization weight")
     parser.add_argument("--temperature", type=float, default=0.07)
+    
+    # NEW: Hierarchical losses
+    parser.add_argument("--lambda_consistency", type=float, default=0.3, help="Weight for hierarchical consistency loss")
+    parser.add_argument("--lambda_parent_contrastive", type=float, default=0.2, help="Weight for inter-parent contrastive loss")
+    parser.add_argument("--lambda_intra_parent", type=float, default=0.01, help="Weight for intra-parent prototype consistency")
+    parser.add_argument("--use_parent_guided_meta", action="store_true", default=True, help="Use parent-guided meta loss")
+    parser.add_argument("--no_parent_guided_meta", dest="use_parent_guided_meta", action="store_false")
+    parser.add_argument("--parent_guide_temperature", type=float, default=2.0, help="Temperature for soft parent gating")
+    parser.add_argument("--consistency_temperature", type=float, default=1.0, help="Temperature for consistency loss")
+    
+    # NEW: Temperature annealing
+    parser.add_argument("--use_temp_annealing", action="store_true", default=True, help="Anneal logit scale from low to high")
+    parser.add_argument("--no_temp_annealing", dest="use_temp_annealing", action="store_false")
+    parser.add_argument("--init_logit_scale_low", type=float, default=4.0, help="Starting logit scale for annealing")
+    parser.add_argument("--init_logit_scale_high", type=float, default=14.0, help="Ending logit scale for annealing")
     
     # Focal loss
     parser.add_argument("--focal_gamma", type=float, default=2.0)
@@ -932,6 +1565,7 @@ if __name__ == "__main__":
     parser.add_argument("--no_class_weights", dest="use_class_weights", action="store_false")
     
     # Misc
+    parser.add_argument("--viz_interval", type=int, default=5, help="Visualize predictions every N epochs (0 to disable)")
     parser.add_argument("--output_dir", type=str, default=None)
     parser.add_argument("--save_interval", type=int, default=10)
     parser.add_argument("--early_stopping_patience", type=int, default=10)

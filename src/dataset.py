@@ -560,7 +560,8 @@ class PanoramaCBMDataset(Dataset):
             'lat': sample['lat'],
             'lng': sample['lng'],
             'note': sample['note'],
-            'images': sample['images']
+            'images': sample['images'],
+            'image_path': str(image_path),
         }
         
         # Add cell label if available

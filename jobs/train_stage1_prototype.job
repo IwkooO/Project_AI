@@ -2,8 +2,8 @@
 #SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
 #SBATCH --job-name=stage1_proto
-#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/train_stage1_prototype.log
-#SBATCH --time=24:00:00  
+#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/train_stage1_prototype_pe_fast.log
+#SBATCH --time=4:00:00  
 #SBATCH --cpus-per-task=9
 #SBATCH --mem=64G
 
@@ -24,19 +24,32 @@ LR=3e-4
 
 # Loss weights
 LAMBDA_META=1.0
-LAMBDA_PARENT=0.3
+LAMBDA_PARENT=0.5
 LAMBDA_CONTRASTIVE=0.5
 LAMBDA_REG=0.001
+
+# NEW: Hierarchical loss weights
+LAMBDA_CONSISTENCY=0.3
+LAMBDA_PARENT_CONTRASTIVE=0.2
+LAMBDA_INTRA_PARENT=0.01
 
 # Focal loss
 FOCAL_GAMMA=2.0
 LABEL_SMOOTHING=0.1
 
+# Temperature annealing
+INIT_LOGIT_SCALE_LOW=4.0
+INIT_LOGIT_SCALE_HIGH=14.0
+
+DATA_ROOT=/scratch-shared/pnair/Project_AI/data
+STAGE0_CKPT="/scratch-shared/pnair/Project_AI/results/concept-aware-3-stage/streetclip/global/haversine/2025-12-04_20-07-33/checkpoints/best_model_stage0.pt"
+CACHE_ROOT="${DATA_ROOT}/precomputed_embeddings/concept-aware-3-stage_haversine_2025-12-04_20-07-33"
+
 # Run Stage 1 Training with Text-Prototype Based Concept Learning
 python scripts/training/train_stage1_prototype.py \
     --csv_path "/scratch-shared/pnair/Project_AI/data/dataset-43k-mapped.csv" \
     --encoder_model "geolocal/StreetCLIP" \
-    --resume_from_checkpoint "/scratch-shared/pnair/Project_AI/results/concept-aware-3-stage/streetclip/global/haversine/2025-12-04_20-07-33/checkpoints/best_model_stage0.pt" \
+    --resume_from_checkpoint ${STAGE0_CKPT} \
     --stage1_epochs ${STAGE1_EPOCHS} \
     --batch_size ${BATCH_SIZE} \
     --lr ${LR} \
@@ -45,16 +58,27 @@ python scripts/training/train_stage1_prototype.py \
     --lambda_parent ${LAMBDA_PARENT} \
     --lambda_contrastive ${LAMBDA_CONTRASTIVE} \
     --lambda_reg ${LAMBDA_REG} \
+    --lambda_consistency ${LAMBDA_CONSISTENCY} \
+    --lambda_parent_contrastive ${LAMBDA_PARENT_CONTRASTIVE} \
+    --lambda_intra_parent ${LAMBDA_INTRA_PARENT} \
+    --use_parent_guided_meta \
+    --parent_guide_temperature 2.0 \
+    --consistency_temperature 1.0 \
+    --use_temp_annealing \
+    --init_logit_scale_low ${INIT_LOGIT_SCALE_LOW} \
+    --init_logit_scale_high ${INIT_LOGIT_SCALE_HIGH} \
     --focal_gamma ${FOCAL_GAMMA} \
     --label_smoothing ${LABEL_SMOOTHING} \
     --temperature 0.07 \
-    --init_logit_scale 14.0 \
     --learnable_prototypes \
     --prototype_residual_scale 0.01 \
     --gradient_accumulation_steps 2 \
     --early_stopping_patience 10 \
     --save_interval 5 \
+    --viz_interval 1 \
     --use_amp \
     --use_class_weights \
     --precompute_embeddings \
-    --use_wandb
+    --use_wandb \
+    --data_root ${DATA_ROOT} \
+    --use_embedding_cache

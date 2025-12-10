@@ -398,6 +398,52 @@ class Stage1ConceptModel(nn.Module):
             self.parent_residuals.pow(2).sum()
         )
         return reg_loss
+    
+    def get_intra_parent_consistency_loss(self, lambda_intra: float = 0.01) -> torch.Tensor:
+        """
+        Regularization that encourages meta concepts within the same parent 
+        to have similar prototype residuals.
+        
+        This creates soft weight sharing within parent groups, helping the model
+        learn parent-level structure before fine-grained distinctions.
+        
+        Args:
+            lambda_intra: Regularization coefficient
+            
+        Returns:
+            Scalar regularization loss
+        """
+        # Get effective meta prototypes with residuals
+        meta_protos = self.T_meta  # [num_metas, dim], already projected and normalized
+        
+        # For each parent, compute mean of its children's prototypes
+        num_parents = self.num_parents
+        device = meta_protos.device
+        
+        # Count metas per parent
+        parent_counts = torch.zeros(num_parents, device=device)
+        parent_sums = torch.zeros(num_parents, meta_protos.size(1), device=device)
+        
+        for meta_idx in range(self.num_metas):
+            parent_idx = self.meta_to_parent_idx[meta_idx].item()
+            parent_counts[parent_idx] += 1
+            parent_sums[parent_idx] += meta_protos[meta_idx]
+        
+        # Compute mean prototype per parent (avoid div by zero)
+        parent_counts = parent_counts.clamp(min=1)
+        parent_means = parent_sums / parent_counts.unsqueeze(1)  # [num_parents, dim]
+        
+        # Compute variance: how much each meta deviates from its parent's mean
+        variance_loss = 0.0
+        for meta_idx in range(self.num_metas):
+            parent_idx = self.meta_to_parent_idx[meta_idx].item()
+            parent_mean = parent_means[parent_idx]
+            deviation = meta_protos[meta_idx] - parent_mean
+            variance_loss += deviation.pow(2).sum()
+        
+        variance_loss = variance_loss / self.num_metas
+        
+        return lambda_intra * variance_loss
 
 
 # ============================================================================
