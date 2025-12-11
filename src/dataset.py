@@ -699,6 +699,98 @@ def create_splits_stratified(samples: List[Dict],
 
     return train_samples, val_samples, test_samples
 
+
+def create_splits_stratified_strict(
+    samples: List[Dict],
+    train_ratio: float = 0.7,
+    val_ratio: float = 0.15,
+    test_ratio: float = 0.15,
+    seed: int = 42,
+) -> Tuple[List[Dict], List[Dict], List[Dict]]:
+    """
+    Strict stratified split ensuring every concept with >=2 samples has at least
+    1 sample in train AND 1 sample in val.
+
+    This guarantees that during validation, no concept is entirely unseen - the model
+    will encounter new images of known concepts rather than unknown concepts.
+
+    Rules:
+    - n=1: sample goes to train only (cannot split)
+    - n=2: 1 train, 1 val, 0 test (guarantee val sample)
+    - n>=3: at least 1 train, at least 1 val, rest proportional (including test)
+
+    Args:
+        samples: List of sample dictionaries with 'meta_name' key
+        train_ratio: Target proportion for training (default 0.7)
+        val_ratio: Target proportion for validation (default 0.15)
+        test_ratio: Target proportion for test (default 0.15)
+        seed: Random seed for reproducibility
+
+    Returns:
+        Tuple of (train_samples, val_samples, test_samples)
+    """
+    assert abs(train_ratio + val_ratio + test_ratio - 1.0) < 1e-6, "Ratios must sum to 1.0"
+
+    rng = np.random.default_rng(seed)
+    
+    # Group samples by concept
+    concept_to_samples: Dict[str, List[Dict]] = {}
+    for sample in samples:
+        concept_to_samples.setdefault(sample['meta_name'], []).append(sample)
+
+    train_samples: List[Dict] = []
+    val_samples: List[Dict] = []
+    test_samples: List[Dict] = []
+
+    # Track statistics
+    concepts_with_no_val = 0
+    concepts_with_no_test = 0
+
+    for concept in sorted(concept_to_samples.keys()):
+        concept_samples = concept_to_samples[concept]
+        
+        # Shuffle samples within concept
+        shuffled_indices = rng.permutation(len(concept_samples))
+        shuffled = [concept_samples[i] for i in shuffled_indices]
+        
+        n = len(shuffled)
+        
+        if n == 1:
+            # Only 1 sample - must go to train
+            train_samples.extend(shuffled)
+            concepts_with_no_val += 1
+            concepts_with_no_test += 1
+        elif n == 2:
+            # 2 samples: 1 train, 1 val (guarantee val coverage)
+            train_samples.append(shuffled[0])
+            val_samples.append(shuffled[1])
+            concepts_with_no_test += 1
+        else:
+            # n >= 3: at least 1 train, at least 1 val, rest proportional
+            # Calculate proportional splits
+            n_train = max(1, int(round(n * train_ratio)))
+            n_val = max(1, int(round(n * val_ratio)))
+            
+            # Ensure we don't exceed n
+            if n_train + n_val > n:
+                # Reduce train to make room for val
+                n_train = max(1, n - n_val)
+            if n_train + n_val > n:
+                # Still exceeds, reduce val
+                n_val = max(1, n - n_train)
+            
+            n_test = n - n_train - n_val
+            
+            if n_test == 0:
+                concepts_with_no_test += 1
+            
+            train_samples.extend(shuffled[:n_train])
+            val_samples.extend(shuffled[n_train:n_train + n_val])
+            test_samples.extend(shuffled[n_train + n_val:])
+
+    return train_samples, val_samples, test_samples
+
+
 def create_splits(samples: List[Dict], train_ratio: float = 0.8, val_ratio: float = 0.1, test_ratio: float = 0.1, seed: int = 42) -> Tuple[List[Dict], List[Dict], List[Dict]]:
     """
     Splits the list of samples into train, validation, and test sets 
@@ -831,6 +923,147 @@ def print_statistics(stats: Dict):
     print("Top 10 concepts:")
     for i, (concept, count) in enumerate(list(stats['concepts'].items())[:10]):
         print(f"  {i+1}. {concept}: {count}")
+
+
+def save_splits_to_json(
+    train_samples: List[Dict],
+    val_samples: List[Dict],
+    test_samples: List[Dict],
+    path: Path,
+    extra_info: Optional[Dict] = None,
+) -> None:
+    """
+    Save dataset splits to JSON for reproducibility.
+
+    Args:
+        train_samples: List of training sample dicts
+        val_samples: List of validation sample dicts
+        test_samples: List of test sample dicts
+        path: Path to save JSON file
+        extra_info: Optional dict with additional metadata (seed, ratios, etc.)
+    """
+    splits_data = {
+        "train_pano_ids": [s['pano_id'] for s in train_samples],
+        "val_pano_ids": [s['pano_id'] for s in val_samples],
+        "test_pano_ids": [s['pano_id'] for s in test_samples],
+        "counts": {
+            "train": len(train_samples),
+            "val": len(val_samples),
+            "test": len(test_samples),
+            "total": len(train_samples) + len(val_samples) + len(test_samples),
+        },
+    }
+    if extra_info:
+        splits_data["metadata"] = extra_info
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, 'w') as f:
+        json.dump(splits_data, f, indent=2)
+    print(f"Saved splits to {path}")
+
+
+def load_splits_from_json(
+    path: Path,
+    samples: List[Dict],
+) -> Tuple[List[Dict], List[Dict], List[Dict]]:
+    """
+    Load dataset splits from JSON file.
+
+    Args:
+        path: Path to JSON file with split pano_ids
+        samples: Full list of sample dicts to filter
+
+    Returns:
+        Tuple of (train_samples, val_samples, test_samples)
+    """
+    path = Path(path)
+    with open(path, 'r') as f:
+        splits_data = json.load(f)
+
+    # Build pano_id -> sample mapping
+    pano_to_sample = {s['pano_id']: s for s in samples}
+
+    train_pano_ids = set(splits_data["train_pano_ids"])
+    val_pano_ids = set(splits_data["val_pano_ids"])
+    test_pano_ids = set(splits_data["test_pano_ids"])
+
+    train_samples = [pano_to_sample[pid] for pid in train_pano_ids if pid in pano_to_sample]
+    val_samples = [pano_to_sample[pid] for pid in val_pano_ids if pid in pano_to_sample]
+    test_samples = [pano_to_sample[pid] for pid in test_pano_ids if pid in pano_to_sample]
+
+    # Warn about missing samples
+    missing_train = len(train_pano_ids) - len(train_samples)
+    missing_val = len(val_pano_ids) - len(val_samples)
+    missing_test = len(test_pano_ids) - len(test_samples)
+    if missing_train > 0 or missing_val > 0 or missing_test > 0:
+        print(f"Warning: Some pano_ids from splits.json not found in dataset:")
+        print(f"  Train: {missing_train} missing, Val: {missing_val} missing, Test: {missing_test} missing")
+
+    print(f"Loaded splits from {path}: Train={len(train_samples)}, Val={len(val_samples)}, Test={len(test_samples)}")
+    return train_samples, val_samples, test_samples
+
+
+def log_split_diagnostics(
+    train_samples: List[Dict],
+    val_samples: List[Dict],
+    test_samples: List[Dict],
+) -> Dict:
+    """
+    Log diagnostics about concept coverage in each split.
+
+    Returns:
+        Dict with diagnostic statistics
+    """
+    # Get unique concepts per split
+    train_concepts = set(s['meta_name'] for s in train_samples)
+    val_concepts = set(s['meta_name'] for s in val_samples)
+    test_concepts = set(s['meta_name'] for s in test_samples)
+    all_concepts = train_concepts | val_concepts | test_concepts
+
+    # Get unique parent concepts per split
+    train_parents = set(s.get('parent_concept', 'unknown') for s in train_samples)
+    val_parents = set(s.get('parent_concept', 'unknown') for s in val_samples)
+    test_parents = set(s.get('parent_concept', 'unknown') for s in test_samples)
+    all_parents = train_parents | val_parents | test_parents
+
+    # Concepts missing from val/test
+    concepts_not_in_val = all_concepts - val_concepts
+    concepts_not_in_test = all_concepts - test_concepts
+    concepts_not_in_train = all_concepts - train_concepts
+
+    # Parents missing from val/test
+    parents_not_in_val = all_parents - val_parents
+    parents_not_in_test = all_parents - test_parents
+    parents_not_in_train = all_parents - train_parents
+
+    diagnostics = {
+        "total_concepts": len(all_concepts),
+        "train_concepts": len(train_concepts),
+        "val_concepts": len(val_concepts),
+        "test_concepts": len(test_concepts),
+        "concepts_not_in_train": len(concepts_not_in_train),
+        "concepts_not_in_val": len(concepts_not_in_val),
+        "concepts_not_in_test": len(concepts_not_in_test),
+        "total_parents": len(all_parents),
+        "train_parents": len(train_parents),
+        "val_parents": len(val_parents),
+        "test_parents": len(test_parents),
+        "parents_not_in_train": len(parents_not_in_train),
+        "parents_not_in_val": len(parents_not_in_val),
+        "parents_not_in_test": len(parents_not_in_test),
+    }
+
+    print(f"Split Diagnostics:")
+    print(f"  Child concepts: {diagnostics['total_concepts']} total")
+    print(f"    Train: {diagnostics['train_concepts']}, Val: {diagnostics['val_concepts']}, Test: {diagnostics['test_concepts']}")
+    print(f"    Missing from train: {diagnostics['concepts_not_in_train']}, val: {diagnostics['concepts_not_in_val']}, test: {diagnostics['concepts_not_in_test']}")
+    print(f"  Parent concepts: {diagnostics['total_parents']} total")
+    print(f"    Train: {diagnostics['train_parents']}, Val: {diagnostics['val_parents']}, Test: {diagnostics['test_parents']}")
+    print(f"    Missing from train: {diagnostics['parents_not_in_train']}, val: {diagnostics['parents_not_in_val']}, test: {diagnostics['parents_not_in_test']}")
+
+    return diagnostics
+
 
 class SubsetDataset(Dataset):
     """

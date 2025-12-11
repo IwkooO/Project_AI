@@ -39,7 +39,10 @@ from geoclip import LocationEncoder
 
 from src.dataset import (
     PanoramaCBMDataset,
-    create_splits_stratified,
+    create_splits_stratified_strict,
+    save_splits_to_json,
+    load_splits_from_json,
+    log_split_diagnostics,
 )
 from src.models.streetclip_encoder import StreetCLIPEncoder, StreetCLIPConfig
 from src.models.concept_aware_cbm import (
@@ -366,19 +369,35 @@ def train(args):
     # ========================================================================
     # CREATE SPLITS (consistent with Stage 1 and Stage 2)
     # ========================================================================
-    # Main split: 70/15/15 with seed=42 for reproducibility
-    train_samples, val_samples, test_samples = create_splits_stratified(
-        full_dataset.samples,
-        train_ratio=0.70,
-        val_ratio=0.15,
-        test_ratio=0.15,
-        seed=42,
-    )
+    if args.splits_json and Path(args.splits_json).exists():
+        # Load existing splits for consistency across stages
+        logger.info(f"Loading splits from {args.splits_json}")
+        train_samples, val_samples, test_samples = load_splits_from_json(
+            args.splits_json, full_dataset.samples
+        )
+    else:
+        # Create new strict stratified splits: 70/15/15
+        logger.info("Creating new strict stratified splits (70/15/15)")
+        train_samples, val_samples, test_samples = create_splits_stratified_strict(
+            full_dataset.samples,
+            train_ratio=0.70,
+            val_ratio=0.15,
+            test_ratio=0.15,
+            seed=42,
+        )
+        # Save splits for reproducibility and cross-stage consistency
+        splits_path = output_dir / "splits.json"
+        save_splits_to_json(
+            train_samples, val_samples, test_samples, splits_path,
+            extra_info={"seed": 42, "train_ratio": 0.7, "val_ratio": 0.15, "test_ratio": 0.15}
+        )
+    
     logger.info(f"Main splits: Train={len(train_samples)}, Val={len(val_samples)}, Test={len(test_samples)}")
+    log_split_diagnostics(train_samples, val_samples, test_samples)
     logger.info("Stage 0 uses TRAIN ONLY (val/test never seen by encoder)")
     
     # Further split train into pretrain_train/pretrain_val (90/10)
-    pretrain_train, pretrain_val, _ = create_splits_stratified(
+    pretrain_train, pretrain_val, _ = create_splits_stratified_strict(
         train_samples,
         train_ratio=0.90,
         val_ratio=0.10,
@@ -700,7 +719,8 @@ if __name__ == "__main__":
     # Dataset
     parser.add_argument("--csv_path", type=str, required=True, help="Path to CSV dataset")
     parser.add_argument("--data_root", type=str, default="data")
-    
+    parser.add_argument("--splits_json", type=str, default=None, help="Path to existing splits.json (if provided, loads splits instead of creating new)")
+
     # Model
     parser.add_argument("--encoder_model", type=str, default="geolocal/StreetCLIP")
     parser.add_argument("--unfreeze_layers", type=int, default=2, help="Number of top vision layers to unfreeze")

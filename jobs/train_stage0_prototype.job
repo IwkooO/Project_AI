@@ -1,0 +1,56 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=s0
+#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/train_stage0_prototype.log
+#SBATCH --time=24:00:00  
+#SBATCH --cpus-per-task=9
+#SBATCH --mem=64G
+
+# Activate environment
+module load 2025
+module load Anaconda3/2025.06-1
+cd /scratch-shared/pnair/Project_AI/
+module load CUDA/12.8.0
+
+source activate streetview_pnair
+export PYTHONNOUSERSITE=1
+export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
+
+# ===== Stage 0 Configuration =====
+STAGE0_EPOCHS=20
+BATCH_SIZE=128
+LR=1e-4
+UNFREEZE_LAYERS=2
+
+# Loss weights
+LAMBDA_GPS=1.0
+LAMBDA_CHILD=1.0
+LAMBDA_PARENT=0.5
+LAMBDA_HIERARCHY=0.3
+TEMPERATURE=0.07
+
+DATA_ROOT=/scratch-shared/pnair/Project_AI/data
+
+# Run Stage 0 Training: Domain Contrastive Pretraining
+python scripts/training/train_stage0_prototype.py \
+    --csv_path "/scratch-shared/pnair/Project_AI/data/dataset-43k-mapped.csv" \
+    --encoder_model "geolocal/StreetCLIP" \
+    --stage0_epochs ${STAGE0_EPOCHS} \
+    --batch_size ${BATCH_SIZE} \
+    --lr ${LR} \
+    --weight_decay 0.01 \
+    --unfreeze_layers ${UNFREEZE_LAYERS} \
+    --finetune_text_encoder \
+    --lambda_gps ${LAMBDA_GPS} \
+    --lambda_child ${LAMBDA_CHILD} \
+    --lambda_parent ${LAMBDA_PARENT} \
+    --lambda_hierarchy ${LAMBDA_HIERARCHY} \
+    --temperature ${TEMPERATURE} \
+    --gradient_accumulation_steps 1 \
+    --max_grad_norm 1.0 \
+    --early_stopping_patience 5 \
+    --save_interval 5 \
+    --use_amp \
+    --use_wandb \
+    --data_root ${DATA_ROOT}

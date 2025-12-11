@@ -18,7 +18,7 @@ export PYTHONNOUSERSITE=1
 export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
 
 # ===== Stage 1 Configuration =====
-STAGE1_EPOCHS=50
+STAGE1_EPOCHS=5
 BATCH_SIZE=256
 LR=3e-4
 
@@ -42,7 +42,7 @@ INIT_LOGIT_SCALE_LOW=4.0
 INIT_LOGIT_SCALE_HIGH=14.0
 
 DATA_ROOT=/scratch-shared/pnair/Project_AI/data
-STAGE0_CKPT="/scratch-shared/pnair/Project_AI/results/concept-aware-3-stage/streetclip/global/haversine/2025-12-04_20-07-33/checkpoints/best_model_stage0.pt"
+STAGE0_CKPT="/scratch-shared/pnair/Project_AI/results/stage0-prototype/geolocal_StreetCLIP/2025-12-10_13-16-37/checkpoints/best_model_stage0.pt"
 CACHE_ROOT="${DATA_ROOT}/precomputed_embeddings/concept-aware-3-stage_haversine_2025-12-04_20-07-33"
 
 # Run Stage 1 Training with Text-Prototype Based Concept Learning

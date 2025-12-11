@@ -37,10 +37,14 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from PIL import Image
 import wandb
+import csv
 
 from src.dataset import (
     PanoramaCBMDataset,
-    create_splits_stratified,
+    create_splits_stratified_strict,
+    save_splits_to_json,
+    load_splits_from_json,
+    log_split_diagnostics,
     get_transforms_from_processor,
 )
 from src.models.streetclip_encoder import StreetCLIPEncoder, StreetCLIPConfig
@@ -676,7 +680,7 @@ def visualize_concept_predictions(
     
     # Create 2x2 grid figure (each cell has image on top, bar chart on bottom)
     # Use gridspec for better control: 2 rows x 2 cols, each cell subdivided into 2 rows
-    fig = plt.figure(figsize=(16, 16))
+    fig = plt.figure(figsize=(28, 16))
     
     # Create outer grid (2x2)
     outer_grid = fig.add_gridspec(2, 2, hspace=0.3, wspace=0.2)
@@ -731,8 +735,8 @@ def visualize_concept_predictions(
             pred_parent_idx = parent_logits[i].argmax().item()
             pred_parent = idx_to_parent.get(pred_parent_idx, f"Unknown_{pred_parent_idx}")
             pred_parent_prob = parent_probs[i][pred_parent_idx].item()
-            true_parent_str = f"Parent: {true_parent}"
-            pred_parent_str = f"→ {pred_parent}"
+            true_parent_str = f"GT Parent: {true_parent}"
+            pred_parent_str = f"Pred Parent: {pred_parent}"
         
         meta_entry = sample_metadata[i] if i < len(sample_metadata) else {}
         pano_id = meta_entry.get('pano_id', 'unknown')
@@ -740,9 +744,9 @@ def visualize_concept_predictions(
         # Compact title for grid layout
         is_correct = "✓" if pred_concept_idx == true_concept_idx else "✗"
         title = f"{is_correct} {pano_id[:12]}...\n"
-        title += f"GT: {true_concept[:20]}... | Pred: {pred_concept[:20]}..."
+        title += f"GT Child: {true_concept[:20]}... | Pred Child: {pred_concept[:20]}..."
         if true_parent_str:
-            title += f"\n{true_parent_str} {pred_parent_str}"
+            title += f"\n{true_parent_str} | {pred_parent_str}"
         ax_img.set_title(title, fontsize=8, loc='left')
         
         # ====== Bottom: Top K concepts bar plot ======
@@ -819,13 +823,42 @@ def log_validation_predictions_table(
     use_precomputed: bool = False,
     max_rows: int = WAND_TABLE_MAX_ROWS,
     step: Optional[int] = None,
+    output_dir: Path = None,
 ):
     """
     Log a compact table of validation predictions to wandb.
     
-    Columns: pano_id, gt child concept, predicted child concept,
-    gt parent concept, predicted parent concept, child_correct, parent_correct.
+    Columns: pano_id, country, gt child concept, predicted child concept,
+    gt parent concept, predicted parent concept, child_correct, parent_correct,
+    child_count, parent_count.
     """
+    concept_to_idx = {name: idx for idx, name in idx_to_concept.items()}
+    parent_to_idx = {name: idx for idx, name in idx_to_parent.items()}
+    
+    child_counts = None
+    parent_counts = None
+    dataset = getattr(dataloader, "dataset", None)
+    if dataset is not None:
+        if hasattr(dataset, "concept_indices") and hasattr(dataset, "parent_indices"):
+            child_counts = torch.bincount(
+                dataset.concept_indices, minlength=len(idx_to_concept)
+            ).tolist()
+            parent_counts = torch.bincount(
+                dataset.parent_indices, minlength=len(idx_to_parent)
+            ).tolist()
+        elif hasattr(dataset, "samples"):
+            child_counts = [0] * len(idx_to_concept)
+            parent_counts = [0] * len(idx_to_parent)
+            for sample in dataset.samples:
+                child_idx = concept_to_idx.get(sample.get("meta_name"))
+                if child_idx is not None:
+                    child_counts[child_idx] += 1
+                
+                parent_name = sample.get("parent_concept", "unknown")
+                parent_idx = parent_to_idx.get(parent_name)
+                if parent_idx is not None:
+                    parent_counts[parent_idx] += 1
+    
     rows = []
     for batch in dataloader:
         if use_precomputed:
@@ -856,18 +889,24 @@ def log_validation_predictions_table(
             gt_parent = int(parent_idx[i])
             pred_child = int(pred_meta[i])
             pred_parent_val = int(pred_parent[i])
+            country_name = meta_list[i].get("country", "unknown")
             
             child_correct = gt_child == pred_child
             parent_correct = gt_parent == pred_parent_val
+            child_count_val = child_counts[gt_child] if child_counts is not None else 0
+            parent_count_val = parent_counts[gt_parent] if parent_counts is not None else 0
             
             rows.append([
                 str(meta_list[i].get("pano_id", "unknown")),
+                country_name,
                 idx_to_concept.get(gt_child, f"meta_{gt_child}"),
                 idx_to_concept.get(pred_child, f"meta_{pred_child}"),
                 idx_to_parent.get(gt_parent, f"parent_{gt_parent}"),
                 idx_to_parent.get(pred_parent_val, f"parent_{pred_parent_val}"),
                 child_correct,
                 parent_correct,
+                child_count_val,
+                parent_count_val,
             ])
             if len(rows) >= max_rows:
                 break
@@ -877,15 +916,25 @@ def log_validation_predictions_table(
     if not rows:
         return
     
+    # Save rows to output directory / diagnostics/predictions_table.csv
+    output_path = output_dir / "diagnostics" / f"predictions_table_{step}.csv"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    df = pd.DataFrame(rows, columns=["pano_id", "country", "gt_child_concept", "pred_child_concept", "gt_parent_concept", "pred_parent_concept", "child_correct", "parent_correct", "count_child", "count_parent"])
+    df.to_csv(output_path, index=False)
+    logger.info(f"Saved predictions table to {output_path}")
+    
     table = wandb.Table(
         columns=[
             "pano_id",
+            "country",
             "gt_child_concept",
             "pred_child_concept",
             "gt_parent_concept",
             "pred_parent_concept",
             "child_correct",
             "parent_correct",
+            "count_child",
+            "count_parent",
         ],
         data=rows,
     )
@@ -940,15 +989,32 @@ def train(args):
     logger.info(f"Parent concepts: {len(parent_names)}")
     logger.info(f"Countries: {len(full_dataset.country_to_idx)}")
     
-    # Split dataset
-    train_samples, val_samples, test_samples = create_splits_stratified(
-        full_dataset.samples,
-        train_ratio=0.8,
-        val_ratio=0.1,
-        test_ratio=0.1,
-        seed=42,
-    )
+    # Split dataset (consistent with Stage 0)
+    if args.splits_json and Path(args.splits_json).exists():
+        # Load existing splits for consistency across stages
+        logger.info(f"Loading splits from {args.splits_json}")
+        train_samples, val_samples, test_samples = load_splits_from_json(
+            args.splits_json, full_dataset.samples
+        )
+    else:
+        # Create new strict stratified splits: 70/15/15 (same as Stage 0)
+        logger.info("Creating new strict stratified splits (70/15/15)")
+        train_samples, val_samples, test_samples = create_splits_stratified_strict(
+            full_dataset.samples,
+            train_ratio=0.70,
+            val_ratio=0.15,
+            test_ratio=0.15,
+            seed=42,
+        )
+        # Save splits for reproducibility
+        splits_path = output_dir / "splits.json"
+        save_splits_to_json(
+            train_samples, val_samples, test_samples, splits_path,
+            extra_info={"seed": 42, "train_ratio": 0.7, "val_ratio": 0.15, "test_ratio": 0.15}
+        )
+    
     logger.info(f"Splits: Train={len(train_samples)}, Val={len(val_samples)}, Test={len(test_samples)}")
+    log_split_diagnostics(train_samples, val_samples, test_samples)
     
     # Compute class weights from training samples
     meta_weights = compute_class_weights(train_samples, concept_to_idx, device, key='meta_name')
@@ -1407,6 +1473,7 @@ def train(args):
                 use_precomputed=use_precomputed,
                 max_rows=WAND_TABLE_MAX_ROWS,
                 step=epoch + 1,
+                output_dir=output_dir,
             )
     
         # Visualization
@@ -1511,7 +1578,8 @@ if __name__ == "__main__":
     # Dataset
     parser.add_argument("--csv_path", type=str, required=True, help="Path to CSV dataset")
     parser.add_argument("--data_root", type=str, default="data")
-    
+    parser.add_argument("--splits_json", type=str, default=None, help="Path to existing splits.json (if provided, loads splits instead of creating new)")
+
     # Model
     parser.add_argument("--encoder_model", type=str, default="geolocal/StreetCLIP")
     parser.add_argument("--resume_from_checkpoint", type=str, default=None, help="Stage 0 checkpoint to resume from")
