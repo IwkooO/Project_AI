@@ -115,13 +115,20 @@ def extract_image_size(processor: Optional[AutoImageProcessor] = None, image_siz
     return (224, 224)  # Default fallback
 
 
-def get_transforms_from_processor(processor: Optional[AutoImageProcessor] = None, image_size: Optional[Tuple[int, int]] = None):
+def get_transforms_from_processor(
+    processor: Optional[AutoImageProcessor] = None, 
+    image_size: Optional[Tuple[int, int]] = None,
+    is_training: bool = True,
+    augmentation_strength: str = "medium",
+):
     """
     Create torchvision transforms from HuggingFace image processor.
     
     Args:
         processor: Optional HuggingFace AutoImageProcessor instance. If None, uses CLIP defaults.
         image_size: Optional override for image size (width, height). Defaults to (336, 336) if processor is None.
+        is_training: If True, apply data augmentation; if False, only apply resize + normalize.
+        augmentation_strength: One of "none", "light", "medium", "strong" for augmentation intensity.
     
     Returns:
         torchvision.Compose transform pipeline
@@ -155,15 +162,92 @@ def get_transforms_from_processor(processor: Optional[AutoImageProcessor] = None
     if len(std) != 3:
         std = tuple(std[:3]) if len(std) > 3 else tuple(list(std) + [std[-1]] * (3 - len(std)))
     
-    # Create transform pipeline - resize directly to target size without cropping
-    transform_list = [
-        transforms.Resize(target_size, interpolation=InterpolationMode.BICUBIC),
-        transforms.RandomHorizontalFlip(),
+    # Validation/test transforms (no augmentation)
+    if not is_training or augmentation_strength == "none":
+        transform_list = [
+            transforms.Resize(target_size, interpolation=InterpolationMode.BICUBIC),
+            transforms.CenterCrop(target_size),  # Center crop for consistency
+            transforms.ToTensor(),
+            transforms.Normalize(mean, std),
+        ]
+        return transforms.Compose(transform_list)
+    
+    # Training transforms with augmentation
+    # Build augmentation pipeline based on strength
+    transform_list = []
+    
+    # ========== Geometric Augmentations ==========
+    if augmentation_strength == "light":
+        # Light: simple resize + horizontal flip
+        transform_list.extend([
+            transforms.Resize(target_size, interpolation=InterpolationMode.BICUBIC),
+            transforms.RandomHorizontalFlip(p=0.5),
+        ])
+    elif augmentation_strength == "medium":
+        # Medium: random crop + flip + light color jitter
+        transform_list.extend([
+            transforms.RandomResizedCrop(
+                target_size,
+                scale=(0.8, 1.0),  # Crop 80-100% of image
+                ratio=(0.9, 1.1),  # Slight aspect ratio variation
+                interpolation=InterpolationMode.BICUBIC,
+            ),
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.ColorJitter(
+                brightness=0.2,
+                contrast=0.2,
+                saturation=0.2,
+                hue=0.05,
+            ),
+        ])
+    elif augmentation_strength == "strong":
+        # Strong: aggressive augmentation for maximum regularization
+        transform_list.extend([
+            transforms.RandomResizedCrop(
+                target_size,
+                scale=(0.6, 1.0),  # More aggressive crop (60-100%)
+                ratio=(0.8, 1.2),  # More aspect ratio variation
+                interpolation=InterpolationMode.BICUBIC,
+            ),
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.ColorJitter(
+                brightness=0.3,
+                contrast=0.3,
+                saturation=0.3,
+                hue=0.1,
+            ),
+            transforms.RandomGrayscale(p=0.1),  # Occasional grayscale
+            # Note: RandomErasing is applied after ToTensor
+        ])
+    
+    # ========== Convert to Tensor + Normalize ==========
+    transform_list.extend([
         transforms.ToTensor(),
         transforms.Normalize(mean, std),
-    ]
+    ])
+    
+    # ========== Post-tensor augmentations (strong only) ==========
+    if augmentation_strength == "strong":
+        transform_list.append(
+            transforms.RandomErasing(
+                p=0.1,  # 10% probability
+                scale=(0.02, 0.15),  # Erase 2-15% of image
+                ratio=(0.3, 3.3),
+                value='random',  # Fill with random values
+            )
+        )
     
     return transforms.Compose(transform_list)
+
+
+def get_train_transforms(processor: Optional[AutoImageProcessor] = None, image_size: Optional[Tuple[int, int]] = None):
+    """Get training transforms with medium augmentation."""
+    return get_transforms_from_processor(processor, image_size, is_training=True, augmentation_strength="medium")
+
+
+def get_val_transforms(processor: Optional[AutoImageProcessor] = None, image_size: Optional[Tuple[int, int]] = None):
+    """Get validation transforms (no augmentation)."""
+    return get_transforms_from_processor(processor, image_size, is_training=False, augmentation_strength="none")
 
 
 class PanoramaCBMDataset(Dataset):

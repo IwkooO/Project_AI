@@ -5,12 +5,221 @@ Loss functions for StreetCLIP CBM geolocation.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 
 from src.evaluation import normalized_latlng_to_sphere, haversine_distance
+
+
+# ============================================================================
+# SEMANTIC SIMILARITY UTILITIES
+# ============================================================================
+
+def compute_concept_similarity_matrix(
+    prototypes: torch.Tensor,
+    margin: float = 0.0,
+    temperature: float = 1.0,
+) -> torch.Tensor:
+    """
+    Compute pairwise cosine similarity matrix between concept prototypes.
+    
+    Args:
+        prototypes: L2-normalized text prototype embeddings [num_concepts, dim]
+        margin: Minimum similarity threshold (values below are clipped to 0)
+        temperature: Temperature for sharpening/softening similarities
+        
+    Returns:
+        Similarity matrix [num_concepts, num_concepts] with values in [0, 1]
+    """
+    # Ensure normalized
+    prototypes_norm = F.normalize(prototypes, p=2, dim=1)
+    
+    # Cosine similarity: [num_concepts, num_concepts]
+    sim_matrix = torch.matmul(prototypes_norm, prototypes_norm.T)
+    
+    # Apply margin clipping (values below margin become 0)
+    if margin > 0:
+        sim_matrix = torch.clamp(sim_matrix - margin, min=0) / (1 - margin + 1e-8)
+    
+    # Temperature scaling (higher temp = softer, lower = sharper)
+    if temperature != 1.0:
+        sim_matrix = sim_matrix ** (1.0 / temperature)
+    
+    return sim_matrix
+
+
+class SemanticSoftCrossEntropy(nn.Module):
+    """
+    Semantic Soft Cross-Entropy Loss for concept classification.
+    
+    Instead of only penalizing wrong predictions, this loss:
+    1. Gives partial credit for predicting semantically similar concepts
+    2. Creates soft targets based on prototype similarity
+    3. Blends hard CE loss with semantic similarity loss
+    
+    This helps prevent overfitting by allowing the model to learn that
+    "Beach - tropical" and "Beach - temperate" are semantically close,
+    rather than treating them as completely unrelated classes.
+    
+    Loss = (1 - λ) * HardCE(pred, target) + λ * SoftCE(pred, soft_targets)
+    
+    Where soft_targets[i] ∝ sim(prototype[target], prototype[i])
+    """
+    
+    def __init__(
+        self,
+        similarity_matrix: torch.Tensor,
+        lambda_soft: float = 0.2,
+        temperature: float = 2.0,
+        normalize_soft_targets: bool = True,
+    ):
+        """
+        Args:
+            similarity_matrix: Precomputed [num_concepts, num_concepts] similarity matrix
+            lambda_soft: Weight for soft target loss (0 = pure hard CE, 1 = pure soft)
+            temperature: Temperature for softening the soft target distribution
+            normalize_soft_targets: Whether to normalize soft targets to sum to 1
+        """
+        super().__init__()
+        self.register_buffer('similarity_matrix', similarity_matrix)
+        self.lambda_soft = lambda_soft
+        self.temperature = temperature
+        self.normalize_soft_targets = normalize_soft_targets
+    
+    def forward(
+        self, 
+        logits: torch.Tensor, 
+        targets: torch.Tensor,
+        return_components: bool = False,
+    ) -> torch.Tensor:
+        """
+        Args:
+            logits: Predicted logits [batch, num_concepts]
+            targets: Ground truth concept indices [batch]
+            return_components: If True, return dict with loss components
+            
+        Returns:
+            Combined loss (scalar) or dict with components if return_components=True
+        """
+        batch_size = logits.size(0)
+        num_classes = logits.size(1)
+        device = logits.device
+        
+        # 1. Hard cross-entropy loss
+        hard_loss = F.cross_entropy(logits, targets)
+        
+        # 2. Build soft targets from similarity matrix
+        # For each sample, soft_targets[i] = similarity(gt_concept, concept_i)
+        # Shape: [batch, num_classes]
+        soft_targets = self.similarity_matrix[targets]  # [batch, num_classes]
+        
+        # Apply temperature to soften/sharpen the distribution
+        if self.temperature != 1.0:
+            soft_targets = soft_targets ** (1.0 / self.temperature)
+        
+        # Normalize to probability distribution
+        if self.normalize_soft_targets:
+            soft_targets = soft_targets / soft_targets.sum(dim=1, keepdim=True).clamp(min=1e-8)
+        
+        # 3. Soft cross-entropy: CE between predictions and soft targets
+        log_probs = F.log_softmax(logits, dim=1)
+        soft_loss = -(soft_targets * log_probs).sum(dim=1).mean()
+        
+        # 4. Combine losses
+        combined_loss = (1 - self.lambda_soft) * hard_loss + self.lambda_soft * soft_loss
+        
+        if return_components:
+            return {
+                'loss': combined_loss,
+                'hard_loss': hard_loss,
+                'soft_loss': soft_loss,
+            }
+        return combined_loss
+    
+    def update_similarity_matrix(self, new_matrix: torch.Tensor):
+        """Update the similarity matrix (e.g., if prototypes change during training)."""
+        self.similarity_matrix = new_matrix.to(self.similarity_matrix.device)
+
+
+def semantic_soft_cross_entropy(
+    logits: torch.Tensor,
+    targets: torch.Tensor,
+    similarity_matrix: torch.Tensor,
+    lambda_soft: float = 0.2,
+    temperature: float = 2.0,
+) -> torch.Tensor:
+    """
+    Functional version of SemanticSoftCrossEntropy.
+    
+    Args:
+        logits: Predicted logits [batch, num_concepts]
+        targets: Ground truth concept indices [batch]
+        similarity_matrix: Precomputed [num_concepts, num_concepts] similarity matrix
+        lambda_soft: Weight for soft target loss
+        temperature: Temperature for soft targets
+        
+    Returns:
+        Combined loss (scalar)
+    """
+    # Hard cross-entropy
+    hard_loss = F.cross_entropy(logits, targets)
+    
+    # Build soft targets
+    soft_targets = similarity_matrix[targets]  # [batch, num_classes]
+    if temperature != 1.0:
+        soft_targets = soft_targets ** (1.0 / temperature)
+    soft_targets = soft_targets / soft_targets.sum(dim=1, keepdim=True).clamp(min=1e-8)
+    
+    # Soft cross-entropy
+    log_probs = F.log_softmax(logits, dim=1)
+    soft_loss = -(soft_targets * log_probs).sum(dim=1).mean()
+    
+    # Combine
+    return (1 - lambda_soft) * hard_loss + lambda_soft * soft_loss
+
+
+def compute_semantic_close_accuracy(
+    predictions: torch.Tensor,
+    targets: torch.Tensor,
+    similarity_matrix: torch.Tensor,
+    threshold: float = 0.7,
+) -> Tuple[float, float]:
+    """
+    Compute both hard accuracy and semantic-close accuracy.
+    
+    Semantic-close accuracy counts a prediction as correct if:
+    - It matches exactly (hard correct), OR
+    - It's within top-k most similar concepts to the ground truth
+    - The similarity between predicted and target concept >= threshold
+    
+    Args:
+        predictions: Predicted class indices [batch]
+        targets: Ground truth class indices [batch]
+        similarity_matrix: [num_concepts, num_concepts] similarity matrix
+        threshold: Minimum similarity to count as "close" prediction
+        
+    Returns:
+        Tuple of (hard_accuracy, semantic_close_accuracy)
+    """
+    batch_size = predictions.size(0)
+    
+    # Hard accuracy
+    hard_correct = (predictions == targets).float()
+    hard_acc = hard_correct.mean().item()
+    
+    # Semantic-close accuracy
+    # Get similarity between predicted and target concepts
+    pred_target_sim = similarity_matrix[targets, predictions]  # [batch]
+    semantic_close = (pred_target_sim >= threshold).float()
+    
+    # A prediction is "semantically close" if it's either exactly correct OR similar enough
+    close_correct = torch.max(hard_correct, semantic_close)
+    semantic_close_acc = close_correct.mean().item()
+    
+    return hard_acc, semantic_close_acc
 
 
 @dataclass

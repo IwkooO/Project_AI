@@ -46,6 +46,8 @@ from src.dataset import (
     load_splits_from_json,
     log_split_diagnostics,
     get_transforms_from_processor,
+    get_train_transforms,
+    get_val_transforms,
 )
 from src.models.streetclip_encoder import StreetCLIPEncoder, StreetCLIPConfig
 from src.models.concept_aware_cbm import (
@@ -54,8 +56,19 @@ from src.models.concept_aware_cbm import (
     build_meta_to_parent_idx,
     DEFAULT_CONCEPT_TEMPLATES,
     DEFAULT_PARENT_TEMPLATES,
+    TransformerBottleneck,
 )
-from src.losses import FocalLoss, concept_prototype_contrastive_loss, hierarchical_consistency_loss, parent_guided_meta_loss, inter_parent_contrastive_loss
+from src.losses import (
+    FocalLoss, 
+    concept_prototype_contrastive_loss, 
+    hierarchical_consistency_loss, 
+    parent_guided_meta_loss, 
+    inter_parent_contrastive_loss,
+    compute_concept_similarity_matrix,
+    SemanticSoftCrossEntropy,
+    semantic_soft_cross_entropy,
+    compute_semantic_close_accuracy,
+)
 from src.concepts.utils import extract_concepts_from_dataset
 
 logging.basicConfig(level=logging.INFO)
@@ -538,6 +551,7 @@ def validate(
     focal_loss_parent: FocalLoss,
     args,
     use_precomputed: bool = False,
+    similarity_matrix: Optional[torch.Tensor] = None,
 ) -> Dict[str, float]:
     """Validate Stage 1 model."""
     model.eval()
@@ -545,6 +559,7 @@ def validate(
     total_loss = 0
     total_meta_correct = 0
     total_parent_correct = 0
+    total_semantic_close_correct = 0
     total_count = 0
     
     for batch in dataloader:
@@ -583,13 +598,28 @@ def validate(
         
         total_meta_correct += (pred_meta == concept_idx).sum().item()
         total_parent_correct += (pred_parent == parent_idx).sum().item()
+        
+        # Semantic-close accuracy (if similarity matrix provided)
+        if similarity_matrix is not None:
+            _, semantic_close_acc_batch = compute_semantic_close_accuracy(
+                pred_meta, concept_idx, similarity_matrix, 
+                threshold=getattr(args, 'semantic_close_threshold', 0.7)
+            )
+            total_semantic_close_correct += semantic_close_acc_batch * len(concept_idx)
+        
         total_count += len(concept_idx)
     
-    return {
+    result = {
         "loss": total_loss / total_count,
         "meta_acc": total_meta_correct / total_count,
         "parent_acc": total_parent_correct / total_count,
     }
+    
+    # Add semantic-close accuracy if computed
+    if similarity_matrix is not None:
+        result["semantic_close_acc"] = total_semantic_close_correct / total_count
+    
+    return result
 
 # ============================================================================
 # VISUALIZATION
@@ -1102,11 +1132,45 @@ def train(args):
         init_logit_scale=args.init_logit_scale,
         learnable_prototypes=args.learnable_prototypes,
         prototype_residual_scale=args.prototype_residual_scale,
+        # Transformer bottleneck options
+        use_transformer_bottleneck=args.use_transformer_bottleneck,
+        transformer_num_heads=args.transformer_num_heads,
+        transformer_num_layers=args.transformer_num_layers,
+        transformer_dropout=args.transformer_dropout,
+        transformer_stochastic_depth=args.transformer_stochastic_depth,
     ).to(device)
     
     trainable_params = model.get_trainable_params()
     num_trainable = sum(p.numel() for p in trainable_params)
     logger.info(f"Trainable parameters: {num_trainable:,}")
+    if args.use_transformer_bottleneck:
+        logger.info(f"Using TransformerBottleneck with {args.transformer_num_layers} layers, {args.transformer_num_heads} heads")
+    
+    # ========================================================================
+    # BUILD SEMANTIC SIMILARITY MATRIX
+    # ========================================================================
+    logger.info("Building semantic similarity matrix for soft targets...")
+    
+    # Compute pairwise similarity between all meta concept prototypes
+    with torch.no_grad():
+        similarity_matrix = compute_concept_similarity_matrix(
+            model.T_meta_base,  # Use base prototypes (frozen text embeddings)
+            margin=args.semantic_margin,
+            temperature=1.0,  # Raw similarity, temperature applied in loss
+        ).to(device)
+    
+    logger.info(f"Similarity matrix shape: {similarity_matrix.shape}")
+    logger.info(f"Similarity stats: min={similarity_matrix.min():.3f}, max={similarity_matrix.max():.3f}, mean={similarity_matrix.mean():.3f}")
+    
+    # Create semantic soft cross-entropy loss (if enabled)
+    semantic_loss_fn = None
+    if args.lambda_semantic > 0:
+        semantic_loss_fn = SemanticSoftCrossEntropy(
+            similarity_matrix=similarity_matrix,
+            lambda_soft=args.lambda_semantic,
+            temperature=args.semantic_temperature,
+        )
+        logger.info(f"Semantic soft CE enabled: λ={args.lambda_semantic}, temp={args.semantic_temperature}")
     
     # ========================================================================
     # SETUP DATALOADERS
@@ -1399,6 +1463,12 @@ def train(args):
                 else:
                     loss_intra = 0.0
                 
+                # 8. Semantic soft cross-entropy loss (anti-overfitting)
+                if semantic_loss_fn is not None and args.lambda_semantic > 0:
+                    loss_semantic = semantic_loss_fn(meta_logits, concept_idx)
+                else:
+                    loss_semantic = 0.0
+                
                 # ============ TOTAL LOSS ============
                 loss = (
                     args.lambda_meta * loss_meta +
@@ -1407,7 +1477,8 @@ def train(args):
                     args.lambda_parent_contrastive * loss_parent_contrastive +
                     args.lambda_contrastive * loss_contrastive +
                     loss_reg +
-                    loss_intra
+                    loss_intra +
+                    loss_semantic  # Semantic loss already weighted in SemanticSoftCrossEntropy
                 )
                 
                 loss = loss / args.gradient_accumulation_steps
@@ -1429,6 +1500,12 @@ def train(args):
             total_meta_correct += (pred_meta == concept_idx).sum().item()
             total_parent_correct += (pred_parent == parent_idx).sum().item()
             total_count += len(concept_idx)
+            
+            # Compute semantic-close accuracy (for logging)
+            if similarity_matrix is not None:
+                hard_acc_batch, semantic_close_acc_batch = compute_semantic_close_accuracy(
+                    pred_meta, concept_idx, similarity_matrix, threshold=args.semantic_close_threshold
+                )
             
             # Update progress bar
             pbar.set_postfix({
@@ -1460,8 +1537,13 @@ def train(args):
             model, val_loader, device,
             focal_loss_meta, focal_loss_parent, args,
             use_precomputed=use_precomputed,
+            similarity_matrix=similarity_matrix,
         )
         log_metrics(val_metrics, prefix="Val", stage=1)
+        
+        # Log semantic-close accuracy if available
+        if "semantic_close_acc" in val_metrics:
+            logger.info(f"  Semantic-close Acc (threshold={args.semantic_close_threshold}): {val_metrics['semantic_close_acc']:.3f}")
         
         if args.use_wandb:
             log_validation_predictions_table(
@@ -1496,7 +1578,7 @@ def train(args):
     
         # Wandb logging - use consistent key prefixes for panel organization
         if args.use_wandb:
-            wandb.log({
+            log_dict = {
                 "epoch": epoch + 1,
                 "train/loss": train_metrics["loss"],
                 "train/meta_acc": train_metrics["meta_acc"],
@@ -1505,7 +1587,11 @@ def train(args):
                 "val/meta_acc": val_metrics["meta_acc"],
                 "val/parent_acc": val_metrics["parent_acc"],
                 "train/lr": scheduler.get_last_lr()[0],
-            }, step=epoch + 1)
+            }
+            # Add semantic-close accuracy if available
+            if "semantic_close_acc" in val_metrics:
+                log_dict["val/semantic_close_acc"] = val_metrics["semantic_close_acc"]
+            wandb.log(log_dict, step=epoch + 1)
     
         # Checkpointing
         val_metric = val_metrics["meta_acc"]
@@ -1590,11 +1676,19 @@ if __name__ == "__main__":
     parser.add_argument("--prototype_residual_scale", type=float, default=0.01)
     parser.add_argument("--init_logit_scale", type=float, default=14.0, help="Initial logit scale (~1/temperature)")
     
+    # Transformer bottleneck settings (anti-overfitting)
+    parser.add_argument("--use_transformer_bottleneck", action="store_true", default=False,
+                        help="Use transformer encoder bottleneck instead of MLP (optional, start with False)")
+    parser.add_argument("--transformer_num_heads", type=int, default=8, help="Transformer attention heads")
+    parser.add_argument("--transformer_num_layers", type=int, default=2, help="Transformer encoder layers")
+    parser.add_argument("--transformer_dropout", type=float, default=0.4, help="Dropout in transformer")
+    parser.add_argument("--transformer_stochastic_depth", type=float, default=0.2, help="Stochastic depth probability")
+    
     # Training
     parser.add_argument("--stage1_epochs", type=int, default=50)
     parser.add_argument("--batch_size", type=int, default=256)
     parser.add_argument("--lr", type=float, default=3e-4)
-    parser.add_argument("--weight_decay", type=float, default=0.01)
+    parser.add_argument("--weight_decay", type=float, default=0.05, help="Weight decay (increased from 0.01 for anti-overfitting)")
     parser.add_argument("--gradient_accumulation_steps", type=int, default=1)
     parser.add_argument("--max_grad_norm", type=float, default=1.0)
     parser.add_argument("--use_amp", action="store_true", default=True)
@@ -1603,6 +1697,11 @@ if __name__ == "__main__":
                         help="Cache precomputed embeddings to disk for reuse")
     parser.add_argument("--no_embedding_cache", dest="use_embedding_cache", action="store_false",
                         help="Disable embedding caching (recompute every time)")
+    
+    # Data augmentation
+    parser.add_argument("--augmentation_strength", type=str, default="medium",
+                        choices=["none", "light", "medium", "strong"],
+                        help="Strength of data augmentation for training")
 
     # Loss weights
     parser.add_argument("--lambda_meta", type=float, default=1.0)
@@ -1610,6 +1709,16 @@ if __name__ == "__main__":
     parser.add_argument("--lambda_contrastive", type=float, default=0.5)
     parser.add_argument("--lambda_reg", type=float, default=0.001, help="Prototype regularization weight")
     parser.add_argument("--temperature", type=float, default=0.07)
+    
+    # Semantic similarity loss (anti-overfitting)
+    parser.add_argument("--lambda_semantic", type=float, default=0.15,
+                        help="Weight for semantic soft cross-entropy loss (0 = disabled)")
+    parser.add_argument("--semantic_temperature", type=float, default=2.0,
+                        help="Temperature for soft targets in semantic loss")
+    parser.add_argument("--semantic_margin", type=float, default=0.0,
+                        help="Minimum similarity threshold for semantic soft targets")
+    parser.add_argument("--semantic_close_threshold", type=float, default=0.7,
+                        help="Similarity threshold for semantic-close accuracy metric")
     
     # NEW: Hierarchical losses
     parser.add_argument("--lambda_consistency", type=float, default=0.3, help="Weight for hierarchical consistency loss")
@@ -1628,7 +1737,7 @@ if __name__ == "__main__":
     
     # Focal loss
     parser.add_argument("--focal_gamma", type=float, default=2.0)
-    parser.add_argument("--label_smoothing", type=float, default=0.1)
+    parser.add_argument("--label_smoothing", type=float, default=0.2, help="Label smoothing (increased from 0.1 for anti-overfitting)")
     parser.add_argument("--use_class_weights", action="store_true", default=True)
     parser.add_argument("--no_class_weights", dest="use_class_weights", action="store_false")
     

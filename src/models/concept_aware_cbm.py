@@ -148,6 +148,204 @@ def build_meta_to_parent_idx(
 
 
 # ============================================================================
+# TRANSFORMER BOTTLENECK WITH ATTENTION POOLING
+# ============================================================================
+
+class TransformerBottleneck(nn.Module):
+    """
+    Transformer-based concept bottleneck with attention pooling.
+    
+    Replaces the simple MLP bottleneck with:
+    1. Input projection + positional encoding
+    2. Transformer encoder layers (self-attention)
+    3. Learnable [CLS] token for aggregation
+    4. Attention-based pooling to produce final concept embedding
+    
+    This allows the model to learn more complex feature interactions
+    while the heavy dropout and stochastic depth prevent overfitting.
+    """
+    
+    def __init__(
+        self,
+        input_dim: int = 768,
+        output_dim: int = 512,
+        hidden_dim: int = 512,
+        num_heads: int = 8,
+        num_layers: int = 2,
+        dropout: float = 0.4,
+        stochastic_depth: float = 0.2,
+    ):
+        """
+        Args:
+            input_dim: Input dimension (StreetCLIP features)
+            output_dim: Output dimension (concept embedding)
+            hidden_dim: Hidden dimension for transformer
+            num_heads: Number of attention heads
+            num_layers: Number of transformer encoder layers
+            dropout: Dropout probability
+            stochastic_depth: Stochastic depth drop probability
+        """
+        super().__init__()
+        
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self.hidden_dim = hidden_dim
+        
+        # Input projection
+        self.input_proj = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.LayerNorm(hidden_dim),
+            nn.Dropout(dropout),
+        )
+        
+        # Learnable [CLS] token for aggregation
+        self.cls_token = nn.Parameter(torch.randn(1, 1, hidden_dim) * 0.02)
+        
+        # Positional encoding (learnable, for [CLS] + input tokens)
+        # Note: For single image embedding input, we have 2 positions: [CLS] + image
+        self.pos_embed = nn.Parameter(torch.randn(1, 2, hidden_dim) * 0.02)
+        
+        # Check PyTorch version for batch_first support
+        import torch
+        pytorch_version = tuple(int(x) for x in torch.__version__.split('.')[:2])
+        self.batch_first = pytorch_version >= (1, 9)
+        
+        # Transformer encoder layers with stochastic depth
+        encoder_kwargs = dict(
+            d_model=hidden_dim,
+            nhead=num_heads,
+            dim_feedforward=hidden_dim * 4,
+            dropout=dropout,
+            activation='gelu',
+        )
+        if self.batch_first:
+            encoder_kwargs['batch_first'] = True
+        
+        # norm_first requires PyTorch >= 1.11
+        if pytorch_version >= (1, 11):
+            encoder_kwargs['norm_first'] = True
+        
+        encoder_layer = nn.TransformerEncoderLayer(**encoder_kwargs)
+        self.transformer_encoder = nn.TransformerEncoder(
+            encoder_layer,
+            num_layers=num_layers,
+        )
+        
+        # Stochastic depth for transformer layers
+        self.drop_path_prob = stochastic_depth
+        
+        # Attention-based pooling (using [CLS] as query, all tokens as keys/values)
+        attn_kwargs = dict(
+            embed_dim=hidden_dim,
+            num_heads=num_heads,
+            dropout=dropout,
+        )
+        if self.batch_first:
+            attn_kwargs['batch_first'] = True
+        self.attn_pool = nn.MultiheadAttention(**attn_kwargs)
+        self.attn_pool_norm = nn.LayerNorm(hidden_dim)
+        
+        # Output projection
+        self.output_proj = nn.Sequential(
+            nn.Linear(hidden_dim, output_dim),
+            nn.LayerNorm(output_dim),
+            nn.Dropout(dropout * 0.75),  # Slightly less dropout at output
+        )
+        
+        self._init_weights()
+    
+    def _init_weights(self):
+        """Initialize weights with Xavier uniform."""
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+    
+    def _stochastic_depth(self, x: torch.Tensor, residual: torch.Tensor) -> torch.Tensor:
+        """Apply stochastic depth (drop path) during training."""
+        if not self.training or self.drop_path_prob == 0:
+            return x + residual
+        
+        keep_prob = 1 - self.drop_path_prob
+        # Sample drop mask per batch
+        shape = (x.shape[0],) + (1,) * (x.ndim - 1)
+        random_tensor = x.new_empty(shape).bernoulli_(keep_prob)
+        if keep_prob > 0:
+            random_tensor.div_(keep_prob)
+        return x + residual * random_tensor
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass through transformer bottleneck.
+        
+        Args:
+            x: Input features [batch, input_dim] (single vector per image)
+            
+        Returns:
+            Concept embeddings [batch, output_dim]
+        """
+        batch_size = x.size(0)
+        
+        # Project input to hidden dim: [batch, hidden_dim]
+        x = self.input_proj(x)
+        
+        # Reshape to sequence: [batch, 1, hidden_dim]
+        x = x.unsqueeze(1)
+        
+        # Prepend [CLS] token: [batch, 2, hidden_dim]
+        cls_tokens = self.cls_token.expand(batch_size, -1, -1)
+        x = torch.cat([cls_tokens, x], dim=1)
+        
+        # Add positional encoding
+        x = x + self.pos_embed
+        
+        # Handle batch_first compatibility for older PyTorch versions
+        if not self.batch_first:
+            # Transpose to [seq, batch, hidden] for older PyTorch
+            x = x.transpose(0, 1)
+        
+        # Transformer encoder
+        x = self.transformer_encoder(x)
+        
+        if not self.batch_first:
+            # Transpose back to [batch, seq, hidden]
+            x = x.transpose(0, 1)
+        
+        # x is now [batch, 2, hidden_dim]
+        
+        # Attention pooling: use [CLS] as query, all tokens as keys/values
+        cls_out = x[:, :1, :]  # [batch, 1, hidden_dim]
+        all_tokens = x  # [batch, 2, hidden_dim]
+        
+        if not self.batch_first:
+            # Transpose for attention
+            cls_out_t = cls_out.transpose(0, 1)  # [1, batch, hidden]
+            all_tokens_t = all_tokens.transpose(0, 1)  # [2, batch, hidden]
+            attn_out, _ = self.attn_pool(
+                query=cls_out_t,
+                key=all_tokens_t,
+                value=all_tokens_t,
+            )
+            attn_out = attn_out.transpose(0, 1)  # [batch, 1, hidden]
+        else:
+            attn_out, _ = self.attn_pool(
+                query=cls_out,
+                key=all_tokens,
+                value=all_tokens,
+            )  # [batch, 1, hidden_dim]
+        
+        # Residual connection + norm
+        pooled = self.attn_pool_norm(cls_out + attn_out)  # [batch, 1, hidden_dim]
+        
+        # Remove sequence dimension and project to output
+        pooled = pooled.squeeze(1)  # [batch, hidden_dim]
+        output = self.output_proj(pooled)  # [batch, output_dim]
+        
+        return output
+
+
+# ============================================================================
 # STAGE 1 CONCEPT MODEL (Text-Prototype Based)
 # ============================================================================
 
@@ -163,6 +361,9 @@ class Stage1ConceptModel(nn.Module):
     
     Supports hierarchical supervision with both meta-level (fine-grained)
     and parent-level (coarse) concept predictions.
+    
+    Optionally uses transformer bottleneck with attention pooling for
+    more expressive feature transformation (set use_transformer_bottleneck=True).
     """
     
     def __init__(
@@ -176,6 +377,11 @@ class Stage1ConceptModel(nn.Module):
         init_logit_scale: float = 14.0,  # ~1/0.07 temperature
         learnable_prototypes: bool = True,
         prototype_residual_scale: float = 0.01,
+        use_transformer_bottleneck: bool = False,
+        transformer_num_heads: int = 8,
+        transformer_num_layers: int = 2,
+        transformer_dropout: float = 0.4,
+        transformer_stochastic_depth: float = 0.2,
     ):
         """
         Args:
@@ -188,6 +394,11 @@ class Stage1ConceptModel(nn.Module):
             init_logit_scale: Initial value for learnable logit scale
             learnable_prototypes: Whether to learn residuals on top of prototypes
             prototype_residual_scale: Scale for initializing prototype residuals
+            use_transformer_bottleneck: Use transformer encoder instead of MLP
+            transformer_num_heads: Number of attention heads in transformer
+            transformer_num_layers: Number of transformer encoder layers
+            transformer_dropout: Dropout probability in transformer
+            transformer_stochastic_depth: Stochastic depth drop probability
         """
         super().__init__()
         
@@ -195,6 +406,7 @@ class Stage1ConceptModel(nn.Module):
         self.concept_emb_dim = concept_emb_dim
         self.num_metas = T_meta.shape[0]
         self.num_parents = T_parent.shape[0]
+        self.use_transformer_bottleneck = use_transformer_bottleneck
         
         # ========== Frozen Image Encoder ==========
         self.image_encoder = image_encoder
@@ -220,15 +432,31 @@ class Stage1ConceptModel(nn.Module):
             self.register_buffer("parent_residuals", torch.zeros_like(T_parent))
         
         # ========== Concept Bottleneck Projection ==========
-        # Projects from StreetCLIP dim (768) to concept embedding dim (512)
-        self.concept_bottleneck = nn.Sequential(
-            nn.Linear(streetclip_dim, 1024),
-            nn.LayerNorm(1024),
-            nn.GELU(),
-            nn.Dropout(0.1),
-            nn.Linear(1024, concept_emb_dim),
-            nn.LayerNorm(concept_emb_dim),
-        )
+        # Choose between MLP and Transformer bottleneck
+        if use_transformer_bottleneck:
+            # Transformer-based bottleneck with attention pooling
+            self.concept_bottleneck = TransformerBottleneck(
+                input_dim=streetclip_dim,
+                output_dim=concept_emb_dim,
+                hidden_dim=concept_emb_dim,  # Match output for simplicity
+                num_heads=transformer_num_heads,
+                num_layers=transformer_num_layers,
+                dropout=transformer_dropout,
+                stochastic_depth=transformer_stochastic_depth,
+            )
+        else:
+            # MLP-based bottleneck (original, with increased dropout)
+            # Projects from StreetCLIP dim (768) to concept embedding dim (512)
+            # Heavy dropout (0.4) to combat overfitting
+            self.concept_bottleneck = nn.Sequential(
+                nn.Linear(streetclip_dim, 1024),
+                nn.LayerNorm(1024),
+                nn.GELU(),
+                nn.Dropout(0.4),  # Increased from 0.1 for regularization
+                nn.Linear(1024, concept_emb_dim),
+                nn.LayerNorm(concept_emb_dim),
+                nn.Dropout(0.3),  # Added: dropout after final projection
+            )
         
         # ========== Text Prototype Projection ==========
         # Projects text prototypes from StreetCLIP dim to concept embedding dim
@@ -241,8 +469,9 @@ class Stage1ConceptModel(nn.Module):
         self.meta_bias = nn.Parameter(torch.zeros(self.num_metas))
         self.parent_bias = nn.Parameter(torch.zeros(self.num_parents))
         
-        # Initialize bottleneck weights
-        self._init_weights()
+        # Initialize bottleneck weights (only for MLP, transformer has its own init)
+        if not use_transformer_bottleneck:
+            self._init_weights()
     
     def _init_weights(self):
         """Initialize projection layers with Xavier uniform initialization."""
@@ -300,11 +529,14 @@ class Stage1ConceptModel(nn.Module):
         
         # 3. Compute meta concept logits via cosine similarity
         # logits = scale * (emb @ T.T) + bias
-        meta_logits = self.logit_scale_meta * (concept_emb_norm @ self.T_meta.T) + self.meta_bias
+        # Clip logit scales to prevent overconfident predictions (max 20 = temp 0.05)
+        meta_scale = self.logit_scale_meta.clamp(max=20.0)
+        meta_logits = meta_scale * (concept_emb_norm @ self.T_meta.T) + self.meta_bias
         meta_probs = F.softmax(meta_logits, dim=-1)
         
         # 4. Compute parent concept logits
-        parent_logits = self.logit_scale_parent * (concept_emb_norm @ self.T_parent.T) + self.parent_bias
+        parent_scale = self.logit_scale_parent.clamp(max=20.0)
+        parent_logits = parent_scale * (concept_emb_norm @ self.T_parent.T) + self.parent_bias
         parent_probs = F.softmax(parent_logits, dim=-1)
         
         return {
@@ -339,11 +571,14 @@ class Stage1ConceptModel(nn.Module):
         concept_emb_norm = F.normalize(concept_emb, p=2, dim=1)
         
         # Compute meta concept logits
-        meta_logits = self.logit_scale_meta * (concept_emb_norm @ self.T_meta.T) + self.meta_bias
+        # Clip logit scales to prevent overconfident predictions (max 20 = temp 0.05)
+        meta_scale = self.logit_scale_meta.clamp(max=20.0)
+        meta_logits = meta_scale * (concept_emb_norm @ self.T_meta.T) + self.meta_bias
         meta_probs = F.softmax(meta_logits, dim=-1)
         
         # Compute parent concept logits
-        parent_logits = self.logit_scale_parent * (concept_emb_norm @ self.T_parent.T) + self.parent_bias
+        parent_scale = self.logit_scale_parent.clamp(max=20.0)
+        parent_logits = parent_scale * (concept_emb_norm @ self.T_parent.T) + self.parent_bias
         parent_probs = F.softmax(parent_logits, dim=-1)
         
         return {
