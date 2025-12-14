@@ -37,9 +37,13 @@ import torch.nn.functional as F
 # ============================================================================
 CONTRASTIVE_TEMPERATURE = 0.2  # Increased from 0.07 for numerical stability
 CONTRASTIVE_WEIGHT = 0.1       # Slightly reduced
-GRAD_CLIP_NORM = 1.0           # Gradient clipping threshold
+GRAD_CLIP_NORM = 5.0           # Increased from 1.0 for patch-only training stability
 WARMUP_EPOCHS = 5              # LR warmup before cosine decay
 LABEL_SMOOTHING = 0.1          # Reduced from 0.2
+# MIL/patch-evidence concept head defaults (faithful attention maps)
+MIL_TOPK_DEFAULT = 8
+MIL_TAU_DEFAULT = 0.1
+CONCEPT_DIM_DEFAULT = 256
 
 try:
     import wandb
@@ -525,16 +529,15 @@ def main():
     parser.add_argument("--resume-checkpoint", type=str, default=None)
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--epochs", type=int, default=20)
-    parser.add_argument("--lr", type=float, default=5e-4)  # Reduced default LR
+    parser.add_argument("--lr", type=float, default=1e-4)  # Reduced from 2e-4 to prevent overfitting
     parser.add_argument("--wandb", action="store_true", help="Log training metrics to Weights & Biases")
     parser.add_argument("--wandb-project", type=str, default="cbm_concept_bottleneck")
     parser.add_argument("--wandb-entity", type=str, default=None)
     parser.add_argument("--wandb-run-name", type=str, default=None)
     parser.add_argument("--load-patch-tokens", action="store_true", help="Load spatial patch tokens for attention")
-    parser.add_argument("--patch-depth", type=int, default=2)
-    parser.add_argument("--patch-heads", type=int, default=4)
-    parser.add_argument("--num-pool-heads", type=int, default=4)
-    parser.add_argument("--gate-hidden", type=int, default=256)
+    parser.add_argument("--concept-dim", type=int, default=CONCEPT_DIM_DEFAULT, help="Concept space dim for patch evidence scoring")
+    parser.add_argument("--mil-topk", type=int, default=MIL_TOPK_DEFAULT, help="Top-k patches used per concept (MIL pooling)")
+    parser.add_argument("--mil-tau", type=float, default=MIL_TAU_DEFAULT, help="Temperature for MIL logsumexp pooling and attention normalization")
     parser.add_argument("--geo-aware-supcon", action="store_true", help="Weight SupCon negatives by geo distance")
     parser.add_argument("--supcon-geo-scale", type=float, default=0.5)
     parser.add_argument("--warmup-epochs", type=int, default=WARMUP_EPOCHS)
@@ -551,7 +554,8 @@ def main():
     print(f"Run ID: {run_id}")
     print(f"Using device: {device}")
     print(f"Hyperparameters: temp={CONTRASTIVE_TEMPERATURE}, contrastive_weight={CONTRASTIVE_WEIGHT}, "
-          f"grad_clip={GRAD_CLIP_NORM}, warmup={args.warmup_epochs}, label_smooth={LABEL_SMOOTHING}")
+          f"grad_clip={GRAD_CLIP_NORM}, warmup={args.warmup_epochs}, label_smooth={LABEL_SMOOTHING}, "
+          f"mil_topk={args.mil_topk}, mil_tau={args.mil_tau}, concept_dim={args.concept_dim}")
     
     use_wandb = args.wandb and wandb is not None
     if args.wandb and wandb is None:
@@ -607,10 +611,10 @@ def main():
         num_concepts=train_ds.num_concepts,
         input_dim=768,
         patch_dim=patch_dim,
-        dropout=0.4,  # Slightly reduced from 0.5
-        patch_depth=args.patch_depth,
-        patch_heads=args.patch_heads,
-        num_pool_heads=args.num_pool_heads,
+        dropout=0.5,  # Increased for better regularization
+        concept_dim=args.concept_dim,
+        mil_topk=args.mil_topk,
+        mil_tau=args.mil_tau,
     ).to(device)
     print_param_counts(model, args.phase)
     
@@ -632,7 +636,7 @@ def main():
     else:
         raise ValueError(f"Only Phase 1 is supported. Got phase={args.phase}")
         
-    optimizer = optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, weight_decay=0.01)
+    optimizer = optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, weight_decay=0.05)  # Increased from 0.01 to reduce overfitting
     scheduler = WarmupCosineScheduler(optimizer, args.warmup_epochs, args.epochs)
     
     best_metric = 0.0
