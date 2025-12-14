@@ -79,43 +79,48 @@ python scripts/training/train_cbm.py \
     --geo-aware-supcon --supcon-geo-scale 0.3 \
     --patch-depth 2 --patch-heads 4 --num-pool-heads 4
 
-# Phase 2: Geo Training
-echo "============================================================"
-echo "Starting Phase 2: Geo Training (resuming from Phase 1)"
-echo "============================================================"
-python scripts/training/train_cbm.py \
-    --phase 2 \
-    --resume-checkpoint $OUTPUT_DIR/phase1/best_phase1.pt \
-    --train-csv $TRAIN_CSV \
-    --val-csv $VAL_CSV \
-    --cached-dir $CACHED_DIR \
-    --concept-data-dir $CONCEPT_DATA \
-    --output-dir $OUTPUT_DIR \
-    --epochs 50 \
-    --batch-size 128 \
-    --lr 5e-4 \
-    --warmup-epochs 3 \
-    --wandb \
-    --load-patch-tokens \
-    --patch-depth 2 --patch-heads 4 --num-pool-heads 4
+# Phase 2: Geo Training (DISABLED - Model simplified for Phase 1 only)
+# echo "============================================================"
+# echo "Starting Phase 2: Geo Training (resuming from Phase 1)"
+# echo "============================================================"
+# python scripts/training/train_cbm.py \
+#     --phase 2 \
+#     --resume-checkpoint $OUTPUT_DIR/phase1/best_phase1.pt \
+#     --train-csv $TRAIN_CSV \
+#     --val-csv $VAL_CSV \
+#     --cached-dir $CACHED_DIR \
+#     --concept-data-dir $CONCEPT_DATA \
+#     --output-dir $OUTPUT_DIR \
+#     --epochs 50 \
+#     --batch-size 128 \
+#     --lr 5e-4 \
+#     --warmup-epochs 3 \
+#     --wandb \
+#     --load-patch-tokens \
+#     --patch-depth 2 --patch-heads 4 --num-pool-heads 4
 
-# Phase 3: Joint Training
+# Phase 3: Joint Training (DISABLED - Model simplified for Phase 1 only)
+# echo "============================================================"
+# echo "Starting Phase 3: Joint Training (fine-tuning)"
+# echo "============================================================"
+# python scripts/training/train_cbm.py \
+#     --phase 3 \
+#     --resume-checkpoint $OUTPUT_DIR/phase2/best_phase2.pt \
+#     --train-csv $TRAIN_CSV \
+#     --val-csv $VAL_CSV \
+#     --cached-dir $CACHED_DIR \
+#     --concept-data-dir $CONCEPT_DATA \
+#     --output-dir $OUTPUT_DIR \
+#     --epochs 50 \
+#     --batch-size 64 \
+#     --lr 1e-4 \
+#     --warmup-epochs 3 \
+#     --wandb \
+#     --load-patch-tokens \
+#     --geo-aware-supcon --supcon-geo-scale 0.3 \
+#     --patch-depth 2 --patch-heads 4 --num-pool-heads 4
+
 echo "============================================================"
-echo "Starting Phase 3: Joint Training (fine-tuning)"
+echo "Training complete! Phase 1 (Concept Prediction) finished."
+echo "Note: Phase 2 and 3 are disabled - model simplified for Phase 1 only."
 echo "============================================================"
-python scripts/training/train_cbm.py \
-    --phase 3 \
-    --resume-checkpoint $OUTPUT_DIR/phase2/best_phase2.pt \
-    --train-csv $TRAIN_CSV \
-    --val-csv $VAL_CSV \
-    --cached-dir $CACHED_DIR \
-    --concept-data-dir $CONCEPT_DATA \
-    --output-dir $OUTPUT_DIR \
-    --epochs 50 \
-    --batch-size 64 \
-    --lr 1e-4 \
-    --warmup-epochs 3 \
-    --wandb \
-    --load-patch-tokens \
-    --geo-aware-supcon --supcon-geo-scale 0.3 \
-    --patch-depth 2 --patch-heads 4 --num-pool-heads 4

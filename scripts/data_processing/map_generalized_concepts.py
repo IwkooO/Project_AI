@@ -38,8 +38,8 @@ def add_generalized_column(csv_path: Path, mapping: dict, backup: bool = True) -
     df['generalized'] = df['meta_name'].map(mapping)
     unmapped = df['generalized'].isna().sum()
     if unmapped:
-        print(f"{csv_path.name}: {unmapped} rows had no mapping; keeping original meta_name")
-        df['generalized'] = df['generalized'].fillna(df['meta_name'])
+        print(f"{csv_path.name}: {unmapped} rows had no mapping; dropping them for training")
+        df = df[df['generalized'].notna()].copy()
 
     df.to_csv(csv_path, index=False)
     print(f"Wrote {csv_path} with generalized column (total rows: {len(df):,})")

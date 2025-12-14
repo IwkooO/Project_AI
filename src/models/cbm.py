@@ -111,8 +111,9 @@ class ConceptHead(nn.Module):
             logits_direct = (pooled_ctx * self.concept_query_proj).sum(dim=-1) + self.concept_query_bias
             pooled_for_mlp = pooled_ctx  # keep for hidden representation aggregation
 
-            # Combine global pooled (x) with spatial context (mean over queries)
-            x = x + pooled_ctx.mean(dim=1)
+            # Patch-only mode: ignore pooled/CLS embedding `x`.
+            # Build the per-image representation purely from patch-derived context.
+            x = pooled_ctx.mean(dim=1)
         else:
             pooled_for_mlp = None
             logits_direct = None
@@ -134,85 +135,16 @@ class ConceptHead(nn.Module):
         return logits, hidden, attn_weights, pooled_for_mlp
 
 
-class GeoHead(nn.Module):
-    """
-    Predicts S2 cell and offset from image embeddings + concept probabilities.
-    
-    Coarse: [z, c_probs] -> MLP -> M cells
-    Fine:   [z, c_probs] -> MLP -> M * 2 offsets
-    """
-    def __init__(self, input_dim=768, num_concepts=100, num_cells=1000, hidden_dim=512, dropout=0.3):
-        super().__init__()
-        
-        # Input is image embedding + concept probabilities
-        combined_dim = input_dim + num_concepts
-        
-        # Shared feature extractor
-        self.feature_net = nn.Sequential(
-            nn.Linear(combined_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout)
-        )
-        
-        # Coarse Head (Cell Classification)
-        self.coarse_head = nn.Linear(hidden_dim, num_cells)
-        
-        # Fine Head (Offset Regression)
-        # Predicts (d_lat, d_lng) for each cell
-        self.fine_head = nn.Linear(hidden_dim, num_cells * 2)
-        
-        self.num_cells = num_cells
-
-    def forward(self, z, c_probs):
-        # z: [B, 768]
-        # c_probs: [B, K]
-        
-        x = torch.cat([z, c_probs], dim=1)
-        features = self.feature_net(x)
-        
-        # Coarse logits: [B, M]
-        cell_logits = self.coarse_head(features)
-        
-        # Fine offsets: [B, M, 2]
-        offsets = self.fine_head(features).view(-1, self.num_cells, 2)
-        
-        return cell_logits, offsets
-
-
-class RelevanceGate(nn.Module):
-    """
-    Learns a per-concept gate conditioned on concept logits/probs and pooled embedding.
-    Encourages concepts that help geo prediction to be emphasized.
-    """
-    def __init__(self, num_concepts, input_dim=768, hidden_dim=256):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(num_concepts + input_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, num_concepts),
-            nn.Sigmoid(),
-        )
-
-    def forward(self, c_logits, z):
-        c_probs = torch.softmax(c_logits, dim=1)
-        gate = self.net(torch.cat([c_probs, z], dim=1))
-        gated = c_probs * gate
-        return gated, gate
-
-
 class CBM(nn.Module):
     """
-    Concept Bottleneck Model for Geolocation.
-    Phase 1: Train ConceptHead
-    Phase 2: Freeze ConceptHead, Train GeoHead
+    Concept Bottleneck Model - Phase 1: Concept Prediction Only.
+    
+    Focuses solely on predicting visual concepts from images.
+    Geo prediction components removed for Phase 1 training.
     """
     def __init__(
         self,
         num_concepts,
-        num_cells,
         input_dim=768,
         patch_dim=1024,
         hidden_dim=512,
@@ -220,7 +152,6 @@ class CBM(nn.Module):
         patch_depth=2,
         patch_heads=4,
         num_pool_heads=4,
-        gate_hidden=256,
     ):
         super().__init__()
         self.concept_head = ConceptHead(
@@ -233,22 +164,22 @@ class CBM(nn.Module):
             patch_heads,
             num_pool_heads,
         )
-        self.geo_head = GeoHead(input_dim, num_concepts, num_cells, hidden_dim, dropout)
-        self.relevance_gate = RelevanceGate(num_concepts, input_dim=input_dim, hidden_dim=gate_hidden)
         
     def forward(self, z, patches=None):
-        # 1. Concept Prediction
+        """
+        Forward pass for concept prediction.
+        
+        Args:
+            z: Global pooled embedding [B, input_dim]
+            patches: Optional spatial patch tokens [B, P, patch_dim]
+        
+        Returns:
+            c_logits: Concept logits [B, num_concepts]
+            c_hidden: Hidden representation [B, hidden_dim]
+            attn_weights: Attention weights [B, num_concepts, P] or None
+            pooled_ctx: Pooled context from patches [B, num_concepts, input_dim] or None
+        """
         c_logits, c_hidden, attn_weights, pooled_ctx = self.concept_head(z, patches)
-        c_probs_raw = torch.softmax(c_logits, dim=1)
-
-        # 1b. Relevance gate to emphasize geo-useful concepts
-        c_probs_gated, gate_values = self.relevance_gate(c_logits, z)
-        
-        # 2. Geo Prediction (using soft concept probs)
-        # Detach c_probs if we want to stop gradients from geo loss to concept head (Phase 2 style)
-        # But usually we can train joint or freeze concept head via optimizer
-        cell_logits, offsets = self.geo_head(z, c_probs_gated)
-        
-        return c_logits, cell_logits, offsets, c_hidden, attn_weights, gate_values, c_probs_raw, c_probs_gated
+        return c_logits, c_hidden, attn_weights, pooled_ctx
 
 
