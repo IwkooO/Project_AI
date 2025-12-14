@@ -44,6 +44,8 @@ LABEL_SMOOTHING = 0.1          # Reduced from 0.2
 MIL_TOPK_DEFAULT = 8
 MIL_TAU_DEFAULT = 0.1
 CONCEPT_DIM_DEFAULT = 256
+DEFAULT_DROPOUT = 0.3
+DEFAULT_WEIGHT_DECAY = 0.02
 
 try:
     import wandb
@@ -55,6 +57,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.models.cbm import CBM
+from src.models.cbm_mil_mixed import CBM_MIL_Mixed
 from src.data.dataset_concept import ConceptDataset, collate_fn
 
 # Check for Cartopy (optional, for map plots)
@@ -530,14 +533,21 @@ def main():
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--lr", type=float, default=1e-4)  # Reduced from 2e-4 to prevent overfitting
+    parser.add_argument("--dropout", type=float, default=DEFAULT_DROPOUT, help="Dropout used in concept head")
+    parser.add_argument("--weight-decay", type=float, default=DEFAULT_WEIGHT_DECAY, help="AdamW weight decay")
     parser.add_argument("--wandb", action="store_true", help="Log training metrics to Weights & Biases")
     parser.add_argument("--wandb-project", type=str, default="cbm_concept_bottleneck")
     parser.add_argument("--wandb-entity", type=str, default=None)
     parser.add_argument("--wandb-run-name", type=str, default=None)
     parser.add_argument("--load-patch-tokens", action="store_true", help="Load spatial patch tokens for attention")
+    parser.add_argument("--model", type=str, default="mil", choices=["mil", "mil_mixed"], help="Which concept model to train")
     parser.add_argument("--concept-dim", type=int, default=CONCEPT_DIM_DEFAULT, help="Concept space dim for patch evidence scoring")
     parser.add_argument("--mil-topk", type=int, default=MIL_TOPK_DEFAULT, help="Top-k patches used per concept (MIL pooling)")
     parser.add_argument("--mil-tau", type=float, default=MIL_TAU_DEFAULT, help="Temperature for MIL logsumexp pooling and attention normalization")
+    parser.add_argument("--mix-depth", type=int, default=1, help="Patch mixer depth (mil_mixed only)")
+    parser.add_argument("--mix-heads", type=int, default=4, help="Patch mixer heads (mil_mixed only)")
+    parser.add_argument("--mix-mlp-ratio", type=float, default=4.0, help="Patch mixer MLP ratio (mil_mixed only)")
+    parser.add_argument("--mix-dropout", type=float, default=None, help="Override mixer dropout (mil_mixed only)")
     parser.add_argument("--geo-aware-supcon", action="store_true", help="Weight SupCon negatives by geo distance")
     parser.add_argument("--supcon-geo-scale", type=float, default=0.5)
     parser.add_argument("--warmup-epochs", type=int, default=WARMUP_EPOCHS)
@@ -555,7 +565,8 @@ def main():
     print(f"Using device: {device}")
     print(f"Hyperparameters: temp={CONTRASTIVE_TEMPERATURE}, contrastive_weight={CONTRASTIVE_WEIGHT}, "
           f"grad_clip={GRAD_CLIP_NORM}, warmup={args.warmup_epochs}, label_smooth={LABEL_SMOOTHING}, "
-          f"mil_topk={args.mil_topk}, mil_tau={args.mil_tau}, concept_dim={args.concept_dim}")
+          f"mil_topk={args.mil_topk}, mil_tau={args.mil_tau}, concept_dim={args.concept_dim}, "
+          f"dropout={args.dropout}, weight_decay={args.weight_decay}, model={args.model}")
     
     use_wandb = args.wandb and wandb is not None
     if args.wandb and wandb is None:
@@ -607,15 +618,32 @@ def main():
     
     # Initialize Model
     print("Initializing CBM (Phase 1: Concept Prediction Only)...")
-    model = CBM(
-        num_concepts=train_ds.num_concepts,
-        input_dim=768,
-        patch_dim=patch_dim,
-        dropout=0.5,  # Increased for better regularization
-        concept_dim=args.concept_dim,
-        mil_topk=args.mil_topk,
-        mil_tau=args.mil_tau,
-    ).to(device)
+    if args.model == "mil":
+        model = CBM(
+            num_concepts=train_ds.num_concepts,
+            input_dim=768,
+            patch_dim=patch_dim,
+            dropout=args.dropout,
+            concept_dim=args.concept_dim,
+            mil_topk=args.mil_topk,
+            mil_tau=args.mil_tau,
+        ).to(device)
+    elif args.model == "mil_mixed":
+        model = CBM_MIL_Mixed(
+            num_concepts=train_ds.num_concepts,
+            patch_dim=patch_dim,
+            concept_dim=args.concept_dim,
+            hidden_dim=512,
+            dropout=args.dropout,
+            mil_topk=args.mil_topk,
+            mil_tau=args.mil_tau,
+            mix_depth=args.mix_depth,
+            mix_heads=args.mix_heads,
+            mix_mlp_ratio=args.mix_mlp_ratio,
+            mix_dropout=args.mix_dropout,
+        ).to(device)
+    else:
+        raise ValueError(f"Unknown model: {args.model}")
     print_param_counts(model, args.phase)
     
     # Resume / Load Pretrained
@@ -636,7 +664,11 @@ def main():
     else:
         raise ValueError(f"Only Phase 1 is supported. Got phase={args.phase}")
         
-    optimizer = optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, weight_decay=0.05)  # Increased from 0.01 to reduce overfitting
+    optimizer = optim.AdamW(
+        filter(lambda p: p.requires_grad, model.parameters()),
+        lr=args.lr,
+        weight_decay=args.weight_decay,
+    )
     scheduler = WarmupCosineScheduler(optimizer, args.warmup_epochs, args.epochs)
     
     best_metric = 0.0
@@ -690,13 +722,9 @@ def main():
                 }
                 wandb_run.log(log_dict, step=epoch + 1)
             
-            # Visualization
-            if (epoch + 1) % 5 == 0 or epoch == 0:
-                print("Generating visualizations...")
-                visualize_predictions(model, val_ds, device, epoch, phase_output_dir, args.phase, run_id=run_id)
-            
             # Save Best
-            if metric > best_metric:
+            is_best = metric > best_metric
+            if is_best:
                 best_metric = metric
                 patience_counter = 0
                 save_path = phase_output_dir / f"best_phase{args.phase}.pt"
@@ -712,6 +740,17 @@ def main():
                 if patience_counter >= patience:
                     print(f"Early stopping triggered after {patience} epochs without improvement")
                     break
+
+            # Visualization:
+            # - always at epoch 0
+            # - periodic (every 5 epochs)
+            # - additionally whenever we hit a new best checkpoint metric
+            if epoch == 0 or (epoch + 1) % 5 == 0 or is_best:
+                reason = "new best" if is_best else "periodic"
+                if epoch == 0:
+                    reason = "baseline"
+                print(f"Generating visualizations ({reason})...")
+                visualize_predictions(model, val_ds, device, epoch, phase_output_dir, args.phase, run_id=run_id)
                     
     finally:
         if wandb_run:

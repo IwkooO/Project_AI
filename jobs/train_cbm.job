@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=12:00:00
-#SBATCH --output=jobs/outputs/cbm_train_%j.out
+#SBATCH --output=jobs/outputs/cbm_train_%j_new_but_8.out
 
 module purge
 module load 2025
@@ -24,7 +24,7 @@ TRAIN_CSV="${SPLITS_DIR}/dataset_train.csv"
 VAL_CSV="${SPLITS_DIR}/dataset_val.csv"
 CACHED_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip"
 CONCEPT_DATA="data/concept_data"
-OUTPUT_DIR="checkpoints/cbm_v2"
+OUTPUT_DIR="checkpoints/cbm_v2_reg_8_drop0.3_wd0.03"
 CONCEPT_MAPPING="data/concept_refinement_mapped.csv"
 
 mkdir -p jobs/outputs
@@ -73,13 +73,15 @@ python scripts/training/train_cbm.py \
     --epochs 80 \
     --batch-size 64 \
     --lr 1e-4 \
+    --dropout 0.3 \
+    --weight-decay 0.03 \
     --warmup-epochs 5 \
     --wandb \
     --load-patch-tokens \
     --geo-aware-supcon --supcon-geo-scale 0.3 \
-    --concept-dim 256 \
-    --mil-topk 8 \
-    --mil-tau 0.1
+    --concept-dim 512 \
+    --mil-topk 16 \
+    --mil-tau 0.3
 
 # Phase 2: Geo Training (DISABLED - Model simplified for Phase 1 only)
 # echo "============================================================"
