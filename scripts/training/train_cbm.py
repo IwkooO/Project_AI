@@ -29,7 +29,6 @@ import json
 import sys
 import math
 import matplotlib.pyplot as plt
-import s2sphere
 from datetime import datetime
 import torch.nn.functional as F
 
@@ -38,7 +37,6 @@ import torch.nn.functional as F
 # ============================================================================
 CONTRASTIVE_TEMPERATURE = 0.2  # Increased from 0.07 for numerical stability
 CONTRASTIVE_WEIGHT = 0.1       # Slightly reduced
-ATTN_ENTROPY_WEIGHT = 0.01     # Regularize attention to prevent collapse
 GRAD_CLIP_NORM = 1.0           # Gradient clipping threshold
 WARMUP_EPOCHS = 5              # LR warmup before cosine decay
 LABEL_SMOOTHING = 0.1          # Reduced from 0.2
@@ -92,16 +90,10 @@ def compute_concept_weights(dataset, num_concepts, device):
 def print_param_counts(model, phase):
     """Print total and phase-trainable parameter counts."""
     total = sum(p.numel() for p in model.parameters())
-    trainable = 0
-    # Concept head trainable in phases 1 and 3
-    if phase in (1, 3):
-        trainable += sum(p.numel() for p in model.concept_head.parameters())
-    # Geo head trainable in phases 2 and 3
-    if phase in (2, 3):
-        trainable += sum(p.numel() for p in model.geo_head.parameters())
-    # Relevance gate is always trainable (per current training logic)
-    if hasattr(model, "relevance_gate"):
-        trainable += sum(p.numel() for p in model.relevance_gate.parameters())
+    # Phase 1-only model: concept head should be the only module
+    if phase != 1:
+        raise ValueError(f"Only Phase 1 is supported. Got phase={phase}")
+    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Params: total={total/1e6:.2f}M, trainable (phase {phase})={trainable/1e6:.2f}M")
 
 
@@ -137,7 +129,7 @@ def visualize_predictions(model, dataset, device, epoch, output_dir, phase, run_
         with torch.no_grad():
             pooled_dev = pooled.unsqueeze(0).to(device)
             patches_dev = patches.unsqueeze(0).to(device) if patches is not None else None
-            c_logits, cell_logits, pred_offsets, _, attn_w, gate_vals, c_probs_raw, c_probs_gated = model(pooled_dev, patches_dev)
+            c_logits, c_hidden, attn_w, pooled_ctx = model(pooled_dev, patches_dev)
             c_probs = torch.softmax(c_logits, dim=1)
         
         # Top 5 Concepts
@@ -211,59 +203,50 @@ def visualize_predictions(model, dataset, device, epoch, output_dir, phase, run_
                 plt.savefig(attn_dir / f"attn_{concept_name}.png", dpi=120)
                 plt.close()
 
-            # Overlay heatmap for the ground-truth concept only
+            def _safe_name(name: str) -> str:
+                # Keep filenames portable
+                return "".join(ch if (ch.isalnum() or ch in ("_", "-", ".")) else "_" for ch in str(name))[:120]
+
+            # Overlay heatmaps for GT + top-k predicted concepts (square grids only)
             if square and image_loaded and img_arr is not None:
                 gt_idx = c_label.item()
+                overlay_indices = []
                 if gt_idx < attn_np.shape[0]:
-                    gt_weights = attn_np[gt_idx]
-                    grid = gt_weights.reshape(side, side)
+                    overlay_indices.append(("gt", gt_idx, None))
+                # add top-k predicted concepts (avoid duplicates)
+                for rank, (ci, prob) in enumerate(zip(top5_idx.tolist(), top5_prob.tolist()), start=1):
+                    if ci < attn_np.shape[0] and ci != gt_idx:
+                        overlay_indices.append((f"top{rank}", ci, prob))
+
+                for tag, concept_idx, prob in overlay_indices:
+                    weights = attn_np[concept_idx]
+                    grid = weights.reshape(side, side)
                     grid_t = torch.tensor(grid, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
-                    grid_up = F.interpolate(grid_t, size=(img_arr.shape[0], img_arr.shape[1]), mode="bilinear", align_corners=False)
+                    grid_up = F.interpolate(
+                        grid_t,
+                        size=(img_arr.shape[0], img_arr.shape[1]),
+                        mode="bilinear",
+                        align_corners=False,
+                    )
                     grid_up_np = grid_up.squeeze(0).squeeze(0).cpu().numpy()
-                    gt_name = dataset.get_concept_name(gt_idx)
+                    concept_name = dataset.get_concept_name(concept_idx)
+
                     plt.figure(figsize=(5, 5))
                     plt.imshow(img_arr)
                     plt.imshow(grid_up_np, cmap="magma", alpha=0.35)
-                    plt.title(f"Attn Overlay (GT) {gt_name}")
+                    if tag == "gt":
+                        title = f"Attn Overlay (GT) {concept_name}"
+                    else:
+                        title = f"Attn Overlay ({tag}) {concept_name}"
+                        if prob is not None:
+                            title += f"  p={prob:.3f}"
+                    plt.title(title)
                     plt.axis("off")
                     plt.tight_layout()
-                    plt.savefig(attn_dir / f"attn_overlay_gt_{gt_name}.png", dpi=120)
+                    plt.savefig(attn_dir / f"attn_overlay_{tag}_{_safe_name(concept_name)}.png", dpi=120)
                     plt.close()
         
-        # Geo Info (Phase 2+)
-        info_lines = []
-        if phase >= 2:
-            pred_cell_idx = cell_logits.argmax(dim=1).item()
-            
-            if dataset.idx_to_cell:
-                token = dataset.idx_to_cell[pred_cell_idx]
-                cell = s2sphere.CellId.from_token(token)
-                center = cell.to_lat_lng()
-                center_lat = center.lat().degrees
-                center_lng = center.lng().degrees
-                
-                d_lat_rad = pred_offsets[0, pred_cell_idx, 0].item()
-                d_lng_rad = pred_offsets[0, pred_cell_idx, 1].item()
-                
-                pred_lat = center_lat + math.degrees(d_lat_rad)
-                pred_lng = center_lng + math.degrees(d_lng_rad)
-                
-                gt_lat = math.degrees(coords[0].item())
-                gt_lng = math.degrees(coords[1].item())
-                
-                error_km = 6371 * 2 * math.asin(math.sqrt(
-                    math.sin(math.radians(pred_lat - gt_lat)/2)**2 +
-                    math.cos(math.radians(gt_lat)) * math.cos(math.radians(pred_lat)) *
-                    math.sin(math.radians(pred_lng - gt_lng)/2)**2
-                ))
-                
-                info_lines.append(f"Loc error: {error_km:.1f} km")
-                info_lines.append(f"Pred: ({pred_lat:.4f}, {pred_lng:.4f})")
-                info_lines.append(f"GT:   ({gt_lat:.4f}, {gt_lng:.4f})")
-        
-        if info_lines:
-            bar_ax.text(1.02, 0.5, "\n".join(info_lines), transform=bar_ax.transAxes,
-                        va='center', fontsize=9, bbox=dict(facecolor='white', alpha=0.8))
+        # Phase 1: Concept prediction only (no geo info)
         
     plt.tight_layout()
     
@@ -351,22 +334,6 @@ def supcon_loss_stable(features: torch.Tensor, labels: torch.Tensor,
     return loss
 
 
-def attention_entropy_loss(attn_weights: torch.Tensor, target_entropy: float = 4.0) -> torch.Tensor:
-    """
-    Regularize attention to prevent collapse (too sharp) or diffusion (too uniform).
-    Penalizes deviation from target entropy.
-    """
-    if attn_weights is None:
-        return torch.tensor(0.0)
-    
-    # attn_weights: [B, num_queries, num_patches]
-    entropy = -(attn_weights * torch.log(attn_weights + 1e-8)).sum(dim=-1).mean()
-    
-    # Penalize if entropy is too low (collapsed) or too high (diffuse)
-    loss = (entropy - target_entropy).abs()
-    return loss
-
-
 class WarmupCosineScheduler:
     """Learning rate scheduler with linear warmup then cosine decay."""
     def __init__(self, optimizer, warmup_epochs, total_epochs, min_lr_ratio=0.01):
@@ -395,20 +362,19 @@ class WarmupCosineScheduler:
 def train_epoch(model, loader, optimizer, device, phase, concept_criterion, cell_criterion, offset_criterion, geo_neg_scale=0.0):
     model.train()
     
-    # Freeze/Unfreeze based on phase
+    # Phase 1-only model: ensure all params trainable
     if phase == 1:
-        for p in model.concept_head.parameters(): p.requires_grad = True
-        for p in model.geo_head.parameters(): p.requires_grad = False
-    elif phase == 2:
-        for p in model.concept_head.parameters(): p.requires_grad = False
-        model.concept_head.eval()
-        for p in model.geo_head.parameters(): p.requires_grad = True
-    elif phase == 3:
-        for p in model.concept_head.parameters(): p.requires_grad = True
-        for p in model.geo_head.parameters(): p.requires_grad = True
+        for p in model.parameters():
+            p.requires_grad = True
+    else:
+        raise NotImplementedError(
+            "Phase 2 and 3 require GeoHead and RelevanceGate components. "
+            "This model is configured for Phase 1 (concept prediction) only."
+        )
         
     total_loss = 0
-    correct_c = 0
+    correct_c_top1 = 0
+    correct_c_top5 = 0
     correct_cell = 0
     total_samples = 0
     total_contrastive_loss = 0.0
@@ -417,8 +383,6 @@ def train_epoch(model, loader, optimizer, device, phase, concept_criterion, cell
     grad_norm_count = 0
     
     pbar = tqdm(loader, desc="Train")
-    attn_entropy_accum = 0.0
-    attn_entropy_count = 0
     
     for pooled, patches, c_labels, coords, cell_labels, offsets in pbar:
         pooled = pooled.to(device)
@@ -432,12 +396,12 @@ def train_epoch(model, loader, optimizer, device, phase, concept_criterion, cell
         optimizer.zero_grad()
         
         # Forward
-        c_logits, cell_logits, pred_offsets, c_feats, attn_w, gate_vals, c_probs_raw, c_probs_gated = model(pooled, patches)
+        c_logits, c_hidden, attn_w, pooled_ctx = model(pooled, patches)
         
         # Check for NaN in outputs
         try:
             check_for_nan(c_logits, "c_logits")
-            check_for_nan(c_feats, "c_feats")
+            check_for_nan(c_hidden, "c_hidden")
         except ValueError as e:
             print(f"WARNING: {e} - skipping batch")
             continue
@@ -451,82 +415,25 @@ def train_epoch(model, loader, optimizer, device, phase, concept_criterion, cell
             loss = c_loss
             
             # Stable contrastive loss
-            contrastive_value = supcon_loss_stable(c_feats, c_labels, coords=coords, geo_neg_scale=geo_neg_scale)
+            contrastive_value = supcon_loss_stable(c_hidden, c_labels, coords=coords, geo_neg_scale=geo_neg_scale)
             loss = loss + CONTRASTIVE_WEIGHT * contrastive_value
-            
-            # Attention entropy regularization
-            if attn_w is not None:
-                attn_reg = attention_entropy_loss(attn_w, target_entropy=5.0)
-                loss = loss + ATTN_ENTROPY_WEIGHT * attn_reg
             
             # Metrics
             preds = c_logits.argmax(dim=1)
-            correct_c += (preds == c_labels).sum().item()
+            correct_c_top1 += (preds == c_labels).sum().item()
+
+            k = min(5, c_logits.size(1))
+            topk = c_logits.topk(k, dim=1).indices  # [B, k]
+            correct_c_top5 += (topk == c_labels.unsqueeze(1)).any(dim=1).sum().item()
             
             pbar.set_postfix({"C_Loss": f"{c_loss.item():.4f}", "SupCon": f"{contrastive_value.item():.4f}"})
             
-        # Phase 2: Geo Loss
-        elif phase == 2:
-            mask = cell_labels != -1
-            if mask.sum() > 0:
-                cell_loss = cell_criterion(cell_logits[mask], cell_labels[mask])
-                
-                valid_offsets = pred_offsets[mask]
-                valid_targets = cell_labels[mask]
-                selected_offsets = valid_offsets[torch.arange(len(valid_targets)), valid_targets]
-                
-                off_loss = offset_criterion(selected_offsets, offsets[mask])
-                
-                loss = cell_loss + 100.0 * off_loss
-                
-                cell_preds = cell_logits.argmax(dim=1)
-                correct_cell += (cell_preds[mask] == cell_labels[mask]).sum().item()
-                
-                pbar.set_postfix({
-                    "Cell_L": f"{cell_loss.item():.4f}", 
-                    "Off_L": f"{off_loss.item():.4f}"
-                })
-            else:
-                continue
-
-        # Phase 3: Joint Loss
-        elif phase == 3:
-            c_loss = concept_criterion(c_logits, c_labels)
-            
-            contrastive_value = supcon_loss_stable(c_feats, c_labels, coords=coords, geo_neg_scale=geo_neg_scale)
-            loss = c_loss + CONTRASTIVE_WEIGHT * contrastive_value
-            
-            # Attention entropy regularization
-            if attn_w is not None:
-                attn_reg = attention_entropy_loss(attn_w, target_entropy=5.0)
-                loss = loss + ATTN_ENTROPY_WEIGHT * attn_reg
-            
-            # Geo Loss
-            mask = cell_labels != -1
-            if mask.sum() > 0:
-                cell_loss = cell_criterion(cell_logits[mask], cell_labels[mask])
-                
-                valid_offsets = pred_offsets[mask]
-                valid_targets = cell_labels[mask]
-                selected_offsets = valid_offsets[torch.arange(len(valid_targets)), valid_targets]
-                off_loss = offset_criterion(selected_offsets, offsets[mask])
-                
-                geo_loss = cell_loss + 100.0 * off_loss
-            else:
-                geo_loss = 0.0
-            
-            loss = c_loss + CONTRASTIVE_WEIGHT * contrastive_value + 0.5 * geo_loss
-            
-            preds = c_logits.argmax(dim=1)
-            correct_c += (preds == c_labels).sum().item()
-            if mask.sum() > 0:
-                cell_preds = cell_logits.argmax(dim=1)
-                correct_cell += (cell_preds[mask] == cell_labels[mask]).sum().item()
-                
-            pbar.set_postfix({
-                "C_Loss": f"{c_loss.item():.2f}",
-                "G_Loss": f"{geo_loss:.2f}" if isinstance(geo_loss, torch.Tensor) else "0.0"
-            })
+        # Phase 2 and 3 not supported in Phase 1-only model
+        elif phase in (2, 3):
+            raise NotImplementedError(
+                "Phase 2 and 3 require GeoHead and RelevanceGate components. "
+                "This model is configured for Phase 1 (concept prediction) only."
+            )
         
         # Check for NaN in loss
         if torch.isnan(loss) or torch.isinf(loss):
@@ -548,27 +455,27 @@ def train_epoch(model, loader, optimizer, device, phase, concept_criterion, cell
             contrastive_samples += pooled.size(0)
         total_samples += pooled.size(0)
         
-        if attn_w is not None:
-            entropy = -(attn_w * torch.log(attn_w + 1e-8)).sum(dim=-1).mean()
-            attn_entropy_accum += entropy.item() * pooled.size(0)
-            attn_entropy_count += pooled.size(0)
-        
     avg_contrastive = total_contrastive_loss / (contrastive_samples + 1e-8) if contrastive_samples > 0 else 0.0
-    attn_entropy = attn_entropy_accum / (attn_entropy_count + 1e-8) if attn_entropy_count > 0 else 0.0
     avg_grad_norm = grad_norm_accum / (grad_norm_count + 1e-8) if grad_norm_count > 0 else 0.0
     
-    return total_loss / total_samples, correct_c / total_samples, correct_cell / total_samples, avg_contrastive, attn_entropy, avg_grad_norm
+    return (
+        total_loss / total_samples,
+        correct_c_top1 / total_samples,
+        correct_c_top5 / total_samples,
+        correct_cell / total_samples,
+        avg_contrastive,
+        avg_grad_norm,
+    )
 
 
 @torch.no_grad()
 def eval_epoch(model, loader, device, phase, concept_criterion, cell_criterion, offset_criterion):
     model.eval()
     total_loss = 0
-    correct_c = 0
+    correct_c_top1 = 0
+    correct_c_top5 = 0
     correct_cell = 0
     total_samples = 0
-    attn_entropy_accum = 0.0
-    attn_entropy_count = 0
     
     for pooled, patches, c_labels, coords, cell_labels, offsets in tqdm(loader, desc="Eval"):
         pooled = pooled.to(device)
@@ -579,45 +486,32 @@ def eval_epoch(model, loader, device, phase, concept_criterion, cell_criterion, 
         offsets = offsets.to(device)
         coords = coords.to(device) if isinstance(coords, torch.Tensor) else torch.tensor(coords, device=device, dtype=torch.float32)
         
-        c_logits, cell_logits, pred_offsets, _, attn_w, gate_vals, c_probs_raw, c_probs_gated = model(pooled, patches)
+        c_logits, c_hidden, attn_w, pooled_ctx = model(pooled, patches)
         
         loss = 0
         if phase == 1:
             loss = concept_criterion(c_logits, c_labels)
-            correct_c += (c_logits.argmax(dim=1) == c_labels).sum().item()
+            preds = c_logits.argmax(dim=1)
+            correct_c_top1 += (preds == c_labels).sum().item()
+
+            k = min(5, c_logits.size(1))
+            topk = c_logits.topk(k, dim=1).indices  # [B, k]
+            correct_c_top5 += (topk == c_labels.unsqueeze(1)).any(dim=1).sum().item()
         else:
-            correct_c += (c_logits.argmax(dim=1) == c_labels).sum().item()
-            
-            mask = cell_labels != -1
-            if mask.sum() > 0:
-                cell_loss = cell_criterion(cell_logits[mask], cell_labels[mask])
-                
-                valid_offsets = pred_offsets[mask]
-                valid_targets = cell_labels[mask]
-                selected_offsets = valid_offsets[torch.arange(len(valid_targets)), valid_targets]
-                off_loss = offset_criterion(selected_offsets, offsets[mask])
-                
-                geo_loss = cell_loss + 100.0 * off_loss
-                correct_cell += (cell_logits.argmax(dim=1)[mask] == cell_labels[mask]).sum().item()
-            else:
-                geo_loss = torch.tensor(0.0).to(device)
-                
-            if phase == 2:
-                loss = geo_loss
-            elif phase == 3:
-                c_loss = concept_criterion(c_logits, c_labels)
-                loss = c_loss + 0.5 * geo_loss
+            # Phase 2 and 3 not supported in Phase 1-only model
+            raise NotImplementedError(
+                "Phase 2 and 3 require GeoHead and RelevanceGate components. "
+                "This model is configured for Phase 1 (concept prediction) only."
+            )
         
         total_loss += loss.item() * pooled.size(0)
         total_samples += pooled.size(0)
-        
-        if attn_w is not None:
-            entropy = -(attn_w * torch.log(attn_w + 1e-8)).sum(dim=-1).mean()
-            attn_entropy_accum += entropy.item() * pooled.size(0)
-            attn_entropy_count += pooled.size(0)
-        
-    attn_entropy = attn_entropy_accum / (attn_entropy_count + 1e-8) if attn_entropy_count > 0 else 0.0
-    return total_loss / total_samples, correct_c / (total_samples+1e-8), correct_cell / (total_samples+1e-8), attn_entropy
+    return (
+        total_loss / total_samples,
+        correct_c_top1 / (total_samples + 1e-8),
+        correct_c_top5 / (total_samples + 1e-8),
+        correct_cell / (total_samples + 1e-8),
+    )
 
 
 def main():
@@ -708,17 +602,15 @@ def main():
         print(f"Detected patch dimension: {patch_dim}")
     
     # Initialize Model
-    print("Initializing CBM...")
+    print("Initializing CBM (Phase 1: Concept Prediction Only)...")
     model = CBM(
         num_concepts=train_ds.num_concepts,
-        num_cells=train_ds.num_cells,
         input_dim=768,
         patch_dim=patch_dim,
         dropout=0.4,  # Slightly reduced from 0.5
         patch_depth=args.patch_depth,
         patch_heads=args.patch_heads,
         num_pool_heads=args.num_pool_heads,
-        gate_hidden=args.gate_hidden
     ).to(device)
     print_param_counts(model, args.phase)
     
@@ -737,10 +629,8 @@ def main():
     
     if args.phase == 1:
         print("Phase 1: Concept Training")
-    elif args.phase == 2:
-        print("Phase 2: Geo Training (Concept Head Frozen)")
-    elif args.phase == 3:
-        print("Phase 3: Joint Training")
+    else:
+        raise ValueError(f"Only Phase 1 is supported. Got phase={args.phase}")
         
     optimizer = optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, weight_decay=0.01)
     scheduler = WarmupCosineScheduler(optimizer, args.warmup_epochs, args.epochs)
@@ -753,32 +643,30 @@ def main():
         for epoch in range(args.epochs):
             print(f"\nEpoch {epoch+1}/{args.epochs} (LR: {scheduler.get_last_lr()[0]:.2e})")
             
-            train_loss, train_acc_c, train_acc_cell, train_contrastive_loss, train_attn_entropy, avg_grad_norm = train_epoch(
+            train_loss, train_acc1, train_acc5, train_acc_cell, train_contrastive_loss, avg_grad_norm = train_epoch(
                 model, train_loader, optimizer, device, args.phase,
                 concept_criterion, cell_criterion, offset_criterion,
                 geo_neg_scale=args.supcon_geo_scale if args.geo_aware_supcon else 0.0
             )
             
-            val_loss, val_acc_c, val_acc_cell, val_attn_entropy = eval_epoch(
+            val_loss, val_acc1, val_acc5, val_acc_cell = eval_epoch(
                 model, val_loader, device, args.phase,
                 concept_criterion, cell_criterion, offset_criterion
             )
             
             scheduler.step(epoch)
             
-            # Log
+            # Log (Phase 1 only)
             if args.phase == 1:
-                print(f"Train Loss: {train_loss:.4f} | Acc: {train_acc_c:.4f} | Attn H: {train_attn_entropy:.4f} | Grad: {avg_grad_norm:.4f}")
-                print(f"Val   Loss: {val_loss:.4f}   | Acc: {val_acc_c:.4f} | Attn H: {val_attn_entropy:.4f}")
-                metric = val_acc_c
-            elif args.phase == 2:
-                print(f"Train Loss: {train_loss:.4f} | Cell Acc: {train_acc_cell:.4f}")
-                print(f"Val   Loss: {val_loss:.4f}   | Cell Acc: {val_acc_cell:.4f}")
-                metric = val_acc_cell
+                print(f"Train Loss: {train_loss:.4f} | Acc@1: {train_acc1:.4f} | Acc@5: {train_acc5:.4f} | Grad: {avg_grad_norm:.4f}")
+                print(f"Val   Loss: {val_loss:.4f}   | Acc@1: {val_acc1:.4f} | Acc@5: {val_acc5:.4f}")
+                # Early stopping / checkpoint selection metric
+                metric = val_acc5
             else:
-                print(f"Train Loss: {train_loss:.4f} | C Acc: {train_acc_c:.4f} | Cell Acc: {train_acc_cell:.4f} | Attn H: {train_attn_entropy:.4f}")
-                print(f"Val   Loss: {val_loss:.4f}   | C Acc: {val_acc_c:.4f} | Cell Acc: {val_acc_cell:.4f} | Attn H: {val_attn_entropy:.4f}")
-                metric = val_acc_cell + val_acc_c
+                raise NotImplementedError(
+                    "Phase 2 and 3 require GeoHead and RelevanceGate components. "
+                    "This model is configured for Phase 1 (concept prediction) only."
+                )
             
             if wandb_run:
                 log_dict = {
@@ -786,13 +674,13 @@ def main():
                     "epoch": epoch + 1,
                     "train_loss": train_loss,
                     "val_loss": val_loss,
-                    "train_concept_acc": train_acc_c,
-                    "val_concept_acc": val_acc_c,
+                    "train_concept_acc@1": train_acc1,
+                    "train_concept_acc@5": train_acc5,
+                    "val_concept_acc@1": val_acc1,
+                    "val_concept_acc@5": val_acc5,
                     "train_cell_acc": train_acc_cell,
                     "val_cell_acc": val_acc_cell,
                     "train_contrastive_loss": train_contrastive_loss,
-                    "train_attn_entropy": train_attn_entropy,
-                    "val_attn_entropy": val_attn_entropy,
                     "avg_grad_norm": avg_grad_norm,
                     "learning_rate": scheduler.get_last_lr()[0],
                 }
