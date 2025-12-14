@@ -72,12 +72,14 @@ python scripts/training/train_cbm.py \
     --output-dir $OUTPUT_DIR \
     --epochs 80 \
     --batch-size 64 \
-    --lr 5e-4 \
+    --lr 1e-4 \
     --warmup-epochs 5 \
     --wandb \
     --load-patch-tokens \
     --geo-aware-supcon --supcon-geo-scale 0.3 \
-    --patch-depth 2 --patch-heads 4 --num-pool-heads 4
+    --concept-dim 256 \
+    --mil-topk 8 \
+    --mil-tau 0.1
 
 # Phase 2: Geo Training (DISABLED - Model simplified for Phase 1 only)
 # echo "============================================================"
