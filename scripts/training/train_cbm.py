@@ -36,7 +36,7 @@ import torch.nn.functional as F
 # HYPERPARAMETERS - Tuned for stability and performance
 # ============================================================================
 CONTRASTIVE_TEMPERATURE = 0.2  # Increased from 0.07 for numerical stability
-CONTRASTIVE_WEIGHT = 0.1       # Slightly reduced
+CONTRASTIVE_WEIGHT = 0.1       # Default SupCon weight (override via CLI)
 GRAD_CLIP_NORM = 5.0           # Increased from 1.0 for patch-only training stability
 WARMUP_EPOCHS = 5              # LR warmup before cosine decay
 LABEL_SMOOTHING = 0.1          # Reduced from 0.2
@@ -112,16 +112,46 @@ def check_for_nan(tensor, name="tensor"):
         raise ValueError(f"Inf detected in {name}")
 
 
-def visualize_predictions(model, dataset, device, epoch, output_dir, phase, run_id=None):
+def visualize_predictions(
+    model,
+    dataset,
+    device,
+    epoch,
+    output_dir,
+    phase,
+    run_id=None,
+    reason: str = None,
+    num_samples: int = 5,
+):
     """
     Visualize predictions for a few validation samples.
     Phase 1: Image + Top 5 Concepts
     Phase 2/3: Image + Top 5 Concepts + Predicted Location vs GT
     """
+    """
+    Generate qualitative visualizations for a few validation samples.
+
+    Args:
+        model: Trained concept model.
+        dataset: Validation ConceptDataset.
+        device: Torch device.
+        epoch: Zero-based epoch index.
+        output_dir: Phase-specific output directory.
+        phase: Training phase (currently 1 only).
+        run_id: Optional run identifier string.
+        reason: Optional string describing why these visualizations were generated.
+                Expected values:
+                    - "baseline_epoch0"      : first epoch, baseline reference
+                    - "best_val_acc"         : new best checkpoint (improvement over baseline)
+                    - "periodic_every5"      : periodic snapshot every 5 epochs
+                    - "final_best_model"     : larger set at end of training using best checkpoint
+        num_samples: Number of samples to visualize (default: 5).
+    """
     model.eval()
     
-    # Select 5 random indices
-    indices = np.random.choice(len(dataset), 5, replace=False)
+    # Select random indices
+    num_samples = max(1, min(num_samples, len(dataset)))
+    indices = np.random.choice(len(dataset), num_samples, replace=False)
     
     fig_h = 5 if phase == 1 else 7
     fig, axes = plt.subplots(len(indices), 2, figsize=(14, fig_h * len(indices)))
@@ -186,7 +216,12 @@ def visualize_predictions(model, dataset, device, epoch, output_dir, phase, run_
         # Save attention weights and heatmaps
         if attn_w is not None:
             attn_np = attn_w.squeeze(0).detach().cpu().numpy()
-            attn_dir = (output_dir / "visualizations" / (run_id or "attn") / f"epoch_{epoch}_sample_{idx}")
+            # Directory structure encodes run ID, trigger reason, and epoch/sample.
+            base_viz_root = output_dir / "visualizations"
+            run_root = base_viz_root / (run_id or "attn")
+            if reason:
+                run_root = run_root / reason
+            attn_dir = run_root / f"epoch_{epoch}_sample_{idx}"
             attn_dir.mkdir(parents=True, exist_ok=True)
             np.save(attn_dir / "attn_weights.npy", attn_np)
 
@@ -217,9 +252,11 @@ def visualize_predictions(model, dataset, device, epoch, output_dir, phase, run_
             # Overlay heatmaps for GT + top-k predicted concepts (square grids only)
             if square and image_loaded and img_arr is not None:
                 gt_idx = c_label.item()
+                gt_prob = float(c_probs[0, gt_idx].item()) if 0 <= gt_idx < c_probs.shape[1] else None
                 overlay_indices = []
                 if gt_idx < attn_np.shape[0]:
-                    overlay_indices.append(("gt", gt_idx, None))
+                    # Include GT activation (probability) so it's visible in the title.
+                    overlay_indices.append(("gt", gt_idx, gt_prob))
                 # add top-k predicted concepts (avoid duplicates)
                 for rank, (ci, prob) in enumerate(zip(top5_idx.tolist(), top5_prob.tolist()), start=1):
                     if ci < attn_np.shape[0] and ci != gt_idx:
@@ -242,7 +279,10 @@ def visualize_predictions(model, dataset, device, epoch, output_dir, phase, run_
                     plt.imshow(img_arr)
                     plt.imshow(grid_up_np, cmap="magma", alpha=0.35)
                     if tag == "gt":
-                        title = f"Attn Overlay (GT) {concept_name}"
+                        if prob is not None:
+                            title = f"Attn Overlay (GT) {concept_name}  p={prob:.3f}"
+                        else:
+                            title = f"Attn Overlay (GT) {concept_name}"
                     else:
                         title = f"Attn Overlay ({tag}) {concept_name}"
                         if prob is not None:
@@ -260,6 +300,8 @@ def visualize_predictions(model, dataset, device, epoch, output_dir, phase, run_
     viz_dir = output_dir / "visualizations"
     if run_id:
         viz_dir = viz_dir / run_id
+    if reason:
+        viz_dir = viz_dir / reason
     viz_dir.mkdir(parents=True, exist_ok=True)
     
     plt.savefig(viz_dir / f"epoch_{epoch}_phase{phase}.png", dpi=150, bbox_inches='tight')
@@ -366,7 +408,18 @@ class WarmupCosineScheduler:
         return [pg['lr'] for pg in self.optimizer.param_groups]
 
 
-def train_epoch(model, loader, optimizer, device, phase, concept_criterion, cell_criterion, offset_criterion, geo_neg_scale=0.0):
+def train_epoch(
+    model,
+    loader,
+    optimizer,
+    device,
+    phase,
+    concept_criterion,
+    cell_criterion,
+    offset_criterion,
+    geo_neg_scale: float = 0.0,
+    contrastive_weight: float = CONTRASTIVE_WEIGHT,
+):
     model.train()
     
     # Phase 1-only model: ensure all params trainable
@@ -423,7 +476,7 @@ def train_epoch(model, loader, optimizer, device, phase, concept_criterion, cell
             
             # Stable contrastive loss
             contrastive_value = supcon_loss_stable(c_hidden, c_labels, coords=coords, geo_neg_scale=geo_neg_scale)
-            loss = loss + CONTRASTIVE_WEIGHT * contrastive_value
+            loss = loss + contrastive_weight * contrastive_value
             
             # Metrics
             preds = c_logits.argmax(dim=1)
@@ -535,6 +588,7 @@ def main():
     parser.add_argument("--lr", type=float, default=1e-4)  # Reduced from 2e-4 to prevent overfitting
     parser.add_argument("--dropout", type=float, default=DEFAULT_DROPOUT, help="Dropout used in concept head")
     parser.add_argument("--weight-decay", type=float, default=DEFAULT_WEIGHT_DECAY, help="AdamW weight decay")
+    parser.add_argument("--contrastive-weight", type=float, default=CONTRASTIVE_WEIGHT, help="Weight for supervised contrastive loss (0 disables it)")
     parser.add_argument("--wandb", action="store_true", help="Log training metrics to Weights & Biases")
     parser.add_argument("--wandb-project", type=str, default="cbm_concept_bottleneck")
     parser.add_argument("--wandb-entity", type=str, default=None)
@@ -563,10 +617,11 @@ def main():
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     print(f"Run ID: {run_id}")
     print(f"Using device: {device}")
-    print(f"Hyperparameters: temp={CONTRASTIVE_TEMPERATURE}, contrastive_weight={CONTRASTIVE_WEIGHT}, "
+    print(f"Hyperparameters: temp={CONTRASTIVE_TEMPERATURE}, contrastive_weight={args.contrastive_weight}, "
           f"grad_clip={GRAD_CLIP_NORM}, warmup={args.warmup_epochs}, label_smooth={LABEL_SMOOTHING}, "
           f"mil_topk={args.mil_topk}, mil_tau={args.mil_tau}, concept_dim={args.concept_dim}, "
-          f"dropout={args.dropout}, weight_decay={args.weight_decay}, model={args.model}")
+          f"dropout={args.dropout}, weight_decay={args.weight_decay}, model={args.model}, "
+          f"contrastive_weight={args.contrastive_weight}")
     
     use_wandb = args.wandb and wandb is not None
     if args.wandb and wandb is None:
@@ -580,7 +635,7 @@ def main():
         }
         wandb_config["run_id"] = run_id
         wandb_config["contrastive_temperature"] = CONTRASTIVE_TEMPERATURE
-        wandb_config["contrastive_weight"] = CONTRASTIVE_WEIGHT
+        wandb_config["contrastive_weight"] = args.contrastive_weight
         wandb_config["grad_clip_norm"] = GRAD_CLIP_NORM
         wandb_config["label_smoothing"] = LABEL_SMOOTHING
         wandb_run = wandb.init(
@@ -672,25 +727,29 @@ def main():
     scheduler = WarmupCosineScheduler(optimizer, args.warmup_epochs, args.epochs)
     
     best_metric = 0.0
-    patience = 10  # Early stopping patience
+    patience = 20  # Early stopping patience
     patience_counter = 0
+    best_ckpt_path = None
+    best_epoch = None
     
     try:
         for epoch in range(args.epochs):
-            print(f"\nEpoch {epoch+1}/{args.epochs} (LR: {scheduler.get_last_lr()[0]:.2e})")
+            # IMPORTANT: step scheduler at the *start* of the epoch so warmup applies to epoch 1.
+            scheduler.step(epoch)
+            current_lr = scheduler.get_last_lr()[0]
+            print(f"\nEpoch {epoch+1}/{args.epochs} (LR: {current_lr:.2e})")
             
             train_loss, train_acc1, train_acc5, train_acc_cell, train_contrastive_loss, avg_grad_norm = train_epoch(
                 model, train_loader, optimizer, device, args.phase,
                 concept_criterion, cell_criterion, offset_criterion,
-                geo_neg_scale=args.supcon_geo_scale if args.geo_aware_supcon else 0.0
+                geo_neg_scale=args.supcon_geo_scale if args.geo_aware_supcon else 0.0,
+                contrastive_weight=args.contrastive_weight,
             )
             
             val_loss, val_acc1, val_acc5, val_acc_cell = eval_epoch(
                 model, val_loader, device, args.phase,
                 concept_criterion, cell_criterion, offset_criterion
             )
-            
-            scheduler.step(epoch)
             
             # Log (Phase 1 only)
             if args.phase == 1:
@@ -718,7 +777,7 @@ def main():
                     "val_cell_acc": val_acc_cell,
                     "train_contrastive_loss": train_contrastive_loss,
                     "avg_grad_norm": avg_grad_norm,
-                    "learning_rate": scheduler.get_last_lr()[0],
+                    "learning_rate": current_lr,
                 }
                 wandb_run.log(log_dict, step=epoch + 1)
             
@@ -735,6 +794,8 @@ def main():
                     'metric': best_metric,
                 }, save_path)
                 print(f"Saved best model to {save_path}")
+                best_ckpt_path = save_path
+                best_epoch = epoch
             else:
                 patience_counter += 1
                 if patience_counter >= patience:
@@ -746,11 +807,51 @@ def main():
             # - periodic (every 5 epochs)
             # - additionally whenever we hit a new best checkpoint metric
             if epoch == 0 or (epoch + 1) % 5 == 0 or is_best:
-                reason = "new best" if is_best else "periodic"
+                # Make the trigger reason explicit in directory names so it's
+                # easy to distinguish:
+                #   - baseline_epoch0: initial baseline visualizations
+                #   - best_val_acc:    improvement over baseline / new best model
+                #   - periodic_every5: periodic snapshots every 5 epochs
                 if epoch == 0:
-                    reason = "baseline"
-                print(f"Generating visualizations ({reason})...")
-                visualize_predictions(model, val_ds, device, epoch, phase_output_dir, args.phase, run_id=run_id)
+                    viz_reason = "baseline_epoch0"
+                elif is_best:
+                    viz_reason = "best_val_acc"
+                else:
+                    viz_reason = "periodic_every5"
+
+                print(f"Generating visualizations ({viz_reason})...")
+                visualize_predictions(
+                    model,
+                    val_ds,
+                    device,
+                    epoch,
+                    phase_output_dir,
+                    args.phase,
+                    run_id=run_id,
+                    reason=viz_reason,
+                )
+        # After training loop: generate a larger visualization set for the best model.
+        if best_ckpt_path is not None and best_epoch is not None:
+            print(f"\nLoading best checkpoint from {best_ckpt_path} for final visualizations...")
+            best_ckpt = torch.load(best_ckpt_path, map_location=device)
+            model.load_state_dict(best_ckpt['model_state_dict'])
+            model.to(device)
+            model.eval()
+
+            # Larger qualitative set highlighting concept activations + attention maps
+            final_reason = "final_best_model"
+            print(f"Generating final large visualization set ({final_reason}) for best epoch {best_epoch}...")
+            visualize_predictions(
+                model,
+                val_ds,
+                device,
+                best_epoch,
+                phase_output_dir,
+                args.phase,
+                run_id=run_id,
+                reason=final_reason,
+                num_samples=30,  # larger set at the end of training
+            )
                     
     finally:
         if wandb_run:

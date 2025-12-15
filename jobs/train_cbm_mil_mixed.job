@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=12:00:00
-#SBATCH --output=jobs/outputs/cbm_train_mil_mixed_%j_new_but_8.out
+#SBATCH --output=jobs/outputs/cbm_train_mil_mixed_tau0.5.out
 
 module purge
 module load 2025
@@ -24,7 +24,7 @@ TRAIN_CSV="${SPLITS_DIR}/dataset_train.csv"
 VAL_CSV="${SPLITS_DIR}/dataset_val.csv"
 CACHED_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip"
 CONCEPT_DATA="data/concept_data"
-OUTPUT_DIR="checkpoints/cbm_v2_mil_mixed_regularization"
+OUTPUT_DIR="checkpoints/cbm_v2_mil_mixed_regularization_tau_03_baseline"
 CONCEPT_MAPPING="data/concept_refinement_mapped.csv"
 
 mkdir -p jobs/outputs
@@ -66,6 +66,7 @@ python scripts/training/train_cbm.py \
     --wandb \
     --load-patch-tokens \
     --model mil_mixed \
+    --contrastive-weight 0.02 \
     --concept-dim 256 \
     --mil-topk 16 \
     --mil-tau 0.3 \
