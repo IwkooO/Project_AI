@@ -38,6 +38,7 @@ import seaborn as sns
 from PIL import Image
 import wandb
 import csv
+from sklearn.metrics import recall_score
 
 from src.dataset import (
     PanoramaCBMDataset,
@@ -529,8 +530,16 @@ def log_metrics(metrics: Dict[str, float], prefix: str = "", stage: int = None):
         parts.append(f"Loss: {metrics['loss']:.4f}")
     if "meta_acc" in metrics:
         parts.append(f"Meta Acc: {metrics['meta_acc']:.3f}")
+    if "meta_acc_top5" in metrics:
+        parts.append(f"Meta Top5: {metrics['meta_acc_top5']:.3f}")
+    if "meta_recall" in metrics:
+        parts.append(f"Meta Recall: {metrics['meta_recall']:.3f}")
     if "parent_acc" in metrics:
         parts.append(f"Parent Acc: {metrics['parent_acc']:.3f}")
+    if "parent_acc_top5" in metrics:
+        parts.append(f"Parent Top5: {metrics['parent_acc_top5']:.3f}")
+    if "parent_recall" in metrics:
+        parts.append(f"Parent Recall: {metrics['parent_recall']:.3f}")
     if "country_acc" in metrics:
         parts.append(f"Country Acc: {metrics['country_acc']:.3f}")
     
@@ -558,9 +567,16 @@ def validate(
     
     total_loss = 0
     total_meta_correct = 0
+    total_meta_correct_top5 = 0
     total_parent_correct = 0
+    total_parent_correct_top5 = 0
     total_semantic_close_correct = 0
     total_count = 0
+    
+    all_pred_meta = []
+    all_target_meta = []
+    all_pred_parent = []
+    all_target_parent = []
     
     for batch in dataloader:
         if use_precomputed:
@@ -599,6 +615,19 @@ def validate(
         total_meta_correct += (pred_meta == concept_idx).sum().item()
         total_parent_correct += (pred_parent == parent_idx).sum().item()
         
+        # Top-5 Accuracy
+        _, pred_meta_top5 = meta_logits.topk(5, dim=1, largest=True, sorted=True)
+        total_meta_correct_top5 += (pred_meta_top5 == concept_idx.view(-1, 1)).sum().item()
+        
+        _, pred_parent_top5 = parent_logits.topk(5, dim=1, largest=True, sorted=True)
+        total_parent_correct_top5 += (pred_parent_top5 == parent_idx.view(-1, 1)).sum().item()
+        
+        # Collect for Recall
+        all_pred_meta.append(pred_meta.cpu())
+        all_target_meta.append(concept_idx.cpu())
+        all_pred_parent.append(pred_parent.cpu())
+        all_target_parent.append(parent_idx.cpu())
+        
         # Semantic-close accuracy (if similarity matrix provided)
         if similarity_matrix is not None:
             _, semantic_close_acc_batch = compute_semantic_close_accuracy(
@@ -609,10 +638,23 @@ def validate(
         
         total_count += len(concept_idx)
     
+    # Compute Recall
+    all_pred_meta = torch.cat(all_pred_meta).numpy()
+    all_target_meta = torch.cat(all_target_meta).numpy()
+    all_pred_parent = torch.cat(all_pred_parent).numpy()
+    all_target_parent = torch.cat(all_target_parent).numpy()
+    
+    meta_recall = recall_score(all_target_meta, all_pred_meta, average='macro', zero_division=0)
+    parent_recall = recall_score(all_target_parent, all_pred_parent, average='macro', zero_division=0)
+    
     result = {
         "loss": total_loss / total_count,
         "meta_acc": total_meta_correct / total_count,
+        "meta_acc_top5": total_meta_correct_top5 / total_count,
+        "meta_recall": meta_recall,
         "parent_acc": total_parent_correct / total_count,
+        "parent_acc_top5": total_parent_correct_top5 / total_count,
+        "parent_recall": parent_recall,
     }
     
     # Add semantic-close accuracy if computed
@@ -771,14 +813,6 @@ def visualize_concept_predictions(
         meta_entry = sample_metadata[i] if i < len(sample_metadata) else {}
         pano_id = meta_entry.get('pano_id', 'unknown')
         
-        # Compact title for grid layout
-        is_correct = "✓" if pred_concept_idx == true_concept_idx else "✗"
-        title = f"{is_correct} {pano_id[:12]}...\n"
-        title += f"GT Child: {true_concept[:20]}... | Pred Child: {pred_concept[:20]}..."
-        if true_parent_str:
-            title += f"\n{true_parent_str} | {pred_parent_str}"
-        ax_img.set_title(title, fontsize=8, loc='left')
-        
         # ====== Bottom: Top K concepts bar plot ======
         top5_probs, top5_indices = torch.topk(meta_probs[i], k=VIZ_TOP_K_CONCEPTS)
         top5_concepts = [idx_to_concept.get(idx.item(), f"Unknown_{idx.item()}") for idx in top5_indices]
@@ -786,6 +820,14 @@ def visualize_concept_predictions(
         
         # Check if ground truth is in top 5
         true_in_top5 = true_concept_idx in top5_indices.cpu().numpy()
+
+        # Compact title for grid layout
+        is_correct = "✓" if true_in_top5 else "✗"
+        title = f"{is_correct} {pano_id[:12]}...\n"
+        title += f"GT Child: {true_concept[:20]}... | Pred Child: {pred_concept[:20]}..."
+        if true_parent_str:
+            title += f"\n{true_parent_str} | {pred_parent_str}"
+        ax_img.set_title(title, fontsize=8, loc='left')
         
         # Reverse arrays to show highest probability at top (horizontal bar chart)
         top5_concepts_reversed = list(reversed(top5_concepts))
@@ -912,6 +954,12 @@ def log_validation_predictions_table(
         pred_meta = meta_logits.argmax(dim=1).cpu()
         pred_parent = parent_logits.argmax(dim=1).cpu()
         
+        # Get top-5 predictions
+        _, pred_meta_top5 = meta_logits.topk(5, dim=1, largest=True, sorted=True)
+        _, pred_parent_top5 = parent_logits.topk(5, dim=1, largest=True, sorted=True)
+        pred_meta_top5 = pred_meta_top5.cpu()
+        pred_parent_top5 = pred_parent_top5.cpu()
+        
         meta_list = split_metadata_batch(metadata, len(pred_meta))
         
         for i in range(len(pred_meta)):
@@ -923,6 +971,10 @@ def log_validation_predictions_table(
             
             child_correct = gt_child == pred_child
             parent_correct = gt_parent == pred_parent_val
+            
+            child_in_top5 = gt_child in pred_meta_top5[i]
+            parent_in_top5 = gt_parent in pred_parent_top5[i]
+            
             child_count_val = child_counts[gt_child] if child_counts is not None else 0
             parent_count_val = parent_counts[gt_parent] if parent_counts is not None else 0
             
@@ -935,6 +987,8 @@ def log_validation_predictions_table(
                 idx_to_parent.get(pred_parent_val, f"parent_{pred_parent_val}"),
                 child_correct,
                 parent_correct,
+                child_in_top5,
+                parent_in_top5,
                 child_count_val,
                 parent_count_val,
             ])
@@ -949,7 +1003,7 @@ def log_validation_predictions_table(
     # Save rows to output directory / diagnostics/predictions_table.csv
     output_path = output_dir / "diagnostics" / f"predictions_table_{step}.csv"
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    df = pd.DataFrame(rows, columns=["pano_id", "country", "gt_child_concept", "pred_child_concept", "gt_parent_concept", "pred_parent_concept", "child_correct", "parent_correct", "count_child", "count_parent"])
+    df = pd.DataFrame(rows, columns=["pano_id", "country", "gt_child_concept", "pred_child_concept", "gt_parent_concept", "pred_parent_concept", "child_correct", "parent_correct", "child_in_top5", "parent_in_top5", "count_child", "count_parent"])
     df.to_csv(output_path, index=False)
     logger.info(f"Saved predictions table to {output_path}")
     
@@ -963,6 +1017,8 @@ def log_validation_predictions_table(
             "pred_parent_concept",
             "child_correct",
             "parent_correct",
+            "child_in_top5",
+            "parent_in_top5",
             "count_child",
             "count_parent",
         ],
@@ -1369,7 +1425,9 @@ def train(args):
         
         total_loss = 0
         total_meta_correct = 0
+        total_meta_correct_top5 = 0
         total_parent_correct = 0
+        total_parent_correct_top5 = 0
         total_count = 0
         
         pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{args.stage1_epochs}")
@@ -1499,6 +1557,14 @@ def train(args):
             pred_parent = parent_logits.argmax(dim=1)
             total_meta_correct += (pred_meta == concept_idx).sum().item()
             total_parent_correct += (pred_parent == parent_idx).sum().item()
+            
+            # Top-5 Accuracy
+            _, pred_meta_top5 = meta_logits.topk(5, dim=1, largest=True, sorted=True)
+            total_meta_correct_top5 += (pred_meta_top5 == concept_idx.view(-1, 1)).sum().item()
+            
+            _, pred_parent_top5 = parent_logits.topk(5, dim=1, largest=True, sorted=True)
+            total_parent_correct_top5 += (pred_parent_top5 == parent_idx.view(-1, 1)).sum().item()
+            
             total_count += len(concept_idx)
             
             # Compute semantic-close accuracy (for logging)
@@ -1528,7 +1594,9 @@ def train(args):
         train_metrics = {
             "loss": total_loss / total_count,
             "meta_acc": total_meta_correct / total_count,
+            "meta_acc_top5": total_meta_correct_top5 / total_count,
             "parent_acc": total_parent_correct / total_count,
+            "parent_acc_top5": total_parent_correct_top5 / total_count,
         }
         log_metrics(train_metrics, prefix="Train", stage=1)
         
@@ -1582,10 +1650,16 @@ def train(args):
                 "epoch": epoch + 1,
                 "train/loss": train_metrics["loss"],
                 "train/meta_acc": train_metrics["meta_acc"],
+                "train/meta_acc_top5": train_metrics["meta_acc_top5"],
                 "train/parent_acc": train_metrics["parent_acc"],
+                "train/parent_acc_top5": train_metrics["parent_acc_top5"],
                 "val/loss": val_metrics["loss"],
                 "val/meta_acc": val_metrics["meta_acc"],
+                "val/meta_acc_top5": val_metrics["meta_acc_top5"],
+                "val/meta_recall": val_metrics["meta_recall"],
                 "val/parent_acc": val_metrics["parent_acc"],
+                "val/parent_acc_top5": val_metrics["parent_acc_top5"],
+                "val/parent_recall": val_metrics["parent_recall"],
                 "train/lr": scheduler.get_last_lr()[0],
             }
             # Add semantic-close accuracy if available

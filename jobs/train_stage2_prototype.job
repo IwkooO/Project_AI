@@ -1,0 +1,51 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=s2
+#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/train_stage2_prototype.log
+#SBATCH --time=14:00:00
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=64G
+
+# Activate environment
+module load 2025
+module load Anaconda3/2025.06-1
+cd /scratch-shared/pnair/Project_AI/
+module load CUDA/12.8.0
+
+source activate streetview_pnair
+export PYTHONNOUSERSITE=1
+export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
+
+# ===== Stage 2 Configuration =====
+STAGE2_EPOCHS=30
+BATCH_SIZE=256
+LR=1e-3
+WEIGHT_DECAY=0.01
+
+# Geolocation
+MIN_SAMPLES_PER_CELL=20
+COORD_LOSS_TYPE="haversine"
+
+# Loss weights
+LAMBDA_CELL=1.0
+LAMBDA_OFFSET=5.0
+
+DATA_ROOT=/scratch-shared/pnair/Project_AI/data
+CSV_PATH="data/dataset-43k-mapped.csv"
+STAGE1_CKPT="/scratch-shared/pnair/Project_AI/results/stage1-prototype/geolocal_StreetCLIP/2025-12-12_22-07-38/checkpoints/checkpoint_epoch_50.pt"
+
+# Run Stage 2 Training
+python scripts/training/train_stage2_prototype.py \
+    --csv_path $CSV_PATH \
+    --data_root $DATA_ROOT \
+    --resume_from_checkpoint $STAGE1_CKPT \
+    --stage2_epochs $STAGE2_EPOCHS \
+    --batch_size $BATCH_SIZE \
+    --lr $LR \
+    --weight_decay $WEIGHT_DECAY \
+    --min_samples_per_cell $MIN_SAMPLES_PER_CELL \
+    --coord_loss_type $COORD_LOSS_TYPE \
+    --lambda_cell $LAMBDA_CELL \
+    --lambda_offset $LAMBDA_OFFSET \
+    --use_wandb
