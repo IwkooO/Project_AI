@@ -1123,6 +1123,11 @@ class Stage2CrossAttentionGeoHead(nn.Module):
     """
     Stage 2 Geolocation Head with Cross-Attention for interpretable predictions.
     
+    Supports three ablation modes:
+    - 'both' (default): Uses both concept embeddings and image patches with fusion
+    - 'concept_only': Uses only concept embeddings for location prediction
+    - 'image_only': Uses only image patch tokens (pooled) for location prediction
+    
     Uses cross-attention where:
     - Query: Concept embedding (512d) from Stage 1 frozen bottleneck
     - Keys/Values: Patch tokens (576 patches × 1024d) from ViT, projected to 512d
@@ -1130,13 +1135,21 @@ class Stage2CrossAttentionGeoHead(nn.Module):
     This allows visualization of which image patches contribute to the geolocation
     prediction via attention weights (reshaped to 24×24 spatial grid).
     
-    Architecture:
+    Architecture (mode='both'):
         concept_emb [B, 512] → query
         patch_tokens [B, 576, 1024] → patch_proj → [B, 576, 512] → keys/values
         cross_attention(query, keys, values) → [B, 512] + attention_weights [B, 1, 576]
-        → cell_head → cell_logits [B, num_cells]
-        → offset_head → pred_offsets [B, coord_dim]
+        → fusion(concept_emb, attn_output) → cell_head, offset_head
+    
+    Architecture (mode='concept_only'):
+        concept_emb [B, 512] → MLP → cell_head, offset_head
+    
+    Architecture (mode='image_only'):
+        patch_tokens [B, 576, 1024] → patch_proj → pool → MLP → cell_head, offset_head
     """
+    
+    # Valid ablation modes
+    ABLATION_MODES = ['both', 'concept_only', 'image_only']
 
     def __init__(
         self,
@@ -1148,7 +1161,8 @@ class Stage2CrossAttentionGeoHead(nn.Module):
         coord_output_dim: int = 2,
         dropout: float = 0.1,
         use_residual: bool = True,
-        use_concept_gate: bool = True,  # NEW: Gating mechanism to ensure concept usage
+        use_concept_gate: bool = True,  # Gating mechanism to ensure concept usage
+        ablation_mode: str = 'both',  # NEW: Ablation mode for experiments
     ):
         """
         Args:
@@ -1161,8 +1175,16 @@ class Stage2CrossAttentionGeoHead(nn.Module):
             dropout: Dropout probability
             use_residual: Whether to add residual connection from concept_emb
             use_concept_gate: Whether to use gating to balance concept vs patch info
+            ablation_mode: One of ['both', 'concept_only', 'image_only']
+                - 'both': Full model with concept + image fusion (default)
+                - 'concept_only': Only concept embedding contributes to prediction
+                - 'image_only': Only image patches contribute to prediction
         """
         super().__init__()
+        
+        # Validate ablation mode
+        if ablation_mode not in self.ABLATION_MODES:
+            raise ValueError(f"ablation_mode must be one of {self.ABLATION_MODES}, got '{ablation_mode}'")
         
         self.num_cells = num_cells
         self.concept_emb_dim = concept_emb_dim
@@ -1171,8 +1193,10 @@ class Stage2CrossAttentionGeoHead(nn.Module):
         self.coord_output_dim = coord_output_dim
         self.use_residual = use_residual
         self.use_concept_gate = use_concept_gate
+        self.ablation_mode = ablation_mode
         
         # Project patch tokens to concept embedding dimension
+        # Used in 'both' and 'image_only' modes
         self.patch_proj = nn.Sequential(
             nn.Linear(patch_dim, concept_emb_dim),
             nn.LayerNorm(concept_emb_dim),
@@ -1209,9 +1233,27 @@ class Stage2CrossAttentionGeoHead(nn.Module):
         
         # Fusion layer that explicitly combines concept + cross-attention output
         # Input: [concept_emb || fused_emb] = 2 * concept_emb_dim
-        # This guarantees concepts are directly fed to prediction heads
+        # This guarantees concepts are directly fed to prediction heads (used in 'both' mode)
         self.fusion = nn.Sequential(
             nn.Linear(concept_emb_dim * 2, concept_emb_dim),
+            nn.LayerNorm(concept_emb_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+        )
+        
+        # Concept-only projection (used in 'concept_only' mode)
+        # Maps concept embeddings directly to prediction space
+        self.concept_only_proj = nn.Sequential(
+            nn.Linear(concept_emb_dim, concept_emb_dim),
+            nn.LayerNorm(concept_emb_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+        )
+        
+        # Image-only projection (used in 'image_only' mode)
+        # Pools patch tokens and projects to prediction space
+        self.image_pool = nn.Sequential(
+            nn.Linear(concept_emb_dim, concept_emb_dim),
             nn.LayerNorm(concept_emb_dim),
             nn.GELU(),
             nn.Dropout(dropout),
@@ -1254,6 +1296,11 @@ class Stage2CrossAttentionGeoHead(nn.Module):
         """
         Forward pass through cross-attention geo head.
         
+        Behavior depends on ablation_mode:
+        - 'both': Full cross-attention with concept + image fusion (default)
+        - 'concept_only': Uses only concept embeddings, ignores patch_tokens
+        - 'image_only': Uses only pooled patch tokens, ignores concept_emb
+        
         Args:
             concept_emb: Concept embeddings [batch, 512] from Stage 1 bottleneck
             patch_tokens: Raw patch tokens [batch, 576, 1024] from ViT
@@ -1263,60 +1310,91 @@ class Stage2CrossAttentionGeoHead(nn.Module):
             Dict containing:
                 - cell_logits: Geocell predictions [batch, num_cells]
                 - pred_offsets: Coordinate offsets [batch, coord_dim]
-                - attn_weights: Attention weights [batch, 1, 576] (if return_attention)
-                - fused_emb: Fused embedding after cross-attention [batch, 512]
+                - attn_weights: Attention weights [batch, 1, 576] (if return_attention, only in 'both' mode)
+                - fused_emb: Final embedding used for prediction [batch, 512]
+                - ablation_mode: Current ablation mode (for logging)
         """
         batch_size = concept_emb.size(0)
+        attn_weights = None
         
-        # Project patch tokens to concept embedding space
-        # [batch, 576, 1024] → [batch, 576, 512]
-        patch_proj = self.patch_proj(patch_tokens)
+        # =====================================================================
+        # ABLATION MODE: concept_only
+        # Only concept embedding contributes to prediction - no image patches
+        # =====================================================================
+        if self.ablation_mode == 'concept_only':
+            # Project concept embedding through dedicated MLP
+            final_emb = self.concept_only_proj(concept_emb)  # [batch, 512]
+            
+        # =====================================================================
+        # ABLATION MODE: image_only
+        # Only image patches contribute to prediction - no concept embedding
+        # =====================================================================
+        elif self.ablation_mode == 'image_only':
+            # Project patch tokens to embedding space
+            patch_proj = self.patch_proj(patch_tokens)  # [batch, 576, 512]
+            
+            # Global average pooling over patches
+            pooled_patches = patch_proj.mean(dim=1)  # [batch, 512]
+            
+            # Project through image-only MLP
+            final_emb = self.image_pool(pooled_patches)  # [batch, 512]
+            
+        # =====================================================================
+        # ABLATION MODE: both (default)
+        # Full cross-attention with enforced concept + image fusion
+        # =====================================================================
+        else:  # self.ablation_mode == 'both'
+            # Project patch tokens to concept embedding space
+            # [batch, 576, 1024] → [batch, 576, 512]
+            patch_proj = self.patch_proj(patch_tokens)
+            
+            # Prepare query: concept_emb as single query token
+            # [batch, 512] → [batch, 1, 512]
+            query = concept_emb.unsqueeze(1)
+            
+            # Cross-attention: concept queries patch tokens
+            # query: [batch, 1, 512], key/value: [batch, 576, 512]
+            attn_output, attn_weights = self.cross_attn(
+                query=query,
+                key=patch_proj,
+                value=patch_proj,
+                need_weights=return_attention,
+                average_attn_weights=True,  # Average across heads
+            )
+            # attn_output: [batch, 1, 512]
+            # attn_weights: [batch, 1, 576] (attention per patch)
+            
+            # Remove sequence dimension
+            attn_output = attn_output.squeeze(1)  # [batch, 512]
+            
+            # Residual connection + norm
+            if self.use_residual:
+                fused_emb = self.attn_norm(concept_emb + attn_output)
+            else:
+                fused_emb = self.attn_norm(attn_output)
+            
+            # Feed-forward with residual
+            ffn_out = self.ffn(fused_emb)
+            fused_emb = self.ffn_norm(fused_emb + ffn_out)
+            
+            # EXPLICIT CONCEPT FUSION: Concatenate original concept_emb with cross-attention output
+            # This ensures concept information cannot be ignored by the model
+            combined = torch.cat([concept_emb, fused_emb], dim=-1)  # [batch, 1024]
+            
+            if self.use_concept_gate:
+                # Learned gating: dynamically balance concept vs spatial information
+                gate = self.concept_gate(combined)  # [batch, 512], values in [0, 1]
+                # gate * concept_emb + (1 - gate) * fused_emb would be one approach
+                # Instead, we use gating on the fused representation
+                gated_combined = gate * concept_emb + (1 - gate) * fused_emb
+                final_emb = self.fusion(torch.cat([concept_emb, gated_combined], dim=-1))
+            else:
+                # Direct fusion: always use both
+                final_emb = self.fusion(combined)
         
-        # Prepare query: concept_emb as single query token
-        # [batch, 512] → [batch, 1, 512]
-        query = concept_emb.unsqueeze(1)
-        
-        # Cross-attention: concept queries patch tokens
-        # query: [batch, 1, 512], key/value: [batch, 576, 512]
-        attn_output, attn_weights = self.cross_attn(
-            query=query,
-            key=patch_proj,
-            value=patch_proj,
-            need_weights=return_attention,
-            average_attn_weights=True,  # Average across heads
-        )
-        # attn_output: [batch, 1, 512]
-        # attn_weights: [batch, 1, 576] (attention per patch)
-        
-        # Remove sequence dimension
-        attn_output = attn_output.squeeze(1)  # [batch, 512]
-        
-        # Residual connection + norm
-        if self.use_residual:
-            fused_emb = self.attn_norm(concept_emb + attn_output)
-        else:
-            fused_emb = self.attn_norm(attn_output)
-        
-        # Feed-forward with residual
-        ffn_out = self.ffn(fused_emb)
-        fused_emb = self.ffn_norm(fused_emb + ffn_out)
-        
-        # EXPLICIT CONCEPT FUSION: Concatenate original concept_emb with cross-attention output
-        # This ensures concept information cannot be ignored by the model
-        combined = torch.cat([concept_emb, fused_emb], dim=-1)  # [batch, 1024]
-        
-        if self.use_concept_gate:
-            # Learned gating: dynamically balance concept vs spatial information
-            gate = self.concept_gate(combined)  # [batch, 512], values in [0, 1]
-            # gate * concept_emb + (1 - gate) * fused_emb would be one approach
-            # Instead, we use gating on the fused representation
-            gated_combined = gate * concept_emb + (1 - gate) * fused_emb
-            final_emb = self.fusion(torch.cat([concept_emb, gated_combined], dim=-1))
-        else:
-            # Direct fusion: always use both
-            final_emb = self.fusion(combined)
-        
-        # Predictions use final_emb which ALWAYS includes concept_emb directly
+        # =====================================================================
+        # Shared prediction heads (all modes)
+        # =====================================================================
         cell_logits = self.cell_head(final_emb)
         pred_offsets = self.offset_head(final_emb)
         
@@ -1324,6 +1402,7 @@ class Stage2CrossAttentionGeoHead(nn.Module):
             "cell_logits": cell_logits,
             "pred_offsets": pred_offsets,
             "fused_emb": final_emb,
+            "ablation_mode": self.ablation_mode,
         }
         
         if return_attention and attn_weights is not None:

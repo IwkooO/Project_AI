@@ -1,0 +1,41 @@
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+INFO:__main__:Using device: cuda
+INFO:__main__:Ablation Mode: image_only
+INFO:__main__:  - concept_only: Only concept embeddings contribute to location prediction
+INFO:__main__:  - image_only: Only image patches contribute to location prediction
+INFO:__main__:  - both: Concept + image fusion with enforced concept usage (default)
+wandb: Currently logged in as: pradyut-nair (project-ai-geoguessr) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.23.0
+wandb: Run data is saved locally in /gpfs/scratch1/shared/pnair/Project_AI/wandb/run-20251217_154835-efmlpopy
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run stage2-image_only-2025-12-17_15-48-34
+wandb: ⭐️ View project at https://wandb.ai/project-ai-geoguessr/streetclip-cbm-stage2
+wandb: 🚀 View run at https://wandb.ai/project-ai-geoguessr/streetclip-cbm-stage2/runs/efmlpopy
+INFO:__main__:Initializing frozen image encoder...
+INFO:__main__:Loading Stage 1 checkpoint from /scratch-shared/pnair/Project_AI/results/stage1-prototype/2025-12-08_22-58-06/checkpoints/best_model_stage1.pt
+INFO:__main__:Loaded Stage 1 model with 2105 concepts, 434 parents
+INFO:__main__:Loading dataset from data/dataset-43k-mapped.csv
+Building dataset:   0%|          | 0/30436 [00:00<?, ?it/s]Building dataset:   6%|▌         | 1794/30436 [00:00<00:01, 17932.66it/s]Building dataset:  12%|█▏        | 3656/30436 [00:00<00:01, 18333.68it/s]Building dataset:  18%|█▊        | 5540/30436 [00:00<00:01, 18561.06it/s]Building dataset:  24%|██▍       | 7419/30436 [00:00<00:01, 18651.06it/s]Building dataset:  31%|███       | 9286/30436 [00:00<00:01, 18655.86it/s]Building dataset:  37%|███▋      | 11165/30436 [00:00<00:01, 18700.04it/s]Building dataset:  43%|████▎     | 13036/30436 [00:00<00:01, 11589.03it/s]Building dataset:  49%|████▉     | 14921/30436 [00:00<00:01, 13218.10it/s]Building dataset:  55%|█████▌    | 16788/30436 [00:01<00:00, 14539.79it/s]Building dataset:  61%|██████▏   | 18666/30436 [00:01<00:00, 15630.24it/s]Building dataset:  67%|██████▋   | 20485/30436 [00:01<00:00, 16316.31it/s]Building dataset:  73%|███████▎  | 22356/30436 [00:01<00:00, 16978.95it/s]Building dataset:  80%|███████▉  | 24219/30436 [00:01<00:00, 17445.54it/s]Building dataset:  86%|████████▌ | 26082/30436 [00:01<00:00, 17787.10it/s]Building dataset:  92%|█████████▏| 27967/30436 [00:01<00:00, 18095.31it/s]Building dataset:  98%|█████████▊| 29831/30436 [00:01<00:00, 18254.52it/s]Building dataset: 100%|██████████| 30436/30436 [00:01<00:00, 16715.17it/s]
+INFO:__main__:Loaded 30436 valid samples
+INFO:__main__:Generating Semantic Geocells...
+Clustering Countries:   0%|          | 0/132 [00:00<?, ?it/s]Clustering Countries:   4%|▍         | 5/132 [00:00<00:19,  6.66it/s]Clustering Countries:   5%|▌         | 7/132 [00:00<00:14,  8.52it/s]Clustering Countries:  11%|█▏        | 15/132 [00:00<00:05, 21.03it/s]Clustering Countries:  17%|█▋        | 23/132 [00:01<00:05, 21.08it/s]Clustering Countries:  20%|██        | 27/132 [00:01<00:04, 21.87it/s]Clustering Countries:  30%|███       | 40/132 [00:01<00:02, 40.01it/s]Clustering Countries:  37%|███▋      | 49/132 [00:01<00:01, 49.33it/s]Clustering Countries:  43%|████▎     | 57/132 [00:02<00:01, 37.60it/s]Clustering Countries:  49%|████▉     | 65/132 [00:02<00:01, 42.55it/s]Clustering Countries:  61%|██████    | 80/132 [00:02<00:00, 60.19it/s]Clustering Countries:  71%|███████   | 94/132 [00:02<00:00, 62.45it/s]Clustering Countries:  77%|███████▋  | 102/132 [00:02<00:00, 59.02it/s]Clustering Countries:  89%|████████▊ | 117/132 [00:02<00:00, 76.86it/s]Clustering Countries:  96%|█████████▌| 127/132 [00:02<00:00, 67.44it/s]Clustering Countries: 100%|██████████| 132/132 [00:02<00:00, 44.07it/s]
+INFO:__main__:Generated 1506 Semantic Geocells.
+INFO:__main__:Saved geocell visualization to results/stage2_cross_attention_image_only/2025-12-17_15-48-34/visualizations/geocells_map.png
+INFO:__main__:Train: 24349, Val: 6087
+INFO:__main__:Initializing Stage2CrossAttentionGeoHead with ablation_mode='image_only'...
+INFO:__main__:Starting Stage 2 Cross-Attention Training...
+Train Epoch 0:   0%|          | 0/95 [00:00<?, ?it/s]Train Epoch 0:   0%|          | 0/95 [01:28<?, ?it/s, loss=11.8207]Train Epoch 0:   1%|          | 1/95 [01:28<2:18:09, 88.18s/it, loss=11.8207]Train Epoch 0:   1%|          | 1/95 [01:32<2:18:09, 88.18s/it, loss=10.0931]Train Epoch 0:   2%|▏         | 2/95 [01:32<1:00:30, 39.04s/it, loss=10.0931]Train Epoch 0:   2%|▏         | 2/95 [01:37<1:00:30, 39.04s/it, loss=11.4378]Train Epoch 0:   3%|▎         | 3/95 [01:37<35:46, 23.33s/it, loss=11.4378]  Train Epoch 0:   3%|▎         | 3/95 [01:42<35:46, 23.33s/it, loss=10.2202]Train Epoch 0:   4%|▍         | 4/95 [01:42<24:11, 15.95s/it, loss=10.2202]

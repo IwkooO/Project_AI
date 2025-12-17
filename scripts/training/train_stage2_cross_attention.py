@@ -810,6 +810,7 @@ def save_checkpoint(
         "patch_dim": model.patch_proj[0].in_features,
         "concept_dim": model.cross_attn.embed_dim,
         "num_heads": model.cross_attn.num_heads,
+        "ablation_mode": model.ablation_mode,  # Save ablation mode for reproducibility
     }
     if optimizer is not None:
         checkpoint["optimizer_state_dict"] = optimizer.state_dict()
@@ -860,6 +861,14 @@ def main():
     parser.add_argument("--lambda_cell", type=float, default=1.0)
     parser.add_argument("--lambda_offset", type=float, default=5.0)
     
+    # Ablation study configuration
+    parser.add_argument("--ablation_mode", type=str, default="both",
+                        choices=["both", "concept_only", "image_only"],
+                        help="Ablation mode for experiments: "
+                             "'both' = concept + image fusion (default), "
+                             "'concept_only' = only concept embedding, "
+                             "'image_only' = only image patches")
+    
     # Misc
     parser.add_argument("--output_dir", type=str, default=None)
     parser.add_argument("--use_wandb", action="store_true", default=False)
@@ -880,16 +889,22 @@ def main():
         output_dir = Path(args.output_dir)
     else:
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        output_dir = Path("results") / "stage2_cross_attention" / timestamp
+        # Include ablation mode in directory name for easy identification
+        output_dir = Path("results") / f"stage2_cross_attention_{args.ablation_mode}" / timestamp
     
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "checkpoints").mkdir(exist_ok=True)
     (output_dir / "visualizations").mkdir(exist_ok=True)
     
+    logger.info(f"Ablation Mode: {args.ablation_mode}")
+    logger.info(f"  - concept_only: Only concept embeddings contribute to location prediction")
+    logger.info(f"  - image_only: Only image patches contribute to location prediction")
+    logger.info(f"  - both: Concept + image fusion with enforced concept usage (default)")
+    
     # Initialize WandB
     if args.use_wandb:
         import wandb
-        wandb.init(project="streetclip-cbm-stage2", config=vars(args), name=f"stage2-xattn-{output_dir.name}")
+        wandb.init(project="streetclip-cbm-stage2", config=vars(args), name=f"stage2-{args.ablation_mode}-{output_dir.name}")
     
     # Initialize Image Encoder (frozen, for patch extraction and concept computation)
     logger.info("Initializing frozen image encoder...")
@@ -1008,13 +1023,14 @@ def main():
     )
     
     # Initialize Stage 2 Cross-Attention Head
-    logger.info("Initializing Stage2CrossAttentionGeoHead...")
+    logger.info(f"Initializing Stage2CrossAttentionGeoHead with ablation_mode='{args.ablation_mode}'...")
     model = Stage2CrossAttentionGeoHead(
         patch_dim=args.patch_dim,
         concept_emb_dim=args.concept_dim,
         num_cells=num_cells,
         coord_output_dim=args.coord_output_dim,
         num_heads=args.num_heads,
+        ablation_mode=args.ablation_mode,
     )
     model.to(device)
     

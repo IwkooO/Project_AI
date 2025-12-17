@@ -1,11 +1,16 @@
 #!/bin/bash
 #SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
-#SBATCH --job-name=s2-xattn
-#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/train_stage2_cross_attention.log
-#SBATCH --time=14:00:00
+#SBATCH --job-name=s2-both
+#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/train_stage2_both.log
+#SBATCH --time=24:00:00
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
+
+# ===== ABLATION STUDY: BOTH (DEFAULT) =====
+# This experiment tests: Concept + Image fusion with enforced concept usage
+# Cross-attention between concepts and patches + explicit concept gating
+# This is the full model with interpretability
 
 # Activate environment
 module load 2025
@@ -17,17 +22,17 @@ source activate streetview_pnair
 export PYTHONNOUSERSITE=1
 export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
 
-# ===== Stage 2 Cross-Attention Configuration =====
+# ===== Stage 2 Configuration =====
 EPOCHS=30
-BATCH_SIZE=256          # Smaller batch size due to on-the-fly patch extraction
+BATCH_SIZE=256
 LR=1e-4
 WEIGHT_DECAY=0.01
 
 # Model architecture
-PATCH_DIM=1024         # ViT-L/14 hidden size
-CONCEPT_DIM=512        # Concept bottleneck output dim
+PATCH_DIM=1024
+CONCEPT_DIM=512
 NUM_HEADS=8
-COORD_OUTPUT_DIM=2     # 2D Cartesian (xy) offsets
+COORD_OUTPUT_DIM=2
 
 # Geocell generation
 MIN_SAMPLES_PER_CELL=20
@@ -36,20 +41,15 @@ MIN_SAMPLES_PER_CELL=20
 LAMBDA_CELL=1.0
 LAMBDA_OFFSET=5.0
 
-# ===== ABLATION MODE CONFIGURATION =====
-# Choose one of the following modes:
-#   - "both"         : Concept + image fusion with enforced concept usage (DEFAULT)
-#   - "concept_only" : Only concept embeddings contribute to location prediction
-#   - "image_only"   : Only image patches contribute to location prediction
+# ABLATION MODE: both (full model)
 ABLATION_MODE="both"
 
 # Data paths
 DATA_ROOT=/scratch-shared/pnair/Project_AI/data
 CSV_PATH="data/dataset-43k-mapped.csv"
-# Stage 1 checkpoint for computing concept embeddings on-the-fly
 STAGE1_CHECKPOINT="/scratch-shared/pnair/Project_AI/results/stage1-prototype/2025-12-08_22-58-06/checkpoints/best_model_stage1.pt"
 
-# Run Stage 2 Cross-Attention Training
+# Run Stage 2 Training with both ablation (full model)
 python scripts/training/train_stage2_cross_attention.py \
     --stage1_checkpoint $STAGE1_CHECKPOINT \
     --csv_path $CSV_PATH \
