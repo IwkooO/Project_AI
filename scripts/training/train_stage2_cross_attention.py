@@ -1040,13 +1040,12 @@ def main():
             cell_centers, args.coord_output_dim, epoch, args
         )
         
-        # Visualize every 2 epochs
-        if epoch % 2 == 0 or epoch == args.epochs - 1:
-            visualize_attention_predictions(
-                model, image_encoder, stage1_model, concept_info, val_loader, device,
-                cell_centers, epoch, output_dir, args.coord_output_dim,
-                num_samples=4, log_to_wandb=args.use_wandb, args=args
-            )
+        # Visualize every epoch
+        visualize_attention_predictions(
+            model, image_encoder, stage1_model, concept_info, val_loader, device,
+            cell_centers, epoch, output_dir, args.coord_output_dim,
+            num_samples=4, log_to_wandb=args.use_wandb, args=args
+        )
         
         # Log to WandB
         if args.use_wandb:
