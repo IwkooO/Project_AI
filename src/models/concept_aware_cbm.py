@@ -1148,6 +1148,7 @@ class Stage2CrossAttentionGeoHead(nn.Module):
         coord_output_dim: int = 2,
         dropout: float = 0.1,
         use_residual: bool = True,
+        use_concept_gate: bool = True,  # NEW: Gating mechanism to ensure concept usage
     ):
         """
         Args:
@@ -1159,6 +1160,7 @@ class Stage2CrossAttentionGeoHead(nn.Module):
             coord_output_dim: Output dimension for coordinates (2 for lat/lng, 3 for sphere)
             dropout: Dropout probability
             use_residual: Whether to add residual connection from concept_emb
+            use_concept_gate: Whether to use gating to balance concept vs patch info
         """
         super().__init__()
         
@@ -1168,6 +1170,7 @@ class Stage2CrossAttentionGeoHead(nn.Module):
         self.num_patches = num_patches
         self.coord_output_dim = coord_output_dim
         self.use_residual = use_residual
+        self.use_concept_gate = use_concept_gate
         
         # Project patch tokens to concept embedding dimension
         self.patch_proj = nn.Sequential(
@@ -1195,6 +1198,24 @@ class Stage2CrossAttentionGeoHead(nn.Module):
             nn.Dropout(dropout),
         )
         self.ffn_norm = nn.LayerNorm(concept_emb_dim)
+        
+        # Gating mechanism to balance concept vs cross-attention information
+        # This ensures concepts can't be ignored - learns how much to weight each
+        if use_concept_gate:
+            self.concept_gate = nn.Sequential(
+                nn.Linear(concept_emb_dim * 2, concept_emb_dim),
+                nn.Sigmoid(),
+            )
+        
+        # Fusion layer that explicitly combines concept + cross-attention output
+        # Input: [concept_emb || fused_emb] = 2 * concept_emb_dim
+        # This guarantees concepts are directly fed to prediction heads
+        self.fusion = nn.Sequential(
+            nn.Linear(concept_emb_dim * 2, concept_emb_dim),
+            nn.LayerNorm(concept_emb_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+        )
         
         # Geocell Classification Head
         self.cell_head = nn.Sequential(
@@ -1280,14 +1301,29 @@ class Stage2CrossAttentionGeoHead(nn.Module):
         ffn_out = self.ffn(fused_emb)
         fused_emb = self.ffn_norm(fused_emb + ffn_out)
         
-        # Predictions
-        cell_logits = self.cell_head(fused_emb)
-        pred_offsets = self.offset_head(fused_emb)
+        # EXPLICIT CONCEPT FUSION: Concatenate original concept_emb with cross-attention output
+        # This ensures concept information cannot be ignored by the model
+        combined = torch.cat([concept_emb, fused_emb], dim=-1)  # [batch, 1024]
+        
+        if self.use_concept_gate:
+            # Learned gating: dynamically balance concept vs spatial information
+            gate = self.concept_gate(combined)  # [batch, 512], values in [0, 1]
+            # gate * concept_emb + (1 - gate) * fused_emb would be one approach
+            # Instead, we use gating on the fused representation
+            gated_combined = gate * concept_emb + (1 - gate) * fused_emb
+            final_emb = self.fusion(torch.cat([concept_emb, gated_combined], dim=-1))
+        else:
+            # Direct fusion: always use both
+            final_emb = self.fusion(combined)
+        
+        # Predictions use final_emb which ALWAYS includes concept_emb directly
+        cell_logits = self.cell_head(final_emb)
+        pred_offsets = self.offset_head(final_emb)
         
         result = {
             "cell_logits": cell_logits,
             "pred_offsets": pred_offsets,
-            "fused_emb": fused_emb,
+            "fused_emb": final_emb,
         }
         
         if return_attention and attn_weights is not None:

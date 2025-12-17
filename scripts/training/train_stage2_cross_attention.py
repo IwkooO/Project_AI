@@ -175,7 +175,7 @@ def load_stage1_checkpoint(
     checkpoint_path: Path,
     image_encoder: StreetCLIPEncoder,
     device: torch.device,
-) -> Stage1ConceptModel:
+) -> Tuple[Stage1ConceptModel, Dict]:
     """
     Load Stage 1 model from checkpoint.
     
@@ -185,7 +185,8 @@ def load_stage1_checkpoint(
         device: Device to load model on
         
     Returns:
-        Loaded and frozen Stage1ConceptModel
+        Tuple of (Stage1ConceptModel, concept_info_dict)
+        concept_info_dict contains: concept_names, parent_names, concept_to_idx, parent_to_idx
     """
     logger.info(f"Loading Stage 1 checkpoint from {checkpoint_path}")
     checkpoint = torch.load(checkpoint_path, map_location=device)
@@ -214,8 +215,21 @@ def load_stage1_checkpoint(
     for param in model.parameters():
         param.requires_grad = False
     
-    logger.info(f"Loaded Stage 1 model with {checkpoint['num_concepts']} concepts")
-    return model
+    # Extract concept info for visualization
+    concept_info = {
+        "concept_names": checkpoint.get("concept_names", []),
+        "parent_names": checkpoint.get("parent_names", []),
+        "concept_to_idx": checkpoint.get("concept_to_idx", {}),
+        "parent_to_idx": checkpoint.get("parent_to_idx", {}),
+        "meta_to_parent_idx": meta_to_parent_idx,
+    }
+    
+    # Build reverse mappings
+    concept_info["idx_to_concept"] = {v: k for k, v in concept_info["concept_to_idx"].items()}
+    concept_info["idx_to_parent"] = {v: k for k, v in concept_info["parent_to_idx"].items()}
+    
+    logger.info(f"Loaded Stage 1 model with {checkpoint['num_concepts']} concepts, {len(concept_info['parent_names'])} parents")
+    return model, concept_info
 
 
 # ---------- Geocell Generation ----------
@@ -352,27 +366,34 @@ def visualize_attention_predictions(
     model: Stage2CrossAttentionGeoHead,
     image_encoder: StreetCLIPEncoder,
     stage1_model: Stage1ConceptModel,
+    concept_info: Dict,
     dataloader: DataLoader,
     device: torch.device,
     cell_centers: torch.Tensor,
     epoch: int,
     output_dir: Path,
     coord_output_dim: int = 3,
-    num_samples: int = 8,
+    num_samples: int = 4,
     log_to_wandb: bool = False,
     args=None,
 ):
     """
-    Visualize predictions with attention heatmaps overlaid on images.
-    
-    Shows:
+    Comprehensive Stage 2 visualization showing:
     - Original image with attention heatmap overlay
-    - GT cell, Pred cell, GT coords, Pred coords, Distance error
+    - Top-5 predicted concepts bar chart
+    - GT vs Pred parent/child concepts
+    - Geocell predictions (GT cell, Pred cell)
+    - Coordinate predictions (GT coords, Pred coords, Distance error)
     """
     model.eval()
     stage1_model.eval()
     viz_dir = output_dir / "visualizations"
     viz_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Get concept name mappings
+    idx_to_concept = concept_info.get("idx_to_concept", {})
+    idx_to_parent = concept_info.get("idx_to_parent", {})
+    meta_to_parent_idx = concept_info.get("meta_to_parent_idx", None)
     
     # Collect samples
     all_samples = []
@@ -384,6 +405,7 @@ def visualize_attention_predictions(
                     "image": images[i],
                     "coords": coords[i],
                     "cell_label": cell_labels[i],
+                    "country": countries[i],
                     "image_path": image_paths[i],
                 })
         if len(all_samples) >= num_samples * 2:
@@ -401,15 +423,10 @@ def visualize_attention_predictions(
     colors = [(1, 0, 0, 0), (1, 0, 0, 0.7)]
     attn_cmap = LinearSegmentedColormap.from_list("attention", colors, N=256)
     
-    fig, axes = plt.subplots(2, 4, figsize=(20, 10))
-    axes = axes.flatten()
+    # Create figure: 4 samples, each with 2 columns (image+attention, bar chart)
+    fig = plt.figure(figsize=(24, 6 * num_samples))
     
     for idx, sample in enumerate(samples):
-        if idx >= len(axes):
-            break
-        
-        ax = axes[idx]
-        
         # Load original image for display
         image_path = Path(sample["image_path"])
         pil_image = Image.open(image_path).convert("RGB")
@@ -421,16 +438,41 @@ def visualize_attention_predictions(
         patch_tokens = image_encoder.get_patch_tokens(img_tensor)  # [1, 576, 1024]
         img_features = image_encoder(img_tensor)  # [1, 768]
         
-        # Get concept embedding from Stage 1
-        concept_emb = stage1_model.concept_bottleneck(img_features)  # [1, 512]
+        # Get concept predictions from Stage 1 (full forward pass)
+        stage1_outputs = stage1_model.forward_from_features(img_features)
+        concept_emb = stage1_outputs["concept_emb"]
+        meta_probs = stage1_outputs["meta_probs"][0]  # [num_metas]
+        parent_probs = stage1_outputs["parent_probs"][0]  # [num_parents]
         
-        # Forward through model
+        # Forward through Stage 2 model
         outputs = model(concept_emb, patch_tokens)
         cell_logits = outputs["cell_logits"]
         pred_offsets = outputs["pred_offsets"]
         attn_weights = outputs.get("attn_weights")
         
-        # Process attention weights to spatial map
+        # ===== Process Concept Predictions =====
+        # Top-5 meta concepts
+        top5_meta_probs, top5_meta_idx = torch.topk(meta_probs, min(5, len(meta_probs)))
+        top5_meta_names = [idx_to_concept.get(i.item(), f"Meta-{i.item()}")[:30] for i in top5_meta_idx]
+        
+        # Top-5 parent concepts
+        top5_parent_probs, top5_parent_idx = torch.topk(parent_probs, min(5, len(parent_probs)))
+        top5_parent_names = [idx_to_parent.get(i.item(), f"Parent-{i.item()}")[:30] for i in top5_parent_idx]
+        
+        # Predicted meta and parent
+        pred_meta_idx = meta_probs.argmax().item()
+        pred_meta_name = idx_to_concept.get(pred_meta_idx, f"Meta-{pred_meta_idx}")
+        pred_parent_idx = parent_probs.argmax().item()
+        pred_parent_name = idx_to_parent.get(pred_parent_idx, f"Parent-{pred_parent_idx}")
+        
+        # Get predicted parent from meta (hierarchical)
+        if meta_to_parent_idx is not None:
+            hier_parent_idx = meta_to_parent_idx[pred_meta_idx].item()
+            hier_parent_name = idx_to_parent.get(hier_parent_idx, f"Parent-{hier_parent_idx}")
+        else:
+            hier_parent_name = "N/A"
+        
+        # ===== Process Attention =====
         attn_spatial = model.attention_to_spatial(attn_weights)  # [1, 24, 24]
         attn_map = attn_spatial[0].cpu().numpy()  # [24, 24]
         
@@ -440,7 +482,7 @@ def visualize_attention_predictions(
         attn_map_upsampled = attn_map_upsampled.resize((img_w, img_h), Image.BILINEAR)
         attn_map_upsampled = np.array(attn_map_upsampled) / 255.0
         
-        # Calculate predictions
+        # ===== Process Geolocation =====
         pred_cell = cell_logits.argmax(dim=1).item()
         pred_cell_center = cell_centers[pred_cell].to(device).unsqueeze(0)
         
@@ -457,39 +499,93 @@ def visualize_attention_predictions(
         gt_coords = sample["coords"].unsqueeze(0).to(device)
         dist_error = haversine_distance(pred_coords, gt_coords).item()
         
-        # Display image with attention overlay
-        ax.imshow(pil_image)
-        ax.imshow(attn_map_upsampled, cmap=attn_cmap, alpha=0.7)
-        ax.axis("off")
-        
-        # Info text
         gt_cell = sample["cell_label"].item()
         gt_lat, gt_lng = sample["coords"][0].item(), sample["coords"][1].item()
         p_lat, p_lng = pred_lat.item(), pred_lng.item()
         
-        title = (
-            f"GT Cell: {gt_cell} | Pred: {pred_cell}\n"
-            f"GT: ({gt_lat:.2f}, {gt_lng:.2f})\n"
-            f"Pred: ({p_lat:.2f}, {p_lng:.2f})\n"
-            f"Error: {format_distance(dist_error)}"
+        # ===== Create Subplots for this sample =====
+        # Row layout: [Image+Attention (wide), Top-5 Meta Bar, Top-5 Parent Bar, Info Text]
+        row_base = idx * 4
+        
+        # Column 1: Image with attention overlay (spans 2 columns worth of space)
+        ax_img = fig.add_subplot(num_samples, 4, row_base + 1)
+        ax_img.imshow(pil_image)
+        ax_img.imshow(attn_map_upsampled, cmap=attn_cmap, alpha=0.6)
+        ax_img.axis("off")
+        ax_img.set_title(f"Sample {idx+1}: {sample['country']}", fontsize=11, fontweight='bold')
+        
+        # Column 2: Top-5 Meta Concepts Bar Chart
+        ax_meta = fig.add_subplot(num_samples, 4, row_base + 2)
+        y_pos = np.arange(len(top5_meta_names))
+        bars_meta = ax_meta.barh(y_pos, top5_meta_probs.cpu().numpy(), color='steelblue', alpha=0.8)
+        ax_meta.set_yticks(y_pos)
+        ax_meta.set_yticklabels(top5_meta_names, fontsize=8)
+        ax_meta.set_xlabel("Probability", fontsize=9)
+        ax_meta.set_title("Top-5 Child Concepts", fontsize=10, fontweight='bold')
+        ax_meta.set_xlim(0, 1)
+        ax_meta.invert_yaxis()
+        # Highlight top prediction
+        if len(bars_meta) > 0:
+            bars_meta[0].set_color('darkblue')
+        
+        # Column 3: Top-5 Parent Concepts Bar Chart
+        ax_parent = fig.add_subplot(num_samples, 4, row_base + 3)
+        y_pos = np.arange(len(top5_parent_names))
+        bars_parent = ax_parent.barh(y_pos, top5_parent_probs.cpu().numpy(), color='darkorange', alpha=0.8)
+        ax_parent.set_yticks(y_pos)
+        ax_parent.set_yticklabels(top5_parent_names, fontsize=8)
+        ax_parent.set_xlabel("Probability", fontsize=9)
+        ax_parent.set_title("Top-5 Parent Concepts", fontsize=10, fontweight='bold')
+        ax_parent.set_xlim(0, 1)
+        ax_parent.invert_yaxis()
+        if len(bars_parent) > 0:
+            bars_parent[0].set_color('darkorange')
+        
+        # Column 4: Prediction Summary Text
+        ax_text = fig.add_subplot(num_samples, 4, row_base + 4)
+        ax_text.axis("off")
+        
+        # Determine accuracy colors
+        cell_correct = gt_cell == pred_cell
+        cell_color = "green" if cell_correct else "red"
+        
+        summary_text = (
+            f"═══ CONCEPT PREDICTIONS ═══\n"
+            f"Pred Child:  {pred_meta_name[:35]}\n"
+            f"Pred Parent: {pred_parent_name[:35]}\n"
+            f"Hier Parent: {hier_parent_name[:35]}\n"
+            f"\n"
+            f"══ GEOLOCATION PREDICTIONS ══\n"
+            f"GT Cell:   {gt_cell:4d}    Pred Cell: {pred_cell:4d}\n"
+            f"Cell Match: {'✓ CORRECT' if cell_correct else '✗ WRONG'}\n"
+            f"\n"
+            f"GT Coords:   ({gt_lat:7.2f}, {gt_lng:8.2f})\n"
+            f"Pred Coords: ({p_lat:7.2f}, {p_lng:8.2f})\n"
+            f"\n"
+            f"════ DISTANCE ERROR ════\n"
+            f"Error: {format_distance(dist_error)}\n"
+            f"\n"
+            f"Street (<1km):   {'✓' if dist_error <= 1 else '✗'}\n"
+            f"City (<25km):    {'✓' if dist_error <= 25 else '✗'}\n"
+            f"Region (<200km): {'✓' if dist_error <= 200 else '✗'}\n"
+            f"Country (<750km):{'✓' if dist_error <= 750 else '✗'}"
         )
-        ax.set_title(title, fontsize=9, loc='left')
-    
-    # Hide unused subplots
-    for idx in range(len(samples), len(axes)):
-        axes[idx].axis("off")
+        
+        ax_text.text(0.05, 0.95, summary_text, transform=ax_text.transAxes,
+                     fontsize=9, verticalalignment='top', fontfamily='monospace',
+                     bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
     
     plt.tight_layout()
-    save_path = viz_dir / f"epoch_{epoch}_attention_predictions.png"
+    save_path = viz_dir / f"epoch_{epoch}_comprehensive_predictions.png"
     plt.savefig(save_path, dpi=VIZ_DPI, bbox_inches="tight")
     plt.close(fig)
     
-    logger.info(f"Saved attention visualization to {save_path}")
+    logger.info(f"Saved comprehensive visualization to {save_path}")
     
     if log_to_wandb and args and args.use_wandb:
         import wandb
         wandb.log({
-            "attention_predictions": wandb.Image(str(save_path), caption=f"Epoch {epoch}")
+            "comprehensive_predictions": wandb.Image(str(save_path), caption=f"Epoch {epoch}")
         }, step=epoch)
 
 
@@ -804,7 +900,7 @@ def main():
         param.requires_grad = False
     
     # Load Stage 1 model for concept embeddings
-    stage1_model = load_stage1_checkpoint(
+    stage1_model, concept_info = load_stage1_checkpoint(
         Path(args.stage1_checkpoint),
         image_encoder,
         device,
@@ -944,12 +1040,12 @@ def main():
             cell_centers, args.coord_output_dim, epoch, args
         )
         
-        # Visualize every 5 epochs
-        if epoch % 5 == 0 or epoch == args.epochs - 1:
+        # Visualize every 2 epochs
+        if epoch % 2 == 0 or epoch == args.epochs - 1:
             visualize_attention_predictions(
-                model, image_encoder, stage1_model, val_loader, device,
+                model, image_encoder, stage1_model, concept_info, val_loader, device,
                 cell_centers, epoch, output_dir, args.coord_output_dim,
-                num_samples=8, log_to_wandb=args.use_wandb, args=args
+                num_samples=4, log_to_wandb=args.use_wandb, args=args
             )
         
         # Log to WandB
