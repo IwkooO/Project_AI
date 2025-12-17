@@ -111,6 +111,54 @@ class StreetCLIPEncoder(nn.Module):
         outputs = self.model.vision_model(pixel_values=pixel_values)
         return outputs.last_hidden_state[:, 0]
 
+    def get_patch_tokens(self, pixel_values: torch.Tensor) -> torch.Tensor:
+        """
+        Get all patch token features (excluding CLS token).
+        
+        For ViT-L/14@336px: 336/14 = 24, so 24x24 = 576 patches.
+        
+        Args:
+            pixel_values: Preprocessed CLIP pixel values [batch, 3, 336, 336]
+        Returns:
+            Patch tokens [batch, 576, hidden_size] (1024 for CLIP ViT-L)
+        """
+        outputs = self.model.vision_model(pixel_values=pixel_values)
+        # last_hidden_state: [batch, 1 + num_patches, hidden_size]
+        # First token is CLS, rest are patch tokens
+        return outputs.last_hidden_state[:, 1:]
+
+    def get_all_tokens(self, pixel_values: torch.Tensor) -> torch.Tensor:
+        """
+        Get CLS + all patch tokens.
+        
+        Args:
+            pixel_values: Preprocessed CLIP pixel values [batch, 3, 336, 336]
+        Returns:
+            All tokens [batch, 1 + num_patches, hidden_size] (577 tokens for ViT-L/14@336)
+        """
+        outputs = self.model.vision_model(pixel_values=pixel_values)
+        return outputs.last_hidden_state
+
+    def get_features_and_patches(self, pixel_values: torch.Tensor) -> tuple:
+        """
+        Get both projected CLS features and raw patch tokens in one forward pass.
+        
+        Args:
+            pixel_values: Preprocessed CLIP pixel values [batch, 3, 336, 336]
+        Returns:
+            Tuple of:
+                - image_features: Projected CLS features [batch, projection_dim] (768)
+                - patch_tokens: Raw patch tokens [batch, 576, hidden_size] (1024)
+        """
+        vision_outputs = self.model.vision_model(pixel_values=pixel_values)
+        # Get patch tokens (exclude CLS)
+        patch_tokens = vision_outputs.last_hidden_state[:, 1:]
+        # Get projected CLS (through post_layernorm and visual_projection)
+        pooled_output = vision_outputs.last_hidden_state[:, 0]
+        pooled_output = self.model.vision_model.post_layernorm(pooled_output)
+        image_features = self.model.visual_projection(pooled_output)
+        return image_features, patch_tokens
+
     @torch.no_grad()
     def get_image_features(self, pixel_values: torch.Tensor) -> torch.Tensor:
         return self.forward(pixel_values)

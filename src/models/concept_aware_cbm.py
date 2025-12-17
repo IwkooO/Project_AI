@@ -206,7 +206,6 @@ class TransformerBottleneck(nn.Module):
         self.pos_embed = nn.Parameter(torch.randn(1, 2, hidden_dim) * 0.02)
         
         # Check PyTorch version for batch_first support
-        import torch
         pytorch_version = tuple(int(x) for x in torch.__version__.split('.')[:2])
         self.batch_first = pytorch_version >= (1, 9)
         
@@ -1114,3 +1113,219 @@ class ConceptAwareGeoModel(nn.Module):
         lat = torch.rad2deg(torch.asin(torch.clamp(z, -1.0, 1.0)))
         lng = torch.rad2deg(torch.atan2(y, x))
         return lat, lng
+
+
+# ============================================================================
+# STAGE 2: CROSS-ATTENTION GEO HEAD WITH PATCH VISUALIZATION
+# ============================================================================
+
+class Stage2CrossAttentionGeoHead(nn.Module):
+    """
+    Stage 2 Geolocation Head with Cross-Attention for interpretable predictions.
+    
+    Uses cross-attention where:
+    - Query: Concept embedding (512d) from Stage 1 frozen bottleneck
+    - Keys/Values: Patch tokens (576 patches × 1024d) from ViT, projected to 512d
+    
+    This allows visualization of which image patches contribute to the geolocation
+    prediction via attention weights (reshaped to 24×24 spatial grid).
+    
+    Architecture:
+        concept_emb [B, 512] → query
+        patch_tokens [B, 576, 1024] → patch_proj → [B, 576, 512] → keys/values
+        cross_attention(query, keys, values) → [B, 512] + attention_weights [B, 1, 576]
+        → cell_head → cell_logits [B, num_cells]
+        → offset_head → pred_offsets [B, coord_dim]
+    """
+
+    def __init__(
+        self,
+        num_cells: int,
+        concept_emb_dim: int = 512,
+        patch_dim: int = 1024,  # ViT-L hidden size
+        num_patches: int = 576,  # 24×24 for 336px image with 14px patches
+        num_heads: int = 8,
+        coord_output_dim: int = 2,
+        dropout: float = 0.1,
+        use_residual: bool = True,
+    ):
+        """
+        Args:
+            num_cells: Number of semantic geocells
+            concept_emb_dim: Dimension of concept embeddings (512)
+            patch_dim: Dimension of raw patch tokens from ViT (1024)
+            num_patches: Number of patches (576 for 24×24 grid)
+            num_heads: Number of attention heads for cross-attention
+            coord_output_dim: Output dimension for coordinates (2 for lat/lng, 3 for sphere)
+            dropout: Dropout probability
+            use_residual: Whether to add residual connection from concept_emb
+        """
+        super().__init__()
+        
+        self.num_cells = num_cells
+        self.concept_emb_dim = concept_emb_dim
+        self.patch_dim = patch_dim
+        self.num_patches = num_patches
+        self.coord_output_dim = coord_output_dim
+        self.use_residual = use_residual
+        
+        # Project patch tokens to concept embedding dimension
+        self.patch_proj = nn.Sequential(
+            nn.Linear(patch_dim, concept_emb_dim),
+            nn.LayerNorm(concept_emb_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+        )
+        
+        # Cross-attention: concept_emb attends to patch tokens
+        self.cross_attn = nn.MultiheadAttention(
+            embed_dim=concept_emb_dim,
+            num_heads=num_heads,
+            dropout=dropout,
+            batch_first=True,
+        )
+        self.attn_norm = nn.LayerNorm(concept_emb_dim)
+        
+        # Feed-forward after attention
+        self.ffn = nn.Sequential(
+            nn.Linear(concept_emb_dim, concept_emb_dim * 2),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(concept_emb_dim * 2, concept_emb_dim),
+            nn.Dropout(dropout),
+        )
+        self.ffn_norm = nn.LayerNorm(concept_emb_dim)
+        
+        # Geocell Classification Head
+        self.cell_head = nn.Sequential(
+            nn.Linear(concept_emb_dim, 512),
+            nn.LayerNorm(512),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(512, num_cells),
+        )
+        
+        # Offset Regression Head
+        self.offset_head = nn.Sequential(
+            nn.Linear(concept_emb_dim, 256),
+            nn.LayerNorm(256),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(256, coord_output_dim),
+        )
+        
+        self._init_weights()
+    
+    def _init_weights(self):
+        """Initialize weights with Xavier uniform."""
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+    
+    def forward(
+        self,
+        concept_emb: torch.Tensor,
+        patch_tokens: torch.Tensor,
+        return_attention: bool = True,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Forward pass through cross-attention geo head.
+        
+        Args:
+            concept_emb: Concept embeddings [batch, 512] from Stage 1 bottleneck
+            patch_tokens: Raw patch tokens [batch, 576, 1024] from ViT
+            return_attention: Whether to return attention weights for visualization
+            
+        Returns:
+            Dict containing:
+                - cell_logits: Geocell predictions [batch, num_cells]
+                - pred_offsets: Coordinate offsets [batch, coord_dim]
+                - attn_weights: Attention weights [batch, 1, 576] (if return_attention)
+                - fused_emb: Fused embedding after cross-attention [batch, 512]
+        """
+        batch_size = concept_emb.size(0)
+        
+        # Project patch tokens to concept embedding space
+        # [batch, 576, 1024] → [batch, 576, 512]
+        patch_proj = self.patch_proj(patch_tokens)
+        
+        # Prepare query: concept_emb as single query token
+        # [batch, 512] → [batch, 1, 512]
+        query = concept_emb.unsqueeze(1)
+        
+        # Cross-attention: concept queries patch tokens
+        # query: [batch, 1, 512], key/value: [batch, 576, 512]
+        attn_output, attn_weights = self.cross_attn(
+            query=query,
+            key=patch_proj,
+            value=patch_proj,
+            need_weights=return_attention,
+            average_attn_weights=True,  # Average across heads
+        )
+        # attn_output: [batch, 1, 512]
+        # attn_weights: [batch, 1, 576] (attention per patch)
+        
+        # Remove sequence dimension
+        attn_output = attn_output.squeeze(1)  # [batch, 512]
+        
+        # Residual connection + norm
+        if self.use_residual:
+            fused_emb = self.attn_norm(concept_emb + attn_output)
+        else:
+            fused_emb = self.attn_norm(attn_output)
+        
+        # Feed-forward with residual
+        ffn_out = self.ffn(fused_emb)
+        fused_emb = self.ffn_norm(fused_emb + ffn_out)
+        
+        # Predictions
+        cell_logits = self.cell_head(fused_emb)
+        pred_offsets = self.offset_head(fused_emb)
+        
+        result = {
+            "cell_logits": cell_logits,
+            "pred_offsets": pred_offsets,
+            "fused_emb": fused_emb,
+        }
+        
+        if return_attention and attn_weights is not None:
+            result["attn_weights"] = attn_weights  # [batch, 1, 576]
+        
+        return result
+    
+    def get_trainable_params(self) -> Iterable[nn.Parameter]:
+        """Return all trainable parameters."""
+        return self.parameters()
+    
+    @staticmethod
+    def attention_to_spatial(
+        attn_weights: torch.Tensor,
+        grid_size: int = 24,
+    ) -> torch.Tensor:
+        """
+        Convert attention weights to spatial grid for visualization.
+        
+        Args:
+            attn_weights: Attention weights [batch, 1, 576]
+            grid_size: Size of spatial grid (24 for 24×24 patches)
+            
+        Returns:
+            Spatial attention map [batch, grid_size, grid_size]
+        """
+        # Remove sequence dim if present
+        if attn_weights.dim() == 3:
+            attn_weights = attn_weights.squeeze(1)  # [batch, 576]
+        
+        batch_size = attn_weights.size(0)
+        return attn_weights.view(batch_size, grid_size, grid_size)
+    
+    @staticmethod
+    def _cartesian_to_latlng(cart: torch.Tensor) -> tuple:
+        """Convert Cartesian to lat/lng."""
+        x, y, z = cart[:, 0], cart[:, 1], cart[:, 2]
+        lat = torch.rad2deg(torch.asin(torch.clamp(z, -1.0, 1.0)))
+        lng = torch.rad2deg(torch.atan2(y, x))
+        return lat, lng
+

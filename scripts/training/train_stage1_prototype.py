@@ -119,9 +119,15 @@ class PrecomputedEmbeddingsDataset(Dataset):
     def __len__(self):
         return len(self.concept_indices)
     
-    def _load_embedding(self, idx: int) -> torch.Tensor:
+    def _load_embedding(self, idx: int) -> Dict[str, torch.Tensor]:
+        """Load embedding data from disk or memory.
+        
+        Returns:
+            Dict with 'embedding' (768d) and optionally 'concept_emb' (512d)
+        """
         if self.embeddings is not None:
-            return self.embeddings[idx]
+            # In-memory embeddings (legacy format)
+            return {"embedding": self.embeddings[idx]}
         if self.embedding_dir is None:
             raise ValueError("No embeddings in memory and no embedding_dir provided.")
         
@@ -132,8 +138,10 @@ class PrecomputedEmbeddingsDataset(Dataset):
         emb_path = self.embedding_dir / emb_file
         loaded = torch.load(emb_path, weights_only=True)
         if isinstance(loaded, dict) and "embedding" in loaded:
-            return loaded["embedding"]
-        return loaded
+            # New format: {"embedding": tensor, "concept_emb": tensor (optional)}
+            return loaded
+        # Legacy format: just the tensor
+        return {"embedding": loaded}
     
     @staticmethod
     def _to_tensor(val, dtype=torch.long):
@@ -142,7 +150,10 @@ class PrecomputedEmbeddingsDataset(Dataset):
         return torch.tensor(val, dtype=dtype)
     
     def __getitem__(self, idx):
-        embedding = self._load_embedding(idx)
+        emb_data = self._load_embedding(idx)
+        embedding = emb_data["embedding"]
+        concept_emb = emb_data.get("concept_emb")  # Optional, for Stage 2
+        
         concept_idx = self._to_tensor(self.concept_indices[idx], dtype=torch.long)
         parent_idx = self._to_tensor(self.parent_indices[idx], dtype=torch.long)
         country_idx = self._to_tensor(self.country_indices[idx], dtype=torch.long)
@@ -151,6 +162,12 @@ class PrecomputedEmbeddingsDataset(Dataset):
             coords = torch.tensor(coords, dtype=torch.float32)
         cell_label = self._to_tensor(self.cell_labels[idx], dtype=torch.long)
         meta = self.metadata[idx] if isinstance(self.metadata, list) else {}
+        
+        # Include concept_emb in metadata for backward compatibility
+        if concept_emb is not None:
+            meta = dict(meta)  # Copy to avoid mutating original
+            meta["concept_emb"] = concept_emb
+        
         return (
             embedding,
             concept_idx,
@@ -359,19 +376,34 @@ def save_embeddings_per_pano(
     cache_dir: Path,
     embeddings: Tuple[torch.Tensor, ...],
     metadata: Optional[List[Dict]] = None,
+    concept_embeddings: Optional[torch.Tensor] = None,
 ) -> None:
-    """Save per-pano embeddings and a manifest for disk-backed loading."""
+    """Save per-pano embeddings and a manifest for disk-backed loading.
+    
+    Args:
+        cache_dir: Directory to save embeddings
+        embeddings: Tuple of (image_embeddings, concept_idx, parent_idx, country_idx, coords, cell_labels)
+        metadata: Optional list of metadata dicts per sample
+        concept_embeddings: Optional concept embeddings [N, 512] from concept bottleneck (for Stage 2)
+    """
     cache_dir.mkdir(parents=True, exist_ok=True)
     entries = []
     
     total = len(embeddings[0])
+    has_concept_emb = concept_embeddings is not None and len(concept_embeddings) == total
+    
     for i in range(total):
         meta_entry = metadata[i] if metadata is not None and i < len(metadata) else {}
         pano_id = meta_entry.get("pano_id", f"idx_{i}")
         filename = f"{sanitize_for_filename(pano_id)}.pt"
         emb_path = cache_dir / filename
         
-        torch.save({"embedding": embeddings[0][i]}, emb_path)
+        # Save both image embedding and concept embedding (if available)
+        save_data = {"embedding": embeddings[0][i]}
+        if has_concept_emb:
+            save_data["concept_emb"] = concept_embeddings[i]
+        
+        torch.save(save_data, emb_path)
         
         entries.append({
             "pano_id": pano_id,
@@ -385,11 +417,12 @@ def save_embeddings_per_pano(
             "meta_name": meta_entry.get("meta_name"),
             "parent_concept": meta_entry.get("parent_concept"),
             "country": meta_entry.get("country"),
+            "has_concept_emb": has_concept_emb,
         })
     
-    manifest = {"entries": entries}
+    manifest = {"entries": entries, "has_concept_emb": has_concept_emb}
     torch.save(manifest, cache_dir / "manifest.pt")
-    logger.info(f"Saved per-pano embeddings to {cache_dir} (n={len(entries)})")
+    logger.info(f"Saved per-pano embeddings to {cache_dir} (n={len(entries)}, concept_emb={has_concept_emb})")
 
 
 def load_cached_embeddings(
@@ -475,6 +508,83 @@ def precompute_embeddings(
         torch.cat(all_cell_labels, dim=0),
     )
     return embeddings_tuple, all_metadata
+
+
+@torch.no_grad()
+def compute_concept_embeddings(
+    model: Stage1ConceptModel,
+    dataloader: DataLoader,
+    device: torch.device,
+) -> torch.Tensor:
+    """
+    Compute concept embeddings from trained Stage 1 model.
+    
+    This runs the concept bottleneck on precomputed image embeddings to get
+    the concept representation for each sample. Used for Stage 2 training.
+    
+    Args:
+        model: Trained Stage1ConceptModel
+        dataloader: DataLoader with PrecomputedEmbeddingsDataset
+        device: Device to run on
+        
+    Returns:
+        Tensor of concept embeddings [N, concept_emb_dim]
+    """
+    model.eval()
+    all_concept_embs = []
+    
+    for batch in tqdm(dataloader, desc="Computing concept embeddings"):
+        # PrecomputedEmbeddingsDataset returns:
+        # (embedding, concept_idx, parent_idx, country_idx, coords, cell_label, meta)
+        embeddings = batch[0].to(device)
+        
+        # Get concept embeddings through the model's concept bottleneck
+        concept_emb = model.concept_bottleneck(embeddings)
+        all_concept_embs.append(concept_emb.cpu())
+    
+    return torch.cat(all_concept_embs, dim=0)
+
+
+def save_concept_embeddings_to_cache(
+    cache_dir: Path,
+    concept_embeddings: torch.Tensor,
+) -> None:
+    """
+    Add concept embeddings to existing per-pano embedding cache.
+    
+    This loads each existing .pt file and adds the concept_emb key.
+    """
+    cache_dir = Path(cache_dir)
+    manifest_path = cache_dir / "manifest.pt"
+    
+    if not manifest_path.exists():
+        raise FileNotFoundError(f"Manifest not found at {manifest_path}")
+    
+    manifest = torch.load(manifest_path, weights_only=True)
+    entries = manifest.get("entries", manifest)
+    
+    if len(entries) != len(concept_embeddings):
+        raise ValueError(f"Mismatch: {len(entries)} entries vs {len(concept_embeddings)} concept embeddings")
+    
+    for i, entry in enumerate(tqdm(entries, desc="Saving concept embeddings")):
+        emb_file = entry.get("embedding_file")
+        if emb_file is None:
+            continue
+        
+        emb_path = cache_dir / emb_file
+        loaded = torch.load(emb_path, weights_only=True)
+        
+        # Add concept embedding
+        loaded["concept_emb"] = concept_embeddings[i]
+        torch.save(loaded, emb_path)
+        
+        # Update entry flag
+        entry["has_concept_emb"] = True
+    
+    # Update manifest
+    manifest["has_concept_emb"] = True
+    torch.save(manifest, manifest_path)
+    logger.info(f"Added concept embeddings to {len(entries)} files in {cache_dir}")
 
 
 def save_checkpoint(
@@ -1723,6 +1833,56 @@ def train(args):
     logger.info(f"\n{'='*74}")
     logger.info(f"Training complete! Best Meta Acc: {best_val_acc:.4f}")
     logger.info(f"{'='*74}")
+    
+    # ========================================================================
+    # POST-TRAINING: Save concept embeddings for Stage 2
+    # ========================================================================
+    if args.use_embedding_cache and args.precompute_embeddings:
+        logger.info("\nComputing and saving concept embeddings for Stage 2...")
+        
+        # Load best model
+        best_ckpt_path = output_dir / "checkpoints" / "best_model_stage1.pt"
+        if best_ckpt_path.exists():
+            best_ckpt = torch.load(best_ckpt_path, map_location=device)
+            model.load_state_dict(best_ckpt["model_state_dict"])
+            logger.info(f"Loaded best model from {best_ckpt_path}")
+        
+        model.eval()
+        
+        # Create dataloaders WITHOUT drop_last to process all samples
+        # Compute concept embeddings for train set
+        if train_embeddings is not None:
+            train_concept_loader = DataLoader(
+                PrecomputedEmbeddingsDataset(*train_embeddings, metadata=train_metadata),
+                batch_size=args.batch_size,
+                shuffle=False,  # Keep order to match manifest
+                num_workers=2,
+                pin_memory=True,
+                drop_last=False,  # IMPORTANT: process all samples
+            )
+            train_concept_embs = compute_concept_embeddings(model, train_concept_loader, device)
+            train_cache_dir = get_embedding_cache_dir(
+                args.resume_from_checkpoint, args.encoder_model, args.data_root, "train"
+            )
+            save_concept_embeddings_to_cache(train_cache_dir, train_concept_embs)
+        
+        # Compute concept embeddings for val set
+        if val_embeddings is not None:
+            val_concept_loader = DataLoader(
+                PrecomputedEmbeddingsDataset(*val_embeddings, metadata=val_metadata),
+                batch_size=args.batch_size,
+                shuffle=False,  # Keep order to match manifest
+                num_workers=2,
+                pin_memory=True,
+                drop_last=False,  # IMPORTANT: process all samples
+            )
+            val_concept_embs = compute_concept_embeddings(model, val_concept_loader, device)
+            val_cache_dir = get_embedding_cache_dir(
+                args.resume_from_checkpoint, args.encoder_model, args.data_root, "val"
+            )
+            save_concept_embeddings_to_cache(val_cache_dir, val_concept_embs)
+        
+        logger.info("Concept embeddings saved successfully!")
     
     if args.use_wandb:
         wandb.finish()

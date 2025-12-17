@@ -18,7 +18,7 @@ export PYTHONNOUSERSITE=1
 export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
 
 # ===== Stage 1 Configuration =====
-STAGE1_EPOCHS=50
+STAGE1_EPOCHS=25
 BATCH_SIZE=256    # Larger batch size possible with precomputed embeddings
 LR=3e-4
 
