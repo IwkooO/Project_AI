@@ -1,1 +1,0 @@
-{"train_concept_acc":0.6874632655460209,"train_cell_acc":0.4982661337721876,"val_concept_acc":0.4521289108434436,"train_contrastive_loss":4.139094732251268,"_step":100,"_runtime":532.290846516,"phase":3,"epoch":100,"val_cell_acc":0.23570924488300235,"_wandb":{"runtime":532},"val_loss":7.415669341840006,"_timestamp":1.7649730792710745e+09,"train_loss":5.924182667019814}
