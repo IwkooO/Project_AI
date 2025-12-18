@@ -1,42 +1,0 @@
-============================================================================================== 
-Warning! Mixing Conda and module environments may lead to corruption of the
-user environment. 
-We do not recommend users mixing those two environments unless absolutely
-necessary. Note that 
-SURF does not provide any support for Conda environment.
-For more information, please refer to our software policy page:
-https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
-
-Remember that many packages have already been installed on the system and can
-be loaded using 
-the 'module load <package__name>' command. If you are uncertain if a package is
-already available 
-on the system, please use 'module avail' or 'module spider' to search for it.
-============================================================================================== 
-============================================================
-Concept Head Training Pipeline
-============================================================
-Job started at: Wed Dec  3 17:55:37 CET 2025
-CSV data: /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced
-Cached data: /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced
-Mode: global
-============================================================
-
-STEP 1: Splits already exist, skipping...
-
-============================================================
-STEP 2: Precomputing StreetCLIP embeddings...
-============================================================
-/home/igodzwon/.conda/envs/streetview/lib/python3.11/site-packages/transformers/utils/hub.py:110: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
-  warnings.warn(
-Loading Model: geolocal/StreetCLIP
-Model resolution detected: 336x336
-
-========================================
-Processing train split...
-Pre-indexing 34028 samples for fast access...
-Pre-indexed 34028 samples
-Dataset size: 34028 images
-train:   0%|          | 0/266 [00:00<?, ?it/s]train:   0%|          | 1/266 [04:39<20:32:52, 279.14s/it]train:   1%|          | 2/266 [04:42<8:33:08, 116.62s/it] train:   1%|          | 3/266 [04:43<4:40:06, 63.90s/it] train:   2%|▏         | 4/266 [04:44<2:50:53, 39.14s/it]train:   2%|▏         | 5/266 [09:19<9:00:30, 124.25s/it]train:   2%|▏         | 6/266 [09:22<5:59:29, 82.96s/it] train:   3%|▎         | 7/266 [09:23<4:02:45, 56.24s/it]train:   3%|▎         | 8/266 [09:24<2:46:25, 38.71s/it]train:   3%|▎         | 9/266 [14:00<8:03:12, 112.81s/it]  Batch 10: 1.18s/batch, 108.8 img/s, 9.2ms/img
-train:   4%|▍         | 10/266 [14:04<5:38:11, 79.26s/it]train:   4%|▍         | 11/266 [14:05<3:55:17, 55.36s/it]train:   5%|▍         | 12/266 [14:06<2:44:34, 38.88s/it]train:   5%|▍         | 13/266 [18:41<7:44:39, 110.20s/it]train:   5%|▌         | 14/266 [18:45<5:28:03, 78.11s/it] train:   6%|▌         | 15/266 [18:46<3:49:43, 54.91s/it]train:   6%|▌         | 16/266 [18:47<2:41:24, 38.74s/it]train:   6%|▋         | 17/266 [23:22<7:35:30, 109.76s/it]train:   7%|▋         | 18/266 [23:23<5:18:48, 77.13s/it] train:   7%|▋         | 19/266 [23:24<3:43:35, 54.31s/it]  Batch 20: 1.16s/batch, 110.1 img/s, 9.1ms/img
-train:   8%|▊         | 20/266 [23:25<2:37:15, 38.36s/it]train:   8%|▊         | 21/266 [28:03<7:29:57, 110.20s/it]train:   8%|▊         | 22/266 [28:04<5:15:03, 77.47s/it] train:   9%|▊         | 23/266 [28:05<3:41:01, 54.58s/it]train:   9%|▉         | 24/266 [28:07<2:35:29, 38.55s/it][2025-12-03T18:25:37.682] error: *** JOB 17094345 ON gcn117 CANCELLED AT 2025-12-03T18:25:37 DUE to SIGNAL Terminated ***

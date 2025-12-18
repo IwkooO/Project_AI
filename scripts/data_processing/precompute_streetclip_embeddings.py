@@ -82,7 +82,12 @@ class FastImageDataset(Dataset):
             return torch.zeros((3, self.image_size, self.image_size)), pano_id, idx
 
 @torch.no_grad()
-def extract_embeddings_batch(model, pixel_values, save_patch_tokens=False):
+def extract_embeddings_batch(
+    model,
+    pixel_values,
+    save_patch_tokens: bool = False,
+    expected_num_patches: int | None = None,
+):
     """
     Run inference on a batch of images.
     Returns projected embeddings (in shared space with text) and optionally raw patch tokens.
@@ -122,12 +127,35 @@ def extract_embeddings_batch(model, pixel_values, save_patch_tokens=False):
                 f"Failed to extract patch tokens from vision_model: {e}"
             ) from e
         
-        if hidden_states.shape[1] > 196:
-            # Has CLS token, patches start at index 1
-            patch_tokens = hidden_states[:, 1:, :]  # [B, P, hidden_dim]
+        # Robust token slicing:
+        # Prefer using expected_num_patches derived from model config (image_size/patch_size)
+        # rather than brittle heuristics like "seq_len > 196".
+        seq_len = int(hidden_states.shape[1])
+        if expected_num_patches is not None:
+            if seq_len == expected_num_patches:
+                patch_tokens = hidden_states  # [B, P, D]
+            elif seq_len > expected_num_patches:
+                # Many ViT-style models include 1 (CLS) or 2 (CLS+distill) special tokens.
+                num_extra = seq_len - expected_num_patches
+                patch_tokens = hidden_states[:, num_extra:, :]  # drop leading special tokens
+            else:
+                raise RuntimeError(
+                    f"Unexpected vision token sequence length: seq_len={seq_len} < "
+                    f"expected_num_patches={expected_num_patches}. Check model config / input resolution."
+                )
         else:
-            # No CLS token, all tokens are patches
-            patch_tokens = hidden_states  # [B, P, hidden_dim]
+            # Fallback: assume first token is special if seq_len is not a perfect square.
+            # (This is still weaker than config-based slicing.)
+            side = int(np.sqrt(seq_len))
+            if side * side == seq_len:
+                patch_tokens = hidden_states
+            else:
+                # Try dropping 1 token (CLS) then check square
+                side2 = int(np.sqrt(seq_len - 1))
+                if side2 * side2 == (seq_len - 1):
+                    patch_tokens = hidden_states[:, 1:, :]
+                else:
+                    patch_tokens = hidden_states  # last resort
     
     return pooled_embeddings.cpu(), patch_tokens.cpu() if patch_tokens is not None else None
 
@@ -150,20 +178,27 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # 1. Detect proper image size
+    # 1. Detect proper image size / patch size (for correct patch token slicing)
     print(f"Loading Config for: {args.model_name}")
     try:
         config = AutoConfig.from_pretrained(args.model_name)
         # StreetCLIP uses 'vision_config', standard CLIP uses top-level config
         if hasattr(config, 'vision_config'):
             image_size = getattr(config.vision_config, "image_size", 336)
+            patch_size = getattr(config.vision_config, "patch_size", None)
         else:
             image_size = getattr(config, "image_size", 336)
+            patch_size = getattr(config, "patch_size", None)
     except Exception:
         print("Warning: Could not auto-detect size. Defaulting to 336px.")
         image_size = 336
+        patch_size = None
         
     print(f"Target Resolution: {image_size}x{image_size}")
+    if patch_size is not None:
+        print(f"Detected vision patch size: {patch_size}")
+    else:
+        print("Warning: Could not detect vision patch size from config; patch token slicing may be less reliable.")
 
     # 2. Load Model
     print(f"Loading Model Weights...")
@@ -171,6 +206,15 @@ def main():
     model.eval()
     model = model.to(args.device)
     
+    # Expected number of patch tokens (excluding special tokens like CLS).
+    expected_num_patches = None
+    if patch_size is not None and isinstance(image_size, int) and image_size % int(patch_size) == 0:
+        grid = image_size // int(patch_size)
+        expected_num_patches = int(grid * grid)
+        print(f"Expected patch tokens per image: {expected_num_patches} ({grid}x{grid})")
+    else:
+        print("Warning: Cannot compute expected_num_patches; will fall back to square/CLS heuristics.")
+
     splits = {'train': args.train_csv, 'val': args.val_csv}
     if args.test_csv: splits['test'] = args.test_csv
     
@@ -205,7 +249,10 @@ def main():
             
             # Inference
             pooled, patches = extract_embeddings_batch(
-                model, pixel_values, save_patch_tokens=args.save_patch_tokens
+                model,
+                pixel_values,
+                save_patch_tokens=args.save_patch_tokens,
+                expected_num_patches=expected_num_patches,
             )
             
             all_pooled.append(pooled)
@@ -229,11 +276,14 @@ def main():
                 print(f"Saved patch tokens: {patch_tensor.shape}")
 
             # Save Metadata mapping
+            # NOTE: This metadata is relied on by ConceptDataset to map CSV rows to cached embeddings.
             metadata = {
                 'pano_ids': list(all_panos),
                 'indices': all_idxs,
                 'total_samples': pooled_tensor.shape[0],
-                'image_size': image_size
+                'image_size': image_size,
+                'patch_size': patch_size,
+                'expected_num_patches': expected_num_patches,
             }
             with open(output_dir / f"{split_name}_metadata.json", 'w') as f:
                 json.dump(metadata, f, indent=2)

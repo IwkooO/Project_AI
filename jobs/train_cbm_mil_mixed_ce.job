@@ -1,0 +1,115 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=cbm_train_mil_mixed_ce
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=12:00:00
+#SBATCH --output=jobs/outputs/cbm_train_mil_mixed_ce_%j.out
+
+# Note: this env has activate.d scripts that reference optional env vars.
+# Using `set -u` (nounset) can crash `source activate` on unset vars (e.g. GEOTIFF_CSV).
+set -eo pipefail
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd "$HOME/Project_AI/"
+
+# Activate environment
+export GEOTIFF_CSV="${GEOTIFF_CSV:-}"
+set +u
+source activate streetview
+set -u
+
+wandb_api_key="9073a011764cb23fce5384443a3996ca9c5d9198"
+export WANDB_API_KEY="$wandb_api_key"
+
+# Paths
+SPLITS_DIR="data/6921d7831744c5356b098bf7_balanced/splits"
+TRAIN_CSV="${SPLITS_DIR}/dataset_train.csv"
+VAL_CSV="${SPLITS_DIR}/dataset_val.csv"
+
+# Fresh cache dir (kept separate from previous cached embeddings)
+CACHED_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip_v2"
+
+# Fresh concept-data dir (kept separate from previous runs)
+CONCEPT_DATA="data/concept_data_v2"
+
+# Fresh checkpoint/output dir (kept separate from previous runs)
+OUTPUT_DIR="checkpoints/cbm_v3_mil_mixed_ce"
+CONCEPT_MAPPING="data/concept_refinement_mapped.csv"
+
+mkdir -p jobs/outputs
+mkdir -p "$OUTPUT_DIR"
+mkdir -p "$CONCEPT_DATA"
+mkdir -p "$CACHED_DIR"
+
+echo "============================================================"
+echo "Step 0: Mapping meta_name -> generalized concepts"
+echo "============================================================"
+python scripts/data_processing/map_generalized_concepts.py \
+  --splits-dir "$SPLITS_DIR" \
+  --mapping "$CONCEPT_MAPPING"
+
+echo "============================================================"
+echo "Step 1: Precomputing concept vocab + geo priors"
+echo "============================================================"
+python scripts/data_processing/precompute_geo_priors.py \
+  --train-csv "$TRAIN_CSV" \
+  --output-dir "$CONCEPT_DATA" \
+  --s2-level 8
+
+echo "============================================================"
+echo "Step 2 (optional): (Re)compute cached StreetCLIP embeddings"
+echo "  - writes *_pooled_embeddings.pt, *_patch_tokens.pt, *_metadata.json"
+echo "  - required for strict pano_id->cache mapping + consistent attention grids"
+echo "============================================================"
+if [[ ! -f "$CACHED_DIR/train_pooled_embeddings.pt" || ! -f "$CACHED_DIR/train_metadata.json" || ! -f "$CACHED_DIR/train_patch_tokens.pt" ]]; then
+  python scripts/data_processing/precompute_streetclip_embeddings.py \
+    --train-csv "$TRAIN_CSV" \
+    --val-csv "$VAL_CSV" \
+    --output-dir "$CACHED_DIR" \
+    --batch-size 128 \
+    --num-workers 8 \
+    --save-patch-tokens
+else
+  echo "Cached embeddings already exist in $CACHED_DIR; skipping recompute."
+fi
+
+echo "============================================================"
+echo "Step 3: Train Phase 1 concept head (MIL + patch mixing) with CE"
+echo "============================================================"
+python scripts/training/train_cbm.py \
+  --phase 1 \
+  --train-csv "$TRAIN_CSV" \
+  --val-csv "$VAL_CSV" \
+  --cached-dir "$CACHED_DIR" \
+  --concept-data-dir "$CONCEPT_DATA" \
+  --output-dir "$OUTPUT_DIR" \
+  --epochs 80 \
+  --batch-size 64 \
+  --lr 7e-5 \
+  --warmup-epochs 5 \
+  --wandb \
+  --load-patch-tokens \
+  --model mil_mixed \
+  --loss-type ce \
+  --contrastive-weight 0.0 \
+  --concept-dim 256 \
+  --mil-topk 8 \
+  --mil-tau 0.30 \
+  --anneal-mil \
+  --mil-topk-start 8 --mil-topk-end 4 \
+  --mil-tau-start 0.35 --mil-tau-end 0.20 \
+  --selection-metric acc1 \
+  --mix-depth 1 --mix-heads 4 --mix-mlp-ratio 2.0 \
+  --mix-dropout 0.2 \
+  --dropout 0.3 --weight-decay 0.05
+
+echo "============================================================"
+echo "Training complete! (CE run)"
+echo "Outputs: $OUTPUT_DIR"
+echo "============================================================"
+
