@@ -1,22 +1,9 @@
 #!/usr/bin/env python3
 """
-Evaluate trained Concept Head.
+Evaluate trained Concept Head (Patch-only).
 
-This script evaluates the concept head on a test set and generates:
-    - Overall accuracy metric
-    - Sample visualizations with top-5 concepts
-    - Attention heatmaps (spatial mode only)
-
-Supports both global (default) and spatial modes.
-
-Usage:
-    python scripts/evaluation/evaluate_concept_head.py \
-        --checkpoint checkpoints/concept_head/best_concept_head.pth \
-        --test-csv data/.../splits/dataset_test.csv \
-        --cached-embeddings-dir data/.../cached_embeddings \
-        --concept-data-dir data/.../concept_data \
-        --output-dir results/concept_head_eval \
-        --mode global
+Computes Acc@1, Acc@5, and CE loss on test set.
+Optionally generates attention overlay visualizations.
 """
 
 import argparse
@@ -28,215 +15,105 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 import torch
+import torch.nn as nn
 import numpy as np
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import json
-from PIL import Image
-import matplotlib.pyplot as plt
 
-from src.data.dataset_concept import ConceptDataset, collate_fn
-from src.models.concept_head import ConceptHead
-from src.utils.concept_utils import (
-    load_all_concept_data,
-    compute_accuracy
-)
+from src.cbm.models.query_sparse import CBM_QuerySparse
+from src.cbm.data.concept_dataset import ConceptDataset, collate_fn
+from src.cbm.visualize.attention import visualize_predictions_summary
+
+
+def compute_concept_weights(dataset, num_concepts, device):
+    """Compute inverse frequency weights for concept loss."""
+    concept_names = dataset.df['meta_name']
+    counts_dict = concept_names.value_counts().to_dict()
+    
+    counts = torch.zeros(num_concepts)
+    for name, count in counts_dict.items():
+        if name in dataset.concept_to_idx:
+            idx = dataset.concept_to_idx[name]
+            counts[idx] = count
+    
+    weights = 1.0 / torch.sqrt(counts + 1.0)
+    weights = torch.clamp(weights, min=0.1, max=10.0)
+    weights = weights / weights.mean()
+    return weights.to(device)
 
 
 @torch.no_grad()
 def evaluate(
-    model: ConceptHead,
+    model: CBM_QuerySparse,
     dataloader: DataLoader,
     device: torch.device,
-    mode: str = "global"
-) -> tuple:
+    criterion: nn.Module,
+) -> dict:
     """
     Evaluate model on a dataset.
     
-    Args:
-        model: Concept head model
-        dataloader: Data loader
-        device: Device to use
-        mode: "global" or "spatial"
-    
     Returns:
-        all_probs: All predicted probabilities [N, K]
-        all_labels: All ground truth labels [N]
+        Dictionary with metrics: ce_loss, acc1, acc5
     """
     model.eval()
     
-    all_probs = []
-    all_labels = []
+    total_ce_loss = 0.0
+    correct_top1 = 0
+    correct_top5 = 0
+    total_samples = 0
     
-    for pooled, patch_tokens, labels, coords in tqdm(dataloader, desc="Evaluating"):
-        pooled = pooled.to(device)
+    for patches, c_labels, coords, cell_labels, offsets in tqdm(dataloader, desc="Evaluating"):
+        patches = patches.to(device)
+        c_labels = c_labels.to(device)
         
-        if mode == "spatial" and patch_tokens is not None:
-            patch_tokens = patch_tokens.to(device)
-        else:
-            patch_tokens = None
+        # Forward (patch-only)
+        c_logits, c_hidden, attn_w, _ = model(patches)
         
-        probs, _ = model(pooled, patch_tokens)
+        # CE loss
+        ce_loss = criterion(c_logits, c_labels)
         
-        all_probs.append(probs.cpu())
-        all_labels.append(labels)
+        # Metrics
+        preds = c_logits.argmax(dim=1)
+        correct_top1 += (preds == c_labels).sum().item()
+        
+        k = min(5, c_logits.size(1))
+        topk = c_logits.topk(k, dim=1).indices
+        correct_top5 += (topk == c_labels.unsqueeze(1)).any(dim=1).sum().item()
+        
+        total_ce_loss += ce_loss.item() * patches.size(0)
+        total_samples += patches.size(0)
     
-    all_probs = torch.cat(all_probs, dim=0)
-    all_labels = torch.cat(all_labels, dim=0)
-    
-    return all_probs, all_labels
-
-
-def visualize_sample(
-    image_path: str,
-    probs: np.ndarray,
-    gt_label: int,
-    idx_to_concept: dict,
-    save_path: str,
-    attention_heatmap: np.ndarray = None,
-    top_k: int = 5
-):
-    """
-    Visualize a single sample with image, top-k concepts, and optional attention.
-    
-    Args:
-        image_path: Path to the image file
-        probs: Predicted probabilities [K]
-        gt_label: Ground truth label index
-        idx_to_concept: Mapping from index to concept name
-        save_path: Where to save the figure
-        attention_heatmap: Optional attention heatmap [H, W]
-        top_k: Number of top concepts to show
-    """
-    # Load image
-    try:
-        image = Image.open(image_path).convert('RGB')
-        image = np.array(image)
-    except Exception as e:
-        print(f"Could not load image {image_path}: {e}")
-        image = np.zeros((224, 224, 3), dtype=np.uint8)
-    
-    # Get top-k concepts
-    top_indices = np.argsort(probs)[::-1][:top_k]
-    top_probs = probs[top_indices]
-    top_names = [idx_to_concept.get(str(i), f"Concept_{i}") for i in top_indices]
-    
-    # Determine number of subplots
-    n_cols = 3 if attention_heatmap is not None else 2
-    fig, axes = plt.subplots(1, n_cols, figsize=(5 * n_cols, 5))
-    
-    # Plot image
-    axes[0].imshow(image)
-    axes[0].set_title("Input Image")
-    axes[0].axis('off')
-    
-    # Plot top-k concepts as bar chart
-    colors = ['#2ecc71' if i == gt_label else '#3498db' for i in top_indices]
-    y_pos = np.arange(top_k)
-    axes[1].barh(y_pos, top_probs, color=colors)
-    axes[1].set_yticks(y_pos)
-    axes[1].set_yticklabels([f"{name[:30]}" for name in top_names], fontsize=9)
-    axes[1].invert_yaxis()
-    axes[1].set_xlabel("Probability")
-    axes[1].set_xlim(0, 1)
-    
-    # Mark ground truth
-    gt_name = idx_to_concept.get(str(gt_label), f"Concept_{gt_label}")
-    if gt_label in top_indices:
-        axes[1].set_title(f"Top-{top_k} Concepts (✓ GT: {gt_name[:20]})")
-    else:
-        axes[1].set_title(f"Top-{top_k} Concepts (GT: {gt_name[:20]})")
-    
-    # Plot attention heatmap if available
-    if attention_heatmap is not None:
-        im = axes[2].imshow(attention_heatmap, cmap='jet', interpolation='bilinear')
-        axes[2].set_title(f"Attention: {top_names[0][:25]}")
-        axes[2].axis('off')
-        plt.colorbar(im, ax=axes[2], fraction=0.046, pad=0.04)
-    
-    plt.tight_layout()
-    plt.savefig(save_path, dpi=150, bbox_inches='tight')
-    plt.close()
-
-
-def visualize_samples(
-    model: ConceptHead,
-    dataset: ConceptDataset,
-    idx_to_concept: dict,
-    output_dir: Path,
-    num_samples: int = 20,
-    device: torch.device = torch.device('cpu'),
-    mode: str = "global"
-):
-    """
-    Visualize sample predictions with images and top-5 concepts.
-    """
-    model.eval()
-    
-    vis_dir = output_dir / 'sample_predictions'
-    vis_dir.mkdir(exist_ok=True)
-    
-    # Sample random indices
-    indices = np.random.choice(len(dataset), size=min(num_samples, len(dataset)), replace=False)
-    
-    with torch.no_grad():
-        for i, idx in enumerate(indices):
-            pooled, patch_tokens, label, coords = dataset[idx]
-            pooled = pooled.unsqueeze(0).to(device)
-            
-            if mode == "spatial" and patch_tokens is not None:
-                patch_tokens = patch_tokens.unsqueeze(0).to(device)
-            else:
-                patch_tokens = None
-            
-            # Get predictions
-            probs, _ = model(pooled, patch_tokens)
-            probs_np = probs[0].cpu().numpy()
-            label_int = label.item()
-            
-            # Get attention heatmap for spatial mode
-            attention_heatmap = None
-            if mode == "spatial" and patch_tokens is not None:
-                heatmaps = model.get_attention_heatmaps(patch_tokens)  # [1, K, H, W]
-                top_idx = probs_np.argmax()
-                attention_heatmap = heatmaps[0, top_idx].cpu().numpy()
-            
-            # Get image path from dataset
-            image_path = dataset.df.iloc[idx]['image_path']
-            
-            # Visualize
-            save_path = vis_dir / f"sample_{i:03d}.png"
-            visualize_sample(
-                image_path=image_path,
-                probs=probs_np,
-                gt_label=label_int,
-                idx_to_concept=idx_to_concept,
-                save_path=str(save_path),
-                attention_heatmap=attention_heatmap,
-                top_k=5
-            )
-    
-    print(f"Saved {len(indices)} sample visualizations to {vis_dir}")
+    return {
+        "ce_loss": total_ce_loss / total_samples,
+        "acc1": correct_top1 / total_samples,
+        "acc5": correct_top5 / total_samples,
+        "num_samples": total_samples,
+    }
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Evaluate Concept Head")
+    parser = argparse.ArgumentParser(description="Evaluate Concept Head (Patch-only)")
     
     # Required paths
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to model checkpoint")
     parser.add_argument("--test-csv", type=str, required=True, help="Path to test CSV")
-    parser.add_argument("--cached-embeddings-dir", type=str, required=True, help="Directory with cached embeddings")
-    parser.add_argument("--concept-data-dir", type=str, required=True, help="Directory with concept data")
+    parser.add_argument("--cached-dir", type=str, required=True, help="Directory with cached patch tokens")
+    parser.add_argument("--concept-data-dir", type=str, required=True, help="Directory with concept vocab and S2 cells")
     parser.add_argument("--output-dir", type=str, required=True, help="Output directory for results")
     
-    # Model options
-    parser.add_argument("--mode", type=str, default="global", choices=["global", "spatial"],
-                        help="Model mode: 'global' (default) or 'spatial'")
+    # Model config (should match training)
+    parser.add_argument("--concept-dim", type=int, default=256, help="Concept dimension")
+    parser.add_argument("--dropout", type=float, default=0.3, help="Dropout")
+    parser.add_argument("--mix-depth", type=int, default=1, help="Patch mixer depth")
+    parser.add_argument("--mix-heads", type=int, default=4, help="Patch mixer heads")
+    parser.add_argument("--mix-mlp-ratio", type=float, default=4.0, help="Patch mixer MLP ratio")
     
-    # Other options
+    # Options
     parser.add_argument("--batch-size", type=int, default=256, help="Batch size")
     parser.add_argument("--num-workers", type=int, default=4, help="Number of data workers")
-    parser.add_argument("--num-samples", type=int, default=50, help="Number of sample visualizations")
+    parser.add_argument("--generate-visualizations", action="store_true", help="Generate attention overlay visualizations")
+    parser.add_argument("--num-viz-samples", type=int, default=20, help="Number of samples to visualize")
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     
     args = parser.parse_args()
@@ -245,96 +122,105 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Load concept data
-    print("Loading concept data...")
-    concept_data = load_all_concept_data(args.concept_data_dir, split="test")
+    device = torch.device(args.device)
+    print(f"Using device: {device}")
     
-    vocab = concept_data['vocabulary']
-    embeddings = concept_data['embeddings']
-    idx_to_concept = vocab['idx_to_concept']
-    K = vocab['num_concepts']
+    # Load vocabularies
+    concept_vocab = Path(args.concept_data_dir) / "concept_vocab.json"
+    s2_vocab = Path(args.concept_data_dir) / "s2_cells.json"
     
-    print(f"Loaded {K} concepts")
-    
-    # Create dataset
-    print(f"Creating test dataset (mode: {args.mode})...")
-    load_patch_tokens = (args.mode == "spatial")
-    
-    test_dataset = ConceptDataset(
-        csv_path=args.test_csv,
-        cached_embeddings_dir=args.cached_embeddings_dir,
-        concept_vocab_path=f"{args.concept_data_dir}/concept_vocabulary.json",
+    # Load test dataset (patch-only)
+    print("Loading test dataset...")
+    test_ds = ConceptDataset(
+        args.test_csv,
+        args.cached_dir,
+        concept_vocab,
+        str(s2_vocab),
         split="test",
-        load_patch_tokens=load_patch_tokens
+        allow_unsafe_index_fallback=False,
     )
     
-    print(f"Test samples: {len(test_dataset)}")
+    print(f"Test samples: {len(test_ds)}")
+    print(f"Num concepts: {test_ds.num_concepts}")
     
     test_loader = DataLoader(
-        test_dataset,
+        test_ds,
         batch_size=args.batch_size,
         shuffle=False,
+        collate_fn=collate_fn,
         num_workers=args.num_workers,
-        collate_fn=collate_fn
     )
     
-    # Load model
-    print(f"Loading model from {args.checkpoint}")
-    device = torch.device(args.device)
+    # Detect patch dimension
+    patch_dim = test_ds.patch_tokens.shape[2]
+    print(f"Patch dimension: {patch_dim}")
     
-    model = ConceptHead(
-        concept_embeddings=embeddings,
-        mode=args.mode
-    ).to(device)
+    # Initialize model (patch-only)
+    print("Initializing model...")
+    model = CBM_QuerySparse(
+        num_concepts=test_ds.num_concepts,
+        patch_dim=patch_dim,
+        concept_dim=args.concept_dim,
+        dropout=args.dropout,
+        attn_type="sparsemax",  # Use sparsemax for evaluation
+        attn_tau=0.2,  # Default tau
+        mix_depth=args.mix_depth,
+        mix_heads=args.mix_heads,
+        mix_mlp_ratio=args.mix_mlp_ratio,
+        use_local_scores=True,
+    )
+    model = model.to(device)
     
+    # Load checkpoint
+    print(f"Loading checkpoint from {args.checkpoint}...")
     checkpoint = torch.load(args.checkpoint, map_location=device)
     model.load_state_dict(checkpoint['model_state_dict'])
-    model.eval()
+    print(f"Loaded checkpoint from epoch {checkpoint.get('epoch', 'unknown')}")
+    if 'val_acc1' in checkpoint:
+        print(f"Checkpoint val Acc@1: {checkpoint['val_acc1']:.4f}")
+        print(f"Checkpoint val Acc@5: {checkpoint['val_acc5']:.4f}")
     
-    print(f"Loaded model from epoch {checkpoint.get('epoch', 'unknown')}")
-    print(f"Model mode: {args.mode}")
+    # Loss function
+    weights = compute_concept_weights(test_ds, test_ds.num_concepts, device)
+    criterion = nn.CrossEntropyLoss(weight=weights, label_smoothing=0.1)
     
     # Evaluate
     print("\nEvaluating...")
-    all_probs, all_labels = evaluate(model, test_loader, device, mode=args.mode)
+    metrics = evaluate(model, test_loader, device, criterion)
     
-    # Compute accuracy
-    accuracy = compute_accuracy(all_probs, all_labels)
-    
+    # Print results
     print("\n" + "="*60)
-    print("Results:")
+    print("Evaluation Results:")
     print("="*60)
-    print(f"Top-1 Accuracy: {accuracy:.4f} ({accuracy*100:.2f}%)")
-    print(f"Test samples: {len(test_dataset)}")
-    print(f"Num concepts: {K}")
-    print(f"Mode: {args.mode}")
+    print(f"CE Loss:     {metrics['ce_loss']:.4f}")
+    print(f"Acc@1:       {metrics['acc1']:.4f} ({metrics['acc1']*100:.2f}%)")
+    print(f"Acc@5:       {metrics['acc5']:.4f} ({metrics['acc5']*100:.2f}%)")
+    print(f"Num samples: {metrics['num_samples']}")
+    print("="*60)
     
     # Save metrics
-    with open(output_dir / 'metrics.json', 'w') as f:
-        json.dump({
-            'accuracy': accuracy,
-            'num_samples': len(test_dataset),
-            'num_concepts': K,
-            'mode': args.mode
-        }, f, indent=2)
-    print(f"\nSaved metrics to {output_dir / 'metrics.json'}")
+    metrics_file = output_dir / 'metrics.json'
+    with open(metrics_file, 'w') as f:
+        json.dump(metrics, f, indent=2)
+    print(f"\nSaved metrics to {metrics_file}")
     
-    # Generate sample visualizations
-    if args.num_samples > 0:
-        print(f"\nGenerating {args.num_samples} sample visualizations...")
-        visualize_samples(
+    # Generate visualizations if requested
+    if args.generate_visualizations:
+        print(f"\nGenerating {args.num_viz_samples} sample visualizations...")
+        visualize_predictions_summary(
             model=model,
-            dataset=test_dataset,
-            idx_to_concept=idx_to_concept,
-            output_dir=output_dir,
-            num_samples=args.num_samples,
+            dataset=test_ds,
             device=device,
-            mode=args.mode
+            epoch=checkpoint.get('epoch', 0),
+            output_dir=output_dir,
+            phase=1,
+            run_id="eval",
+            reason="evaluation",
+            num_samples=args.num_viz_samples,
         )
+        print(f"Visualizations saved to {output_dir / 'visualizations'}")
     
-    print(f"\n{'='*60}")
-    print(f"Evaluation complete! Results saved to: {output_dir}")
-    print("="*60)
+    print(f"\nEvaluation complete! Results saved to: {output_dir}")
 
 
 if __name__ == "__main__":

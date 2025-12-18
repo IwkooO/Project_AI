@@ -1,212 +1,0 @@
-============================================================================================== 
-Warning! Mixing Conda and module environments may lead to corruption of the
-user environment. 
-We do not recommend users mixing those two environments unless absolutely
-necessary. Note that 
-SURF does not provide any support for Conda environment.
-For more information, please refer to our software policy page:
-https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
-
-Remember that many packages have already been installed on the system and can
-be loaded using 
-the 'module load <package__name>' command. If you are uncertain if a package is
-already available 
-on the system, please use 'module avail' or 'module spider' to search for it.
-============================================================================================== 
-============================================================
-Concept Head Training Pipeline
-============================================================
-Job started at: Wed Dec  3 20:30:06 CET 2025
-CSV data: /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced
-Cached data: /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced
-Mode: global
-============================================================
-
-STEP 1: Splits already exist, skipping...
-
-============================================================
-STEP 2: Precomputing StreetCLIP embeddings...
-============================================================
-/home/igodzwon/.conda/envs/streetview/lib/python3.11/site-packages/transformers/utils/hub.py:110: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
-  warnings.warn(
-Loading Config for: geolocal/StreetCLIP
-Target Resolution: 336x336
-Loading Model Weights...
-
-========================================
-Processing split: train
-========================================
-Loading metadata from /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/splits/dataset_train.csv...
-Loaded 34028 samples into memory.
-train:   0%|          | 0/266 [00:00<?, ?it/s]train:   0%|          | 1/266 [01:18<5:47:13, 78.62s/it]train:   1%|          | 2/266 [01:19<2:25:27, 33.06s/it]train:   1%|          | 3/266 [01:21<1:21:10, 18.52s/it]train:   2%|▏         | 4/266 [01:22<51:14, 11.73s/it]  train:   2%|▏         | 5/266 [01:23<34:27,  7.92s/it]train:   2%|▏         | 6/266 [01:24<24:22,  5.62s/it]train:   3%|▎         | 7/266 [01:25<17:58,  4.17s/it]train:   3%|▎         | 8/266 [01:26<13:48,  3.21s/it]train:   3%|▎         | 9/266 [02:36<1:42:06, 23.84s/it]train:   4%|▍         | 10/266 [02:37<1:11:51, 16.84s/it]train:   4%|▍         | 11/266 [02:38<51:15, 12.06s/it]  train:   5%|▍         | 12/266 [02:39<37:01,  8.74s/it]train:   5%|▍         | 13/266 [02:40<27:11,  6.45s/it]train:   5%|▌         | 14/266 [02:42<20:22,  4.85s/it]train:   6%|▌         | 15/266 [02:43<15:38,  3.74s/it]train:   6%|▌         | 16/266 [02:44<12:21,  2.96s/it]train:   6%|▋         | 17/266 [03:55<1:37:26, 23.48s/it]train:   7%|▋         | 18/266 [03:56<1:09:23, 16.79s/it]train:   7%|▋         | 19/266 [03:57<49:47, 12.10s/it]  train:   8%|▊         | 20/266 [03:59<36:08,  8.81s/it]train:   8%|▊         | 21/266 [04:00<26:36,  6.52s/it]train:   8%|▊         | 22/266 [04:01<19:58,  4.91s/it]train:   9%|▊         | 23/266 [04:02<15:20,  3.79s/it]train:   9%|▉         | 24/266 [04:03<12:06,  3.00s/it]train:   9%|▉         | 25/266 [05:13<1:32:36, 23.06s/it]train:  10%|▉         | 26/266 [05:14<1:05:57, 16.49s/it]train:  10%|█         | 27/266 [05:15<47:21, 11.89s/it]  train:  11%|█         | 28/266 [05:17<34:24,  8.67s/it]train:  11%|█         | 29/266 [05:18<25:21,  6.42s/it]train:  11%|█▏        | 30/266 [05:19<19:03,  4.84s/it]train:  12%|█▏        | 31/266 [05:20<14:38,  3.74s/it]train:  12%|█▏        | 32/266 [05:21<11:34,  2.97s/it]train:  12%|█▏        | 33/266 [06:31<1:28:57, 22.91s/it]train:  13%|█▎        | 34/266 [06:32<1:03:21, 16.38s/it]train:  13%|█▎        | 35/266 [06:33<45:29, 11.82s/it]  train:  14%|█▎        | 36/266 [06:34<33:02,  8.62s/it]train:  14%|█▍        | 37/266 [06:35<24:22,  6.38s/it]train:  14%|█▍        | 38/266 [06:37<18:18,  4.82s/it]train:  15%|█▍        | 39/266 [06:38<14:05,  3.72s/it]train:  15%|█▌        | 40/266 [06:39<11:07,  2.96s/it]train:  15%|█▌        | 41/266 [07:48<1:25:57, 22.92s/it]train:  16%|█▌        | 42/266 [07:50<1:01:12, 16.40s/it]train:  16%|█▌        | 43/266 [07:51<43:57, 11.83s/it]  train:  17%|█▋        | 44/266 [07:52<31:55,  8.63s/it]train:  17%|█▋        | 45/266 [07:53<23:31,  6.39s/it]train:  17%|█▋        | 46/266 [07:54<17:40,  4.82s/it]train:  18%|█▊        | 47/266 [07:55<13:35,  3.72s/it]train:  18%|█▊        | 48/266 [07:57<10:44,  2.96s/it]train:  18%|█▊        | 49/266 [09:07<1:23:35, 23.11s/it]train:  19%|█▉        | 50/266 [09:08<59:30, 16.53s/it]  train:  19%|█▉        | 51/266 [09:09<42:42, 11.92s/it]train:  20%|█▉        | 52/266 [09:10<30:59,  8.69s/it]train:  20%|█▉        | 53/266 [09:11<22:50,  6.43s/it]train:  20%|██        | 54/266 [09:12<17:08,  4.85s/it]train:  21%|██        | 55/266 [09:14<13:10,  3.75s/it]train:  21%|██        | 56/266 [09:15<10:24,  2.97s/it]train:  21%|██▏       | 57/266 [10:24<1:19:42, 22.88s/it]train:  22%|██▏       | 58/266 [10:25<56:46, 16.38s/it]  train:  22%|██▏       | 59/266 [10:27<41:14, 11.95s/it]train:  23%|██▎       | 60/266 [10:28<29:56,  8.72s/it]train:  23%|██▎       | 61/266 [10:29<22:02,  6.45s/it]train:  23%|██▎       | 62/266 [10:30<16:32,  4.87s/it]train:  24%|██▎       | 63/266 [10:32<12:42,  3.76s/it]train:  24%|██▍       | 64/266 [10:33<10:01,  2.98s/it]train:  24%|██▍       | 65/266 [11:43<1:17:41, 23.19s/it]train:  25%|██▍       | 66/266 [11:44<55:16, 16.58s/it]  train:  25%|██▌       | 67/266 [11:46<39:39, 11.96s/it]train:  26%|██▌       | 68/266 [11:47<28:46,  8.72s/it]train:  26%|██▌       | 69/266 [11:48<21:11,  6.45s/it]train:  26%|██▋       | 70/266 [11:49<15:53,  4.87s/it]train:  27%|██▋       | 71/266 [11:50<12:12,  3.76s/it]train:  27%|██▋       | 72/266 [11:51<09:37,  2.98s/it]train:  27%|██▋       | 73/266 [13:02<1:14:25, 23.14s/it]train:  28%|██▊       | 74/266 [13:03<53:20, 16.67s/it]  train:  28%|██▊       | 75/266 [13:05<38:57, 12.24s/it]train:  29%|██▊       | 76/266 [13:06<28:13,  8.92s/it]train:  29%|██▉       | 77/266 [13:07<20:45,  6.59s/it]train:  29%|██▉       | 78/266 [13:08<15:32,  4.96s/it]train:  30%|██▉       | 79/266 [13:10<11:54,  3.82s/it]train:  30%|███       | 80/266 [13:11<09:22,  3.03s/it]train:  30%|███       | 81/266 [14:19<1:10:04, 22.73s/it]train:  31%|███       | 82/266 [14:21<50:04, 16.33s/it]  train:  31%|███       | 83/266 [14:22<35:55, 11.78s/it]train:  32%|███▏      | 84/266 [14:23<26:04,  8.60s/it]train:  32%|███▏      | 85/266 [14:24<19:12,  6.37s/it]train:  32%|███▏      | 86/266 [14:26<14:25,  4.81s/it]train:  33%|███▎      | 87/266 [14:27<11:04,  3.71s/it]train:  33%|███▎      | 88/266 [14:28<08:44,  2.95s/it]train:  33%|███▎      | 89/266 [15:39<1:08:37, 23.26s/it]train:  34%|███▍      | 90/266 [15:40<48:47, 16.63s/it]  train:  34%|███▍      | 91/266 [15:41<34:58, 11.99s/it]train:  35%|███▍      | 92/266 [15:42<25:21,  8.74s/it]train:  35%|███▍      | 93/266 [15:43<18:38,  6.47s/it]train:  35%|███▌      | 94/266 [15:44<13:58,  4.88s/it]train:  36%|███▌      | 95/266 [15:46<10:43,  3.76s/it]train:  36%|███▌      | 96/266 [15:47<08:27,  2.98s/it]train:  36%|███▋      | 97/266 [16:57<1:05:36, 23.29s/it]train:  37%|███▋      | 98/266 [16:59<46:37, 16.65s/it]  train:  37%|███▋      | 99/266 [17:00<33:24, 12.00s/it]train:  38%|███▊      | 100/266 [17:01<24:12,  8.75s/it]train:  38%|███▊      | 101/266 [17:02<17:48,  6.47s/it]train:  38%|███▊      | 102/266 [17:03<13:20,  4.88s/it]train:  39%|███▊      | 103/266 [17:04<10:13,  3.77s/it]train:  39%|███▉      | 104/266 [17:05<08:03,  2.98s/it]train:  39%|███▉      | 105/266 [18:14<1:01:07, 22.78s/it]train:  40%|███▉      | 106/266 [18:16<43:27, 16.29s/it]  train:  40%|████      | 107/266 [18:17<31:09, 11.75s/it]train:  41%|████      | 108/266 [18:18<22:35,  8.58s/it]train:  41%|████      | 109/266 [18:19<16:37,  6.35s/it]train:  41%|████▏     | 110/266 [18:20<12:28,  4.80s/it]train:  42%|████▏     | 111/266 [18:21<09:34,  3.71s/it]train:  42%|████▏     | 112/266 [18:23<07:33,  2.94s/it]train:  42%|████▏     | 113/266 [19:32<58:11, 22.82s/it]train:  43%|████▎     | 114/266 [19:33<41:21, 16.33s/it]train:  43%|████▎     | 115/266 [19:35<30:15, 12.02s/it]train:  44%|████▎     | 116/266 [19:36<21:54,  8.76s/it]train:  44%|████▍     | 117/266 [19:37<16:06,  6.48s/it]train:  44%|████▍     | 118/266 [19:38<12:03,  4.89s/it]train:  45%|████▍     | 119/266 [19:40<09:14,  3.77s/it]train:  45%|████▌     | 120/266 [19:41<07:16,  2.99s/it]train:  45%|████▌     | 121/266 [20:50<55:10, 22.83s/it]train:  46%|████▌     | 122/266 [20:51<39:11, 16.33s/it]train:  46%|████▌     | 123/266 [20:53<28:23, 11.91s/it]train:  47%|████▋     | 124/266 [20:54<20:48,  8.79s/it]train:  47%|████▋     | 125/266 [20:55<15:17,  6.50s/it]train:  47%|████▋     | 126/266 [20:57<11:26,  4.90s/it]train:  48%|████▊     | 127/266 [20:58<08:45,  3.78s/it]train:  48%|████▊     | 128/266 [20:59<06:53,  2.99s/it]train:  48%|████▊     | 129/266 [22:08<52:10, 22.85s/it]train:  49%|████▉     | 130/266 [22:09<37:02, 16.35s/it]train:  49%|████▉     | 131/266 [22:10<26:31, 11.79s/it]train:  50%|████▉     | 132/266 [22:12<19:12,  8.60s/it]train:  50%|█████     | 133/266 [22:13<14:07,  6.37s/it]train:  50%|█████     | 134/266 [22:14<10:34,  4.81s/it]train:  51%|█████     | 135/266 [22:15<08:06,  3.71s/it]train:  51%|█████     | 136/266 [22:16<06:23,  2.95s/it]train:  52%|█████▏    | 137/266 [23:25<49:02, 22.81s/it]train:  52%|█████▏    | 138/266 [23:26<34:48, 16.32s/it]train:  52%|█████▏    | 139/266 [23:29<25:32, 12.06s/it]train:  53%|█████▎    | 140/266 [23:30<18:47,  8.95s/it]train:  53%|█████▎    | 141/266 [23:31<13:46,  6.61s/it]train:  53%|█████▎    | 142/266 [23:33<10:17,  4.98s/it]train:  54%|█████▍    | 143/266 [23:34<07:51,  3.83s/it]train:  54%|█████▍    | 144/266 [23:35<06:09,  3.03s/it]train:  55%|█████▍    | 145/266 [24:43<45:17, 22.45s/it]train:  55%|█████▍    | 146/266 [24:44<32:08, 16.07s/it]train:  55%|█████▌    | 147/266 [24:45<23:08, 11.67s/it]train:  56%|█████▌    | 148/266 [24:48<17:46,  9.04s/it]train:  56%|█████▌    | 149/266 [24:49<13:01,  6.68s/it]train:  56%|█████▋    | 150/266 [24:51<09:42,  5.02s/it]train:  57%|█████▋    | 151/266 [24:52<07:24,  3.86s/it]train:  57%|█████▋    | 152/266 [24:53<05:48,  3.05s/it]train:  58%|█████▊    | 153/266 [26:00<42:13, 22.42s/it]train:  58%|█████▊    | 154/266 [26:02<29:56, 16.04s/it]train:  58%|█████▊    | 155/266 [26:03<21:33, 11.65s/it]train:  59%|█████▊    | 156/266 [26:05<16:04,  8.77s/it]train:  59%|█████▉    | 157/266 [26:06<11:46,  6.49s/it]train:  59%|█████▉    | 158/266 [26:07<08:47,  4.89s/it]train:  60%|█████▉    | 159/266 [26:09<06:43,  3.77s/it]train:  60%|██████    | 160/266 [26:10<05:16,  2.99s/it]train:  61%|██████    | 161/266 [27:18<39:27, 22.55s/it]train:  61%|██████    | 162/266 [27:19<27:57, 16.13s/it]train:  61%|██████▏   | 163/266 [27:21<20:20, 11.85s/it]train:  62%|██████▏   | 164/266 [27:23<15:24,  9.06s/it]train:  62%|██████▏   | 165/266 [27:25<11:15,  6.69s/it]train:  62%|██████▏   | 166/266 [27:26<08:23,  5.03s/it]train:  63%|██████▎   | 167/266 [27:27<06:23,  3.87s/it]train:  63%|██████▎   | 168/266 [27:28<04:59,  3.06s/it]train:  64%|██████▎   | 169/266 [28:35<35:41, 22.08s/it]train:  64%|██████▍   | 170/266 [28:36<25:16, 15.80s/it]train:  64%|██████▍   | 171/266 [28:38<18:32, 11.71s/it]train:  65%|██████▍   | 172/266 [28:41<14:29,  9.25s/it]train:  65%|██████▌   | 173/266 [28:43<10:34,  6.82s/it]train:  65%|██████▌   | 174/266 [28:44<07:51,  5.12s/it]train:  66%|██████▌   | 175/266 [28:45<05:58,  3.93s/it]train:  66%|██████▌   | 176/266 [28:46<04:39,  3.10s/it]train:  67%|██████▋   | 177/266 [29:52<32:38, 22.00s/it]train:  67%|██████▋   | 178/266 [29:53<23:05, 15.75s/it]train:  67%|██████▋   | 179/266 [29:56<16:59, 11.72s/it]train:  68%|██████▊   | 180/266 [29:59<13:10,  9.19s/it]train:  68%|██████▊   | 181/266 [30:00<09:36,  6.78s/it]train:  68%|██████▊   | 182/266 [30:01<07:08,  5.10s/it]train:  69%|██████▉   | 183/266 [30:02<05:25,  3.92s/it]train:  69%|██████▉   | 184/266 [30:04<04:13,  3.09s/it]train:  70%|██████▉   | 185/266 [31:11<30:10, 22.35s/it]train:  70%|██████▉   | 186/266 [31:12<21:19, 16.00s/it]train:  70%|███████   | 187/266 [31:13<15:12, 11.55s/it]train:  71%|███████   | 188/266 [31:17<11:57,  9.20s/it]train:  71%|███████   | 189/266 [31:18<08:42,  6.79s/it]train:  71%|███████▏  | 190/266 [31:19<06:27,  5.10s/it]train:  72%|███████▏  | 191/266 [31:20<04:53,  3.92s/it]train:  72%|███████▏  | 192/266 [31:22<03:48,  3.09s/it]train:  73%|███████▎  | 193/266 [32:29<27:13, 22.37s/it]train:  73%|███████▎  | 194/266 [32:30<19:12, 16.01s/it]train:  73%|███████▎  | 195/266 [32:31<13:40, 11.56s/it]train:  74%|███████▎  | 196/266 [32:35<10:43,  9.19s/it]train:  74%|███████▍  | 197/266 [32:36<07:48,  6.78s/it]train:  74%|███████▍  | 198/266 [32:37<05:46,  5.10s/it]train:  75%|███████▍  | 199/266 [32:38<04:22,  3.92s/it]train:  75%|███████▌  | 200/266 [32:40<03:24,  3.09s/it]train:  76%|███████▌  | 201/266 [33:47<24:13, 22.37s/it]train:  76%|███████▌  | 202/266 [33:48<17:04, 16.01s/it]train:  76%|███████▋  | 203/266 [33:49<12:07, 11.55s/it]train:  77%|███████▋  | 204/266 [33:52<09:17,  9.00s/it]train:  77%|███████▋  | 205/266 [33:53<06:45,  6.65s/it]train:  77%|███████▋  | 206/266 [33:55<05:00,  5.00s/it]train:  78%|███████▊  | 207/266 [33:56<03:47,  3.85s/it]train:  78%|███████▊  | 208/266 [33:57<02:56,  3.04s/it]train:  79%|███████▊  | 209/266 [35:05<21:20, 22.47s/it]train:  79%|███████▉  | 210/266 [35:06<15:00, 16.08s/it]train:  79%|███████▉  | 211/266 [35:07<10:38, 11.60s/it]train:  80%|███████▉  | 212/266 [35:11<08:16,  9.19s/it]train:  80%|████████  | 213/266 [35:12<05:59,  6.78s/it]train:  80%|████████  | 214/266 [35:13<04:24,  5.10s/it]train:  81%|████████  | 215/266 [35:14<03:19,  3.92s/it]train:  81%|████████  | 216/266 [35:15<02:34,  3.09s/it]train:  82%|████████▏ | 217/266 [36:22<18:12, 22.30s/it]train:  82%|████████▏ | 218/266 [36:24<12:46, 15.96s/it]train:  82%|████████▏ | 219/266 [36:25<09:01, 11.52s/it]train:  83%|████████▎ | 220/266 [36:27<06:35,  8.61s/it]train:  83%|████████▎ | 221/266 [36:28<04:46,  6.37s/it]train:  83%|████████▎ | 222/266 [36:29<03:31,  4.81s/it]train:  84%|████████▍ | 223/266 [36:30<02:39,  3.72s/it]train:  84%|████████▍ | 224/266 [36:31<02:03,  2.95s/it]train:  85%|████████▍ | 225/266 [37:40<15:35, 22.82s/it]train:  85%|████████▍ | 226/266 [37:42<10:52, 16.32s/it]train:  85%|████████▌ | 227/266 [37:43<07:39, 11.78s/it]train:  86%|████████▌ | 228/266 [37:44<05:26,  8.59s/it]train:  86%|████████▌ | 229/266 [37:45<03:55,  6.36s/it]train:  86%|████████▋ | 230/266 [37:46<02:52,  4.80s/it]train:  87%|████████▋ | 231/266 [37:47<02:09,  3.71s/it]train:  87%|████████▋ | 232/266 [37:49<01:40,  2.95s/it]train:  88%|████████▊ | 233/266 [38:58<12:38, 22.98s/it]train:  88%|████████▊ | 234/266 [38:59<08:45, 16.44s/it]train:  88%|████████▊ | 235/266 [39:01<06:07, 11.85s/it]train:  89%|████████▊ | 236/266 [39:02<04:19,  8.65s/it]train:  89%|████████▉ | 237/266 [39:03<03:05,  6.40s/it]train:  89%|████████▉ | 238/266 [39:04<02:15,  4.83s/it]train:  90%|████████▉ | 239/266 [39:05<01:40,  3.73s/it]train:  90%|█████████ | 240/266 [39:06<01:17,  2.96s/it]train:  91%|█████████ | 241/266 [40:16<09:30, 22.83s/it]train:  91%|█████████ | 242/266 [40:17<06:31, 16.33s/it]train:  91%|█████████▏| 243/266 [40:18<04:30, 11.78s/it]train:  92%|█████████▏| 244/266 [40:19<03:09,  8.60s/it]train:  92%|█████████▏| 245/266 [40:20<02:13,  6.37s/it]train:  92%|█████████▏| 246/266 [40:21<01:36,  4.81s/it]train:  93%|█████████▎| 247/266 [40:23<01:10,  3.71s/it]train:  93%|█████████▎| 248/266 [40:24<00:53,  2.95s/it]train:  94%|█████████▎| 249/266 [41:34<06:32, 23.11s/it]train:  94%|█████████▍| 250/266 [41:35<04:24, 16.53s/it]train:  94%|█████████▍| 251/266 [41:36<02:58, 11.92s/it]train:  95%|█████████▍| 252/266 [41:37<02:01,  8.69s/it]train:  95%|█████████▌| 253/266 [41:39<01:23,  6.43s/it]train:  95%|█████████▌| 254/266 [41:40<00:58,  4.85s/it]train:  96%|█████████▌| 255/266 [41:41<00:41,  3.75s/it]train:  96%|█████████▌| 256/266 [41:42<00:29,  2.97s/it]train:  97%|█████████▋| 257/266 [42:51<03:25, 22.88s/it]train:  97%|█████████▋| 258/266 [42:53<02:10, 16.36s/it]train:  97%|█████████▋| 259/266 [42:54<01:22, 11.80s/it]train:  98%|█████████▊| 260/266 [42:56<00:52,  8.83s/it]train:  98%|█████████▊| 261/266 [42:57<00:32,  6.53s/it]train:  98%|█████████▊| 262/266 [42:58<00:19,  4.92s/it]train:  99%|█████████▉| 263/266 [42:59<00:11,  3.79s/it]train:  99%|█████████▉| 264/266 [43:00<00:06,  3.01s/it]train: 100%|█████████▉| 265/266 [44:09<00:22, 22.76s/it]train: 100%|██████████| 266/266 [44:10<00:00, 16.23s/it]train: 100%|██████████| 266/266 [44:10<00:00,  9.96s/it]
-Concatenating 266 batches...
-Saved pooled embeddings: torch.Size([34028, 768]) (dimension: 768)
-
-========================================
-Processing split: val
-========================================
-Loading metadata from /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/splits/dataset_val.csv...
-Loaded 4254 samples into memory.
-val:   0%|          | 0/34 [00:00<?, ?it/s]val:   3%|▎         | 1/34 [01:19<43:48, 79.65s/it]val:   6%|▌         | 2/34 [01:20<17:51, 33.48s/it]val:   9%|▉         | 3/34 [01:21<09:40, 18.72s/it]val:  12%|█▏        | 4/34 [01:23<05:53, 11.79s/it]val:  15%|█▍        | 5/34 [01:24<03:50,  7.96s/it]val:  18%|█▊        | 6/34 [01:25<02:38,  5.65s/it]val:  21%|██        | 7/34 [01:26<01:52,  4.18s/it]val:  24%|██▎       | 8/34 [01:27<01:23,  3.22s/it]val:  26%|██▋       | 9/34 [02:37<09:57, 23.89s/it]val:  29%|██▉       | 10/34 [02:38<06:46, 16.92s/it]val:  32%|███▏      | 11/34 [02:39<04:38, 12.10s/it]val:  35%|███▌      | 12/34 [02:40<03:12,  8.77s/it]val:  38%|███▊      | 13/34 [02:41<02:15,  6.47s/it]val:  41%|████      | 14/34 [02:43<01:37,  4.86s/it]val:  44%|████▍     | 15/34 [02:44<01:11,  3.75s/it]val:  47%|████▋     | 16/34 [02:45<00:53,  2.97s/it]val:  50%|█████     | 17/34 [03:56<06:36, 23.30s/it]val:  53%|█████▎    | 18/34 [03:57<04:26, 16.65s/it]val:  56%|█████▌    | 19/34 [03:58<02:59, 12.00s/it]val:  59%|█████▉    | 20/34 [03:59<02:02,  8.75s/it]val:  62%|██████▏   | 21/34 [04:00<01:24,  6.47s/it]val:  65%|██████▍   | 22/34 [04:01<00:58,  4.88s/it]val:  68%|██████▊   | 23/34 [04:02<00:41,  3.76s/it]val:  71%|███████   | 24/34 [04:04<00:29,  2.98s/it]val:  74%|███████▎  | 25/34 [05:13<03:26, 22.99s/it]val:  76%|███████▋  | 26/34 [05:14<02:11, 16.44s/it]val:  79%|███████▉  | 27/34 [05:16<01:23, 11.86s/it]val:  82%|████████▏ | 28/34 [05:17<00:51,  8.65s/it]val:  85%|████████▌ | 29/34 [05:18<00:32,  6.40s/it]val:  88%|████████▊ | 30/34 [05:19<00:19,  4.83s/it]val:  91%|█████████ | 31/34 [05:20<00:11,  3.73s/it]val:  94%|█████████▍| 32/34 [05:21<00:05,  2.96s/it]val:  97%|█████████▋| 33/34 [06:30<00:22, 22.77s/it]val: 100%|██████████| 34/34 [06:31<00:00, 16.03s/it]val: 100%|██████████| 34/34 [06:31<00:00, 11.51s/it]
-Concatenating 34 batches...
-Saved pooled embeddings: torch.Size([4254, 768]) (dimension: 768)
-
-========================================
-Processing split: test
-========================================
-Loading metadata from /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/splits/dataset_test.csv...
-Loaded 4254 samples into memory.
-test:   0%|          | 0/34 [00:00<?, ?it/s]test:   3%|▎         | 1/34 [01:19<43:49, 79.68s/it]test:   6%|▌         | 2/34 [01:20<17:51, 33.49s/it]test:   9%|▉         | 3/34 [01:22<09:40, 18.73s/it]test:  12%|█▏        | 4/34 [01:23<05:53, 11.79s/it]test:  15%|█▍        | 5/34 [01:24<03:50,  7.96s/it]test:  18%|█▊        | 6/34 [01:25<02:38,  5.65s/it]test:  21%|██        | 7/34 [01:26<01:52,  4.18s/it]test:  24%|██▎       | 8/34 [01:27<01:23,  3.22s/it]test:  26%|██▋       | 9/34 [02:37<10:01, 24.07s/it]test:  29%|██▉       | 10/34 [02:38<06:47, 17.00s/it]test:  32%|███▏      | 11/34 [02:40<04:39, 12.15s/it]test:  35%|███▌      | 12/34 [02:41<03:13,  8.81s/it]test:  38%|███▊      | 13/34 [02:42<02:16,  6.49s/it]test:  41%|████      | 14/34 [02:43<01:37,  4.88s/it]test:  44%|████▍     | 15/34 [02:44<01:11,  3.76s/it]test:  47%|████▋     | 16/34 [02:45<00:53,  2.98s/it]test:  50%|█████     | 17/34 [03:55<06:30, 22.97s/it]test:  53%|█████▎    | 18/34 [03:56<04:22, 16.41s/it]test:  56%|█████▌    | 19/34 [03:57<02:57, 11.83s/it]test:  59%|█████▉    | 20/34 [03:58<02:00,  8.63s/it]test:  62%|██████▏   | 21/34 [03:59<01:23,  6.39s/it]test:  65%|██████▍   | 22/34 [04:01<00:57,  4.82s/it]test:  68%|██████▊   | 23/34 [04:02<00:40,  3.72s/it]test:  71%|███████   | 24/34 [04:03<00:29,  2.96s/it]test:  74%|███████▎  | 25/34 [05:13<03:27, 23.06s/it]test:  76%|███████▋  | 26/34 [05:14<02:11, 16.49s/it]test:  79%|███████▉  | 27/34 [05:15<01:23, 11.89s/it]test:  82%|████████▏ | 28/34 [05:16<00:52,  8.67s/it]test:  85%|████████▌ | 29/34 [05:18<00:32,  6.42s/it]test:  88%|████████▊ | 30/34 [05:19<00:19,  4.84s/it]test:  91%|█████████ | 31/34 [05:20<00:11,  3.74s/it]test:  94%|█████████▍| 32/34 [05:21<00:05,  2.97s/it]test:  97%|█████████▋| 33/34 [06:31<00:23, 23.05s/it]test: 100%|██████████| 34/34 [06:31<00:00, 16.23s/it]test: 100%|██████████| 34/34 [06:31<00:00, 11.52s/it]
-Concatenating 34 batches...
-Saved pooled embeddings: torch.Size([4254, 768]) (dimension: 768)
-
-Done! Outputs saved to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip
-
-============================================================
-STEP 3: Computing concept embeddings and priors...
-============================================================
-/home/igodzwon/.conda/envs/streetview/lib/python3.11/site-packages/transformers/utils/hub.py:110: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
-  warnings.warn(
-Loading train split for concept extraction from /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/splits/dataset_train.csv
-(Using only train concepts ensures we only use concepts with training data)
-Loaded 33852 train samples
-
-Found 6242 unique concepts in train split
-
-Loading StreetCLIP model: geolocal/StreetCLIP
-
-Extracting and cleaning concept text descriptions...
-
-Computing text embeddings for 6242 concepts...
-Text embeddings shape: torch.Size([6242, 768]) (dimension: 768)
-
-Loading pooled embeddings from /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/train_pooled_embeddings.pt
-Pooled embeddings shape: torch.Size([34028, 768]) (dimension: 768)
-Using pooled embeddings for zero-shot scores
-✓ Verified: Pooled and text embeddings have matching dimensions (768D)
-
-Computing zero-shot scores...
-Zero-shot scores shape: (34028, 6242)
-
-Loading train split for prior estimation from /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/splits/dataset_train.csv
-
-Estimating class priors (CLIP percentile: 98.0)...
-
-Class prior statistics:
-  Mean annotated prior: 0.0002
-  Mean CLIP prior: 0.0200
-  Mean final prior: 0.0200
-
-Saving concept data to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data...
-Saved concept vocabulary to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data/concept_vocabulary.json
-Saved text embeddings to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data/concept_text_embeddings.pt
-Saved class priors to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data/class_priors.json
-Saved zero-shot scores to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data/train_zero_shot_scores.npy
-
-============================================================
-Concept embedding computation complete!
-Output saved to: /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data
-============================================================
-
-Computing zero-shot scores for val split...
-/home/igodzwon/.conda/envs/streetview/lib/python3.11/site-packages/transformers/utils/hub.py:110: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
-  warnings.warn(
-Loading train split for concept extraction from /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/splits/dataset_train.csv
-(Using only train concepts ensures we only use concepts with training data)
-Loaded 33852 train samples
-
-Found 6242 unique concepts in train split
-
-Loading StreetCLIP model: geolocal/StreetCLIP
-
-Extracting and cleaning concept text descriptions...
-
-Computing text embeddings for 6242 concepts...
-Text embeddings shape: torch.Size([6242, 768]) (dimension: 768)
-
-Loading pooled embeddings from /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/val_pooled_embeddings.pt
-Pooled embeddings shape: torch.Size([4254, 768]) (dimension: 768)
-Using pooled embeddings for zero-shot scores
-✓ Verified: Pooled and text embeddings have matching dimensions (768D)
-
-Computing zero-shot scores...
-Zero-shot scores shape: (4254, 6242)
-
-Loading val split for prior estimation from /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/splits/dataset_val.csv
-
-Estimating class priors (CLIP percentile: 98.0)...
-
-Class prior statistics:
-  Mean annotated prior: 0.0002
-  Mean CLIP prior: 0.0202
-  Mean final prior: 0.0202
-
-Saving concept data to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data...
-Saved concept vocabulary to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data/concept_vocabulary.json
-Saved text embeddings to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data/concept_text_embeddings.pt
-Saved class priors to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data/class_priors.json
-Saved zero-shot scores to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data/val_zero_shot_scores.npy
-
-============================================================
-Concept embedding computation complete!
-Output saved to: /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data
-============================================================
-
-Computing zero-shot scores for test split...
-/home/igodzwon/.conda/envs/streetview/lib/python3.11/site-packages/transformers/utils/hub.py:110: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
-  warnings.warn(
-Loading train split for concept extraction from /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/splits/dataset_train.csv
-(Using only train concepts ensures we only use concepts with training data)
-Loaded 33852 train samples
-
-Found 6242 unique concepts in train split
-
-Loading StreetCLIP model: geolocal/StreetCLIP
-
-Extracting and cleaning concept text descriptions...
-
-Computing text embeddings for 6242 concepts...
-Text embeddings shape: torch.Size([6242, 768]) (dimension: 768)
-
-Loading pooled embeddings from /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip/test_pooled_embeddings.pt
-Pooled embeddings shape: torch.Size([4254, 768]) (dimension: 768)
-Using pooled embeddings for zero-shot scores
-✓ Verified: Pooled and text embeddings have matching dimensions (768D)
-
-Computing zero-shot scores...
-Zero-shot scores shape: (4254, 6242)
-
-Loading test split for prior estimation from /home/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/splits/dataset_test.csv
-
-Estimating class priors (CLIP percentile: 98.0)...
-
-Class prior statistics:
-  Mean annotated prior: 0.0002
-  Mean CLIP prior: 0.0202
-  Mean final prior: 0.0202
-
-Saving concept data to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data...
-Saved concept vocabulary to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data/concept_vocabulary.json
-Saved text embeddings to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data/concept_text_embeddings.pt
-Saved class priors to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data/class_priors.json
-Saved zero-shot scores to /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data/test_zero_shot_scores.npy
-
-============================================================
-Concept embedding computation complete!
-Output saved to: /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/concept_data
-============================================================
-
-============================================================
-STEP 4: Training concept head...
-============================================================
-Mode: global
-Epochs: 50
-Batch size: 256
-Learning rate: 1e-3
-Lambda drift: 0.01
-============================================================
-Traceback (most recent call last):
-  File "/gpfs/home4/igodzwon/Project_AI/scripts/training/train_concept_head.py", line 50, in <module>
-    from src.utils.concept_utils import (
-ModuleNotFoundError: No module named 'src.utils.concept_utils'
-ERROR: Training failed
