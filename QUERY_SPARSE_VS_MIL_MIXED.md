@@ -447,3 +447,5 @@ Both models are trained with:
 5. **Is the parameter count difference (2x more parameters) a significant factor, or is it primarily the aggregation strategy?**
 
 Any insights into these architectural differences and their impact on learning dynamics would be greatly appreciated!
+
+

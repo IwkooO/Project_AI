@@ -21,6 +21,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.cbm.models.query_sparse import CBM_QuerySparse
+from src.cbm.models.query_topk_256 import CBM_QueryTopK
 from src.cbm.data.concept_dataset import ConceptDataset, collate_fn
 from src.cbm.visualize.attention import visualize_predictions_summary
 
@@ -137,19 +138,12 @@ def train_epoch(
     criterion,
     epoch: int,
     total_epochs: int,
-    attn_warmup_epochs: int = 0,
     anneal_attn_tau: bool = False,
     attn_tau_start: float = 0.5,
     attn_tau_end: float = 0.2,
 ):
     """Train for one epoch."""
     model.train()
-    
-    # Update attention type (warmup: softmax -> sparsemax)
-    if attn_warmup_epochs > 0 and epoch < attn_warmup_epochs:
-        model.concept_head.attn_type = "softmax"
-    else:
-        model.concept_head.attn_type = "sparsemax"
     
     # Update attention tau (annealing)
     if anneal_attn_tau:
@@ -305,6 +299,13 @@ def eval_epoch(model, loader, device, criterion):
 
 def main():
     parser = argparse.ArgumentParser(description="Train CBM Phase 1 (Concept Prediction)")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="query_sparse",
+        choices=["query_sparse", "query_topk"],
+        help="Which concept model to train. query_sparse uses StreetCLIP visual_projection init; query_topk learns concept space from scratch.",
+    )
     parser.add_argument("--train-csv", required=True, help="Training CSV path")
     parser.add_argument("--val-csv", required=True, help="Validation CSV path")
     parser.add_argument("--cached-dir", default=None, help="Directory with cached patch tokens (required if --trainable-backbone=False)")
@@ -328,15 +329,14 @@ def main():
     parser.add_argument("--dropout", type=float, default=DEFAULT_DROPOUT)
     parser.add_argument("--weight-decay", type=float, default=DEFAULT_WEIGHT_DECAY)
     parser.add_argument("--concept-dim", type=int, default=CONCEPT_DIM_DEFAULT, help="Must match CLIP projection_dim when using text init.")
-    parser.add_argument("--attn-type", type=str, default="sparsemax", choices=["sparsemax", "softmax"])
-    parser.add_argument("--attn-tau", type=float, default=0.25, help="Attention temperature")
-    parser.add_argument("--attn-warmup-epochs", type=int, default=15, help="Use softmax for first N epochs, then sparsemax")
+    parser.add_argument("--attn-tau", type=float, default=0.25, help="Temperature for LogSumExp aggregation")
     parser.add_argument("--anneal-attn-tau", action="store_true", help="Anneal attn_tau over epochs")
     parser.add_argument("--attn-tau-start", type=float, default=0.5, help="Start attn_tau for annealing")
     parser.add_argument("--attn-tau-end", type=float, default=0.2, help="End attn_tau for annealing")
     parser.add_argument("--mix-depth", type=int, default=1, help="Patch mixer depth")
     parser.add_argument("--mix-heads", type=int, default=4, help="Patch mixer heads")
     parser.add_argument("--mix-mlp-ratio", type=float, default=4.0, help="Patch mixer MLP ratio")
+    parser.add_argument("--mil-topk", type=int, default=8, help="Hard top-K selection for MIL-style aggregation")
     parser.add_argument(
         "--init-concepts-from-text",
         action="store_true",
@@ -431,13 +431,13 @@ def main():
     patch_dim = train_ds.patch_tokens.shape[2]
     print(f"Detected patch dimension: {patch_dim}")
 
-    # Baseline: if --init-concepts-from-text is enabled, we deterministically:
+    # Baseline (query_sparse only): if --init-concepts-from-text is enabled, we deterministically:
     # - set concept_dim to CLIP projection_dim (must match),
     # - initialize query/local_weight from CLIP text embeddings,
     # - initialize a trainable vision projection from CLIP visual_projection.
     init_concept_vecs = None
     vision_proj_init_weight = None
-    if args.init_concepts_from_text and args.resume_checkpoint is None:
+    if args.model == "query_sparse" and args.init_concepts_from_text and args.resume_checkpoint is None:
         concepts_in_order = [train_ds.idx_to_concept[i] for i in range(train_ds.num_concepts)]
 
         if "{}" not in args.concept_prompt_template:
@@ -473,20 +473,36 @@ def main():
         )
     
     # Initialize model (patch-only)
-    print("Initializing CBM_QuerySparse...")
-    model = CBM_QuerySparse(
-        num_concepts=train_ds.num_concepts,
-        patch_dim=patch_dim,
-        concept_dim=args.concept_dim,
-        dropout=args.dropout,
-        attn_type=args.attn_type,
-        attn_tau=args.attn_tau_start if args.anneal_attn_tau else args.attn_tau,
-        mix_depth=args.mix_depth,
-        mix_heads=args.mix_heads,
-        mix_mlp_ratio=args.mix_mlp_ratio,
-        use_local_scores=True,
-        vision_proj_init_weight=vision_proj_init_weight,
-    )
+    if args.model == "query_sparse":
+        print("Initializing CBM_QuerySparse...")
+        model = CBM_QuerySparse(
+            num_concepts=train_ds.num_concepts,
+            patch_dim=patch_dim,
+            concept_dim=args.concept_dim,
+            dropout=args.dropout,
+            attn_tau=args.attn_tau_start if args.anneal_attn_tau else args.attn_tau,
+            mix_depth=args.mix_depth,
+            mix_heads=args.mix_heads,
+            mix_mlp_ratio=args.mix_mlp_ratio,
+            use_local_scores=False,
+            vision_proj_init_weight=vision_proj_init_weight,
+            mil_topk=args.mil_topk,
+        )
+    else:
+        if args.init_concepts_from_text:
+            print("WARNING: --init-concepts-from-text is ignored for --model query_topk (scratch concept space).")
+        print("Initializing CBM_QueryTopK (scratch concept space)...")
+        model = CBM_QueryTopK(
+            num_concepts=train_ds.num_concepts,
+            patch_dim=patch_dim,
+            concept_dim=args.concept_dim,
+            dropout=args.dropout,
+            mil_topk=args.mil_topk,
+            mil_tau=args.attn_tau_start if args.anneal_attn_tau else args.attn_tau,
+            mix_depth=args.mix_depth,
+            mix_heads=args.mix_heads,
+            mix_mlp_ratio=args.mix_mlp_ratio,
+        )
     model = model.to(device)
     print_param_counts(model)
 
@@ -544,7 +560,6 @@ def main():
             criterion,
             epoch,
             args.epochs,
-            attn_warmup_epochs=args.attn_warmup_epochs,
             anneal_attn_tau=args.anneal_attn_tau,
             attn_tau_start=args.attn_tau_start,
             attn_tau_end=args.attn_tau_end,
@@ -563,7 +578,7 @@ def main():
         print(f"\nEpoch {epoch+1}/{args.epochs}:")
         print(f"  Train: Loss={train_loss:.4f}, CE={train_ce:.4f}, Acc@1={train_acc1:.4f}, Acc@5={train_acc5:.4f}, GradNorm={grad_norm:.2f}")
         print(f"  Val:   CE={val_ce:.4f}, Acc@1={val_acc1:.4f}, Acc@5={val_acc5:.4f}")
-        print(f"  LR: {current_lr:.6f}, AttnType={model.concept_head.attn_type}, AttnTau={model.concept_head.attn_tau:.3f}")
+        print(f"  LR: {current_lr:.6f}, AttnTau={model.concept_head.attn_tau:.3f}")
         
         # Log to W&B
         if wandb_run:
@@ -578,7 +593,6 @@ def main():
                 "val/acc1": val_acc1,
                 "val/acc5": val_acc5,
                 "lr": current_lr,
-                "attn_type": model.concept_head.attn_type,
                 "attn_tau": model.concept_head.attn_tau,
             })
         

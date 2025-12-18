@@ -2,77 +2,13 @@
 Query-based sparse attention model for concept prediction.
 
 This module contains the ConceptHeadQuerySparse and CBM_QuerySparse classes,
-which implement patch-only concept prediction with sparse attention.
+which implement patch-only concept prediction with hard top-K selection.
 """
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-
-
-def sparsemax(logits: torch.Tensor, dim: int = -1) -> torch.Tensor:
-    """
-    Sparsemax activation (Martins & Astudillo, 2016).
-
-    Like softmax, maps logits -> probabilities that sum to 1, but can produce
-    exact zeros (sparse distributions). Useful for sparse, interpretable attention.
-
-    Intuition:
-    - softmax = "exponentiate then normalize" -> always dense (never exact zeros)
-    - sparsemax = "project onto the probability simplex" -> can hit the boundary
-      of the simplex, producing exact zeros (sparsity).
-
-    Mathematically, for each vector z (along `dim`), sparsemax computes:
-      sparsemax(z) = argmin_p ||p - z||^2  subject to p >= 0 and sum(p) = 1
-    i.e., Euclidean projection onto the simplex.
-    """
-    # 1) Numerical stability: shift logits by their maximum.
-    #    This does NOT change the projection result, but avoids large magnitudes.
-    z = logits - logits.max(dim=dim, keepdim=True).values
-
-    # 2) Sort z in descending order (needed to find the active set / support).
-    z_sorted, _ = torch.sort(z, dim=dim, descending=True)
-
-    # 3) Prefix sums of sorted logits: z_cumsum[j] = sum_{i<=j} z_sorted[i]
-    z_cumsum = z_sorted.cumsum(dim)
-
-    # 4) Determine the support size k (how many entries will be > 0 after projection).
-    #
-    #    For sparsemax, the optimal threshold tau satisfies:
-    #      p_i = max(z_i - tau, 0)
-    #    and sum_i p_i = 1.
-    #
-    #    If we sort z in descending order, the support is the largest k such that:
-    #      1 + k * z_sorted[k] > sum_{j<=k} z_sorted[j]
-    #    (using 1-indexing for the inequality).
-    #
-    #    We'll compute this condition for all possible k and count how many hold.
-    r = torch.arange(1, z_sorted.size(dim) + 1, device=z.device, dtype=z.dtype)
-    view = [1] * z.dim()
-    view[dim] = -1
-    r = r.view(*view)
-
-    # Boolean mask indicating which k satisfy the support condition.
-    support = 1 + r * z_sorted > z_cumsum
-
-    # Count how many entries are in the support; clamp to at least 1 to be safe.
-    k = support.sum(dim=dim, keepdim=True).clamp(min=1)
-
-    # 5) Compute the threshold tau:
-    #      tau = (sum_{j<=k} z_sorted[j] - 1) / k
-    #    We grab the cumulative sum at index (k-1) because of 0-based indexing.
-    z_cumsum_k = z_cumsum.gather(dim, k - 1)
-    tau = (z_cumsum_k - 1) / k.to(z.dtype)
-
-    # 6) Compute projected probabilities:
-    #      p = max(z - tau, 0)
-    #    This yields exact zeros outside the support (sparse distribution).
-    p = torch.clamp(z - tau, min=0.0)
-
-    # 7) Numerical safety: enforce sum(p)=1 (tiny error can accumulate in fp16/bf16).
-    p = p / (p.sum(dim=dim, keepdim=True) + 1e-12)
-    return p
 
 
 class PatchMixer(nn.Module):
@@ -114,13 +50,12 @@ class ConceptHeadQuerySparse(nn.Module):
     """
     Concept head that implements:
       (1) Concept-query cross-attention scores (query · contextualized patch)
-      (2) Sparse attention (sparsemax or softmax)
-      (3) Local+context fusion: score = α_k * s_ctx + (1-α_k) * s_local
+      (2) Hard top-K selection (like MIL Mixed)
+      (3) LogSumExp aggregation over top-K patches only
+      (4) Optional local+context fusion: score = α_k * s_ctx + (1-α_k) * s_local
 
-    Faithfulness:
-      - attention A[k,p] is computed directly from fused scores s[k,p]
-      - logits are computed as sum_p A[k,p] * s[k,p]
-        so attention directly determines the logit.
+    This approach addresses gradient dilution by concentrating gradients on
+    the top-K most relevant patches, matching MIL Mixed's successful strategy.
     
     Patch-only: This model only uses patch tokens, not pooled embeddings.
     """
@@ -131,7 +66,6 @@ class ConceptHeadQuerySparse(nn.Module):
         num_concepts: int,
         concept_dim: int = 256,
         dropout: float = 0.3,
-        attn_type: str = "sparsemax",  # "sparsemax" or "softmax"
         attn_tau: float = 0.25,
         mix_depth: int = 1,
         mix_heads: int = 4,
@@ -139,26 +73,21 @@ class ConceptHeadQuerySparse(nn.Module):
         mix_dropout: float | None = None,
         use_local_scores: bool = True,
         vision_proj_init_weight: torch.Tensor | None = None,
+        mil_topk: int = 8,  # Hard top-K selection (like MIL Mixed)
     ):
         super().__init__()
         if attn_tau <= 0:
             raise ValueError(f"attn_tau must be > 0, got {attn_tau}")
-        if attn_type not in ("sparsemax", "softmax"):
-            raise ValueError(f"attn_type must be 'sparsemax' or 'softmax', got {attn_type}")
 
         self.num_concepts = num_concepts
-        self.attn_type = attn_type
         self.attn_tau = float(attn_tau)
         self.use_local_scores = bool(use_local_scores)
         self.concept_dim = int(concept_dim)
-        # Standard dot-product attention scaling (stabilizes score magnitudes).
-        self.score_scale = 1.0 / math.sqrt(max(1, self.concept_dim))
-
-        # Patch projection into concept space (CLIP-style trainable projection).
+        self.mil_topk = int(mil_topk)
+        # Patch projection into concept space (matching MIL Mixed structure).
         #
-        # Baseline behavior: we REQUIRE `vision_proj_init_weight` and use it to initialize
-        # a trainable linear map patch_dim -> concept_dim (typically StreetCLIP's
-        # visual_projection.weight). No alternative projection path here.
+        # Use Sequential with LayerNorm, Linear, GELU, Dropout for stability.
+        # Initialize the Linear layer with CLIP visual_projection weights if provided.
         if vision_proj_init_weight is None:
             raise ValueError(
                 "vision_proj_init_weight must be provided for this baseline "
@@ -176,12 +105,17 @@ class ConceptHeadQuerySparse(nn.Module):
                 f"expected [{concept_dim}, {patch_dim}], got {tuple(vision_proj_init_weight.shape)}"
             )
 
-        proj = nn.Linear(patch_dim, concept_dim, bias=False)
+        # Match MIL Mixed projection structure: LayerNorm -> Linear -> GELU -> Dropout
+        self.patch_proj = nn.Sequential(
+            nn.LayerNorm(patch_dim),
+            nn.Linear(patch_dim, concept_dim, bias=False),
+            nn.GELU(),
+            nn.Dropout(dropout),
+        )
+        
+        # Initialize the Linear layer (index 1) with CLIP weights
         with torch.no_grad():
-            proj.weight.copy_(vision_proj_init_weight.to(dtype=proj.weight.dtype))
-
-        # Keep this projection trainable: it is a normal nn.Linear parameter.
-        self.patch_proj = proj
+            self.patch_proj[1].weight.copy_(vision_proj_init_weight.to(dtype=self.patch_proj[1].weight.dtype))
 
         # Contextualize patches (patch self-attention)
         self.patch_mixer = PatchMixer(
@@ -206,13 +140,6 @@ class ConceptHeadQuerySparse(nn.Module):
         # Optional per-concept bias (applied to fused scores)
         self.bias = nn.Parameter(torch.zeros(num_concepts))
 
-    def _attn(self, score_bKp: torch.Tensor) -> torch.Tensor:
-        # score_bKp: [B, K, P]
-        scaled = score_bKp / self.attn_tau
-        if self.attn_type == "softmax":
-            return F.softmax(scaled, dim=-1)
-        return sparsemax(scaled, dim=-1)
-
     def forward(self, patches: torch.Tensor):
         """
         Forward pass using patch tokens only.
@@ -236,10 +163,11 @@ class ConceptHeadQuerySparse(nn.Module):
 
         # Contextual query scores: s_ctx[b,k,p] = <q_k, x_ctx[b,p]>
         # Using einsum for clarity.
-        s_ctx = torch.einsum("bpd,kd->bkp", x_ctx, self.query) * self.score_scale  # [B, K, P]
+        # Removed score_scale to match MIL Mixed magnitude
+        s_ctx = torch.einsum("bpd,kd->bkp", x_ctx, self.query)  # [B, K, P]
 
         if self.use_local_scores:
-            s_local = torch.einsum("bpd,kd->bkp", x_local, self.local_weight) * self.score_scale  # [B, K, P]
+            s_local = torch.einsum("bpd,kd->bkp", x_local, self.local_weight)  # [B, K, P]
             alpha = torch.sigmoid(self.fuse_logit).view(1, -1, 1)  # [1, K, 1]
             scores = alpha * s_ctx + (1.0 - alpha) * s_local
         else:
@@ -248,34 +176,27 @@ class ConceptHeadQuerySparse(nn.Module):
         scores = scores + self.bias.view(1, -1, 1)
 
         # ---------------------------------------------------------
-        # FIX: Decoupled Selection & Aggregation
+        # HARD TOP-K SELECTION (like MIL Mixed)
         # ---------------------------------------------------------
         # This addresses the "gradient dilution problem" by:
-        # 1. Using Sparsemax to select active patches (adaptive K)
-        # 2. Using LogSumExp (smooth max) instead of weighted sum
-        #    to prevent background noise from washing out the signal
+        # 1. Using hard top-K selection (fixed K=8) instead of soft attention
+        # 2. Using LogSumExp (smooth max) over top-K only
+        # 3. This matches MIL Mixed's successful approach while preserving
+        #    the contextual query mechanism
         # ---------------------------------------------------------
 
-        # 1. Selection: Compute Sparsemax Attention
-        #    This determines the "Active Set" (where attn > 0)
-        #    Patches below the sparsemax threshold get exactly 0.0
-        attn = self._attn(scores)  # [B, K, P]
-
-        # 2. Masking: Identify noise patches
-        #    We create a boolean mask of patches that Sparsemax selected
-        #    Using small epsilon for numerical stability
-        active_mask = (attn > 0)
-
-        # 3. Suppression: Force noise scores to -infinity
-        #    We must clone scores to avoid in-place errors if used elsewhere
-        masked_scores = scores.clone()
-        masked_scores.masked_fill_(~active_mask, float("-inf"))
-
-        # 4. Aggregation: LogSumExp (Smooth Max)
-        #    This mimics the fast convergence of MIL Mixed.
-        #    It aggregates only the ACTIVE patches using a Max-like operator
-        #    instead of a Weighted Sum.
-        logits = self.attn_tau * torch.logsumexp(masked_scores / self.attn_tau, dim=-1)
+        # 1. Hard Top-K Selection
+        k = min(self.mil_topk, scores.size(-1))
+        topk_vals, topk_idx = scores.topk(k=k, dim=-1)  # [B, K, k], [B, K, k]
+        
+        # 2. LogSumExp Aggregation (only on top-K)
+        logits = self.attn_tau * torch.logsumexp(topk_vals / self.attn_tau, dim=-1)  # [B, K]
+        
+        # 3. Attention for Visualization (matches MIL Mixed style)
+        # Softmax over top-K only, others get -inf
+        attn_logits = torch.full_like(scores, float("-inf"))
+        attn_logits.scatter_(dim=-1, index=topk_idx, src=scores.gather(dim=-1, index=topk_idx))
+        attn = F.softmax(attn_logits / self.attn_tau, dim=-1)  # [B, K, P]
 
         # Hidden representation (for SupCon if enabled elsewhere): mean pooled contextual patches
         hidden = x_ctx.mean(dim=1)
@@ -300,7 +221,6 @@ class CBM_QuerySparse(nn.Module):
         patch_dim: int = 1024,
         concept_dim: int = 256,
         dropout: float = 0.3,
-        attn_type: str = "sparsemax",
         attn_tau: float = 0.25,
         mix_depth: int = 1,
         mix_heads: int = 4,
@@ -310,6 +230,7 @@ class CBM_QuerySparse(nn.Module):
         vision_proj_init_weight: torch.Tensor | None = None,
         vision_encoder: nn.Module | None = None,
         expected_num_patches: int | None = None,
+        mil_topk: int = 8,
     ):
         super().__init__()
         self.vision_encoder = vision_encoder
@@ -321,7 +242,6 @@ class CBM_QuerySparse(nn.Module):
             num_concepts=num_concepts,
             concept_dim=concept_dim,
             dropout=dropout,
-            attn_type=attn_type,
             attn_tau=attn_tau,
             mix_depth=mix_depth,
             mix_heads=mix_heads,
@@ -329,6 +249,7 @@ class CBM_QuerySparse(nn.Module):
             mix_dropout=mix_dropout,
             use_local_scores=use_local_scores,
             vision_proj_init_weight=vision_proj_init_weight,
+            mil_topk=mil_topk,
         )
 
     def forward(self, patches_or_images: torch.Tensor):
