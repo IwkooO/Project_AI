@@ -247,9 +247,35 @@ class ConceptHeadQuerySparse(nn.Module):
 
         scores = scores + self.bias.view(1, -1, 1)
 
-        # Attention and logits (faithful)
+        # ---------------------------------------------------------
+        # FIX: Decoupled Selection & Aggregation
+        # ---------------------------------------------------------
+        # This addresses the "gradient dilution problem" by:
+        # 1. Using Sparsemax to select active patches (adaptive K)
+        # 2. Using LogSumExp (smooth max) instead of weighted sum
+        #    to prevent background noise from washing out the signal
+        # ---------------------------------------------------------
+
+        # 1. Selection: Compute Sparsemax Attention
+        #    This determines the "Active Set" (where attn > 0)
+        #    Patches below the sparsemax threshold get exactly 0.0
         attn = self._attn(scores)  # [B, K, P]
-        logits = (attn * scores).sum(dim=-1)  # [B, K]
+
+        # 2. Masking: Identify noise patches
+        #    We create a boolean mask of patches that Sparsemax selected
+        #    Using small epsilon for numerical stability
+        active_mask = (attn > 0)
+
+        # 3. Suppression: Force noise scores to -infinity
+        #    We must clone scores to avoid in-place errors if used elsewhere
+        masked_scores = scores.clone()
+        masked_scores.masked_fill_(~active_mask, float("-inf"))
+
+        # 4. Aggregation: LogSumExp (Smooth Max)
+        #    This mimics the fast convergence of MIL Mixed.
+        #    It aggregates only the ACTIVE patches using a Max-like operator
+        #    instead of a Weighted Sum.
+        logits = self.attn_tau * torch.logsumexp(masked_scores / self.attn_tau, dim=-1)
 
         # Hidden representation (for SupCon if enabled elsewhere): mean pooled contextual patches
         hidden = x_ctx.mean(dim=1)

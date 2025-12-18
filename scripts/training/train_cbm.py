@@ -209,9 +209,10 @@ def train_epoch(
         topk = c_logits.topk(k, dim=1).indices
         correct_top5 += (topk == c_labels.unsqueeze(1)).any(dim=1).sum().item()
         
-        total_loss += loss.item() * patches.size(0)
-        total_ce_loss += ce_loss.item() * patches.size(0)
-        total_samples += patches.size(0)
+        batch_size = c_labels.size(0)
+        total_loss += loss.item() * batch_size
+        total_ce_loss += ce_loss.item() * batch_size
+        total_samples += batch_size
         
         pbar.set_postfix({
             "Loss": f"{loss.item():.4f}",
@@ -268,7 +269,8 @@ def eval_epoch(model, loader, device, criterion):
             first_batch_debug = False
             unique_labels = torch.unique(c_labels).cpu().tolist()
             unique_preds = torch.unique(preds).cpu().tolist()
-            print(f"DEBUG first batch: batch_size={patches.size(0)}, unique_labels={len(unique_labels)}, unique_preds={len(unique_preds)}")
+            batch_size = c_labels.size(0)
+            print(f"DEBUG first batch: batch_size={batch_size}, unique_labels={len(unique_labels)}, unique_preds={len(unique_preds)}")
             print(f"DEBUG first batch: label_range=[{c_labels.min().item()}, {c_labels.max().item()}], pred_range=[{preds.min().item()}, {preds.max().item()}]")
             print(f"DEBUG first batch: logits_range=[{c_logits.min().item():.2f}, {c_logits.max().item():.2f}], logits_std={c_logits.std().item():.2f}")
         
@@ -278,8 +280,9 @@ def eval_epoch(model, loader, device, criterion):
         for pred in preds.cpu().tolist():
             pred_counts[pred] = pred_counts.get(pred, 0) + 1
         
-        total_ce_loss += ce_loss.item() * patches.size(0)
-        total_samples += patches.size(0)
+        batch_size = c_labels.size(0)
+        total_ce_loss += ce_loss.item() * batch_size
+        total_samples += batch_size
     
     # Debug: print label distribution if accuracy is suspiciously high
     acc1 = correct_top1 / total_samples
