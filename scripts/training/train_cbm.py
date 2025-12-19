@@ -337,6 +337,9 @@ def main():
     parser.add_argument("--mix-heads", type=int, default=4, help="Patch mixer heads")
     parser.add_argument("--mix-mlp-ratio", type=float, default=4.0, help="Patch mixer MLP ratio")
     parser.add_argument("--mil-topk", type=int, default=8, help="Hard top-K selection for MIL-style aggregation")
+    parser.add_argument("--stk-mask-prob", type=float, default=0.0, help="STKIM: probability of masking top patches (0.0 = disabled)")
+    parser.add_argument("--stk-k-mask", type=int, default=1, help="STKIM: number of top patches to mask (per concept)")
+    parser.add_argument("--stk-mask-fill", type=str, default="min", choices=["min", "zero"], help="STKIM: fill value for masked patches ('min' or 'zero')")
     parser.add_argument(
         "--init-concepts-from-text",
         action="store_true",
@@ -360,7 +363,12 @@ def main():
     parser.add_argument("--wandb-entity", type=str, default=None)
     parser.add_argument("--wandb-run-name", type=str, default=None)
     parser.add_argument("--warmup-epochs", type=int, default=WARMUP_EPOCHS, help="LR warmup epochs")
+    parser.add_argument("--early-stop-patience", type=int, default=10, help="Early stopping patience (epochs without improvement). Set to 0 or negative to disable.")
     args = parser.parse_args()
+    
+    # Disable early stopping if patience <= 0
+    if args.early_stop_patience <= 0:
+        args.early_stop_patience = None
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     output_dir = Path(args.output_dir)
@@ -487,6 +495,9 @@ def main():
             use_local_scores=False,
             vision_proj_init_weight=vision_proj_init_weight,
             mil_topk=args.mil_topk,
+            stk_mask_prob=args.stk_mask_prob,
+            stk_k_mask=args.stk_k_mask,
+            stk_mask_fill=args.stk_mask_fill,
         )
     else:
         if args.init_concepts_from_text:
@@ -519,13 +530,17 @@ def main():
     # Resume from checkpoint if provided
     start_epoch = 0
     best_val_metric = 0.0
+    best_val_acc5 = 0.0
+    epochs_without_improvement = 0
     if args.resume_checkpoint:
         print(f"Loading checkpoint from {args.resume_checkpoint}...")
         checkpoint = torch.load(args.resume_checkpoint, map_location=device)
         model.load_state_dict(checkpoint['model_state_dict'])
         start_epoch = checkpoint.get('epoch', 0) + 1
         best_val_metric = checkpoint.get('best_val_metric', 0.0)
-        print(f"Resumed from epoch {start_epoch}, best_val_metric={best_val_metric:.4f}")
+        best_val_acc5 = checkpoint.get('best_val_acc5', checkpoint.get('val_acc5', 0.0))
+        epochs_without_improvement = checkpoint.get('epochs_without_improvement', 0)
+        print(f"Resumed from epoch {start_epoch}, best_val_metric={best_val_metric:.4f}, best_val_acc5={best_val_acc5:.4f}, epochs_without_improvement={epochs_without_improvement}")
     
     # Loss and optimizer
     weights = compute_concept_weights(train_ds, train_ds.num_concepts, device)
@@ -596,11 +611,29 @@ def main():
                 "attn_tau": model.concept_head.attn_tau,
             })
         
-        # Save checkpoint
+        # Save checkpoint (selection_metric for best model selection)
         is_best = val_metric > best_val_metric
         if is_best:
             best_val_metric = val_metric
             print(f"  *** New best {args.selection_metric}: {val_metric:.4f} ***")
+        
+        # Early stopping: monitor val_acc5 (top-5 accuracy) separately
+        if args.early_stop_patience is not None:
+            # Track best val_acc5 for early stopping
+            if val_acc5 > best_val_acc5:
+                best_val_acc5 = val_acc5
+                epochs_without_improvement = 0
+                print(f"  *** New best val_acc5: {val_acc5:.4f} ***")
+            else:
+                epochs_without_improvement += 1
+                print(f"  No improvement in val_acc5 for {epochs_without_improvement} epochs (best: {best_val_acc5:.4f})")
+            
+            # Check early stopping (based on val_acc5)
+            if epochs_without_improvement >= args.early_stop_patience:
+                print(f"\n*** Early stopping triggered! ***")
+                print(f"  No improvement in val_acc5 for {args.early_stop_patience} epochs.")
+                print(f"  Best val_acc5: {best_val_acc5:.4f} (achieved at epoch {epoch - epochs_without_improvement + 1})")
+                break
         
         checkpoint = {
             'epoch': epoch,
@@ -608,8 +641,10 @@ def main():
             'optimizer_state_dict': optimizer.state_dict(),
             'scheduler_state_dict': scheduler.state_dict(),
             'best_val_metric': best_val_metric,
+            'best_val_acc5': best_val_acc5 if args.early_stop_patience is not None else val_acc5,
             'val_acc1': val_acc1,
             'val_acc5': val_acc5,
+            'epochs_without_improvement': epochs_without_improvement if args.early_stop_patience is not None else 0,
         }
         
         # Save latest

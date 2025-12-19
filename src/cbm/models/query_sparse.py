@@ -3,6 +3,11 @@ Query-based sparse attention model for concept prediction.
 
 This module contains the ConceptHeadQuerySparse and CBM_QuerySparse classes,
 which implement patch-only concept prediction with hard top-K selection.
+
+Optional regularization:
+  - Stochastic Top-K Instance Masking (STKIM): during training, randomly masks
+    the highest-scoring patches (per concept) with probability p to prevent
+    attention concentration and encourage learning from alternative evidence.
 """
 
 import torch
@@ -74,16 +79,30 @@ class ConceptHeadQuerySparse(nn.Module):
         use_local_scores: bool = True,
         vision_proj_init_weight: torch.Tensor | None = None,
         mil_topk: int = 8,  # Hard top-K selection (like MIL Mixed)
+        # --- Optional STKIM regularization (training only) ---
+        stk_mask_prob: float = 0.0,
+        stk_k_mask: int = 1,
+        stk_mask_fill: str = "min",  # "min" (recommended) or "zero"
     ):
         super().__init__()
         if attn_tau <= 0:
             raise ValueError(f"attn_tau must be > 0, got {attn_tau}")
+        if not (0.0 <= float(stk_mask_prob) <= 1.0):
+            raise ValueError(f"stk_mask_prob must be in [0,1], got {stk_mask_prob}")
+        if int(stk_k_mask) < 0:
+            raise ValueError(f"stk_k_mask must be >= 0, got {stk_k_mask}")
+        stk_mask_fill = str(stk_mask_fill).lower().strip()
+        if stk_mask_fill not in {"min", "zero"}:
+            raise ValueError(f"stk_mask_fill must be 'min' or 'zero', got {stk_mask_fill!r}")
 
         self.num_concepts = num_concepts
         self.attn_tau = float(attn_tau)
         self.use_local_scores = bool(use_local_scores)
         self.concept_dim = int(concept_dim)
         self.mil_topk = int(mil_topk)
+        self.stk_mask_prob = float(stk_mask_prob)
+        self.stk_k_mask = int(stk_k_mask)
+        self.stk_mask_fill = stk_mask_fill
         # Patch projection into concept space (matching MIL Mixed structure).
         #
         # Use Sequential with LayerNorm, Linear, GELU, Dropout for stability.
@@ -176,6 +195,46 @@ class ConceptHeadQuerySparse(nn.Module):
         scores = scores + self.bias.view(1, -1, 1)
 
         # ---------------------------------------------------------
+        # STKIM (Stochastic Top-K Instance Masking) regularization
+        # ---------------------------------------------------------
+        # During training, with probability p, mask the top-k_mask highest-scoring
+        # patches *per concept* to discourage attention concentration.
+        #
+        # For sparse concepts, a conservative default is stk_k_mask=1 (mask top-1).
+        #
+        # Masking is applied to the evidence scores before top-K MIL pooling so
+        # the pooling naturally shifts to "runner-up" patches.
+        if self.training and self.stk_mask_prob > 0.0 and self.stk_k_mask > 0:
+            P = int(scores.size(-1))
+            # Ensure at least one patch remains unmasked.
+            k_mask = min(self.stk_k_mask, max(0, P - 1))
+            if k_mask > 0:
+                # Indices of top-k_mask patches: [B, K, k_mask]
+                top_mask_idx = scores.topk(k=k_mask, dim=-1).indices
+
+                # Decide (per sample, per concept) whether to apply masking.
+                # Shape: [B, K, 1] to broadcast across the k_mask positions.
+                do_mask = (torch.rand(scores.size(0), scores.size(1), 1, device=scores.device) < self.stk_mask_prob)
+
+                if self.stk_mask_fill == "zero":
+                    fill_value = 0.0
+                else:
+                    # Use dtype min instead of -inf for broad dtype safety.
+                    fill_value = torch.finfo(scores.dtype).min
+
+                # Replace only the selected top positions when do_mask is true.
+                # This blocks gradients through masked top patches (as intended).
+                # Use non-inplace scatter to avoid gradient computation issues
+                orig_top = scores.gather(dim=-1, index=top_mask_idx)
+                new_top = torch.where(
+                    do_mask.expand_as(orig_top),
+                    torch.full_like(orig_top, fill_value),
+                    orig_top,
+                )
+                # Create a new tensor with masked values (non-inplace)
+                scores = scores.scatter(dim=-1, index=top_mask_idx, src=new_top)
+
+        # ---------------------------------------------------------
         # HARD TOP-K SELECTION (like MIL Mixed)
         # ---------------------------------------------------------
         # This addresses the "gradient dilution problem" by:
@@ -231,6 +290,9 @@ class CBM_QuerySparse(nn.Module):
         vision_encoder: nn.Module | None = None,
         expected_num_patches: int | None = None,
         mil_topk: int = 8,
+        stk_mask_prob: float = 0.0,
+        stk_k_mask: int = 1,
+        stk_mask_fill: str = "min",
     ):
         super().__init__()
         self.vision_encoder = vision_encoder
@@ -250,6 +312,9 @@ class CBM_QuerySparse(nn.Module):
             use_local_scores=use_local_scores,
             vision_proj_init_weight=vision_proj_init_weight,
             mil_topk=mil_topk,
+            stk_mask_prob=stk_mask_prob,
+            stk_k_mask=stk_k_mask,
+            stk_mask_fill=stk_mask_fill,
         )
 
     def forward(self, patches_or_images: torch.Tensor):
