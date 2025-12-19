@@ -15,6 +15,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
+from .neighborhood_attention import get_local_attention_bias
+
 
 class PatchMixer(nn.Module):
     """
@@ -32,8 +34,17 @@ class PatchMixer(nn.Module):
         num_heads: int = 4,
         mlp_ratio: float = 4.0,
         dropout: float = 0.1,
+        local_kernel_size: int | None = None,
     ):
         super().__init__()
+        if local_kernel_size is not None:
+            k = int(local_kernel_size)
+            if k <= 0 or (k % 2 == 0):
+                raise ValueError(f"local_kernel_size must be odd and > 0, got {local_kernel_size}")
+            self.local_kernel_size = k
+        else:
+            self.local_kernel_size = None
+
         ff_dim = int(dim * mlp_ratio)
         layer = nn.TransformerEncoderLayer(
             d_model=dim,
@@ -48,7 +59,18 @@ class PatchMixer(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: [B, P, dim]
-        return self.encoder(x)
+        if self.local_kernel_size is None:
+            return self.encoder(x)
+
+        p = int(x.shape[1])
+        attn_bias = get_local_attention_bias(
+            p,
+            self.local_kernel_size,
+            device=x.device,
+            dtype=x.dtype,
+        )
+        # nn.TransformerEncoder forwards this as the per-layer self-attention mask.
+        return self.encoder(x, mask=attn_bias)
 
 
 class ConceptHeadQuerySparse(nn.Module):
@@ -76,6 +98,7 @@ class ConceptHeadQuerySparse(nn.Module):
         mix_heads: int = 4,
         mix_mlp_ratio: float = 4.0,
         mix_dropout: float | None = None,
+        mix_local_kernel_size: int | None = None,
         use_local_scores: bool = True,
         vision_proj_init_weight: torch.Tensor | None = None,
         mil_topk: int = 8,  # Hard top-K selection (like MIL Mixed)
@@ -143,6 +166,7 @@ class ConceptHeadQuerySparse(nn.Module):
             num_heads=mix_heads,
             mlp_ratio=mix_mlp_ratio,
             dropout=(dropout if mix_dropout is None else mix_dropout),
+            local_kernel_size=mix_local_kernel_size,
         )
 
         # Concept queries (for contextual scores): [K, D] -> K is num_concepts and D is the concept_dim
@@ -285,6 +309,7 @@ class CBM_QuerySparse(nn.Module):
         mix_heads: int = 4,
         mix_mlp_ratio: float = 4.0,
         mix_dropout: float | None = None,
+        mix_local_kernel_size: int | None = None,
         use_local_scores: bool = True,
         vision_proj_init_weight: torch.Tensor | None = None,
         vision_encoder: nn.Module | None = None,
@@ -309,6 +334,7 @@ class CBM_QuerySparse(nn.Module):
             mix_heads=mix_heads,
             mix_mlp_ratio=mix_mlp_ratio,
             mix_dropout=mix_dropout,
+            mix_local_kernel_size=mix_local_kernel_size,
             use_local_scores=use_local_scores,
             vision_proj_init_weight=vision_proj_init_weight,
             mil_topk=mil_topk,

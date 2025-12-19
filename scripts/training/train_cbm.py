@@ -336,6 +336,12 @@ def main():
     parser.add_argument("--mix-depth", type=int, default=1, help="Patch mixer depth")
     parser.add_argument("--mix-heads", type=int, default=4, help="Patch mixer heads")
     parser.add_argument("--mix-mlp-ratio", type=float, default=4.0, help="Patch mixer MLP ratio")
+    parser.add_argument(
+        "--mix-local-kernel-size",
+        type=int,
+        default=0,
+        help="Neighborhood Attention kernel size for patch mixing (0 disables; must be odd, e.g. 3/5/7).",
+    )
     parser.add_argument("--mil-topk", type=int, default=8, help="Hard top-K selection for MIL-style aggregation")
     parser.add_argument("--stk-mask-prob", type=float, default=0.0, help="STKIM: probability of masking top patches (0.0 = disabled)")
     parser.add_argument("--stk-k-mask", type=int, default=1, help="STKIM: number of top patches to mask (per concept)")
@@ -481,6 +487,9 @@ def main():
         )
     
     # Initialize model (patch-only)
+    mix_local_kernel_size = int(args.mix_local_kernel_size)
+    if mix_local_kernel_size == 0:
+        mix_local_kernel_size = None
     if args.model == "query_sparse":
         print("Initializing CBM_QuerySparse...")
         model = CBM_QuerySparse(
@@ -492,6 +501,7 @@ def main():
             mix_depth=args.mix_depth,
             mix_heads=args.mix_heads,
             mix_mlp_ratio=args.mix_mlp_ratio,
+            mix_local_kernel_size=mix_local_kernel_size,
             use_local_scores=False,
             vision_proj_init_weight=vision_proj_init_weight,
             mil_topk=args.mil_topk,
@@ -513,6 +523,7 @@ def main():
             mix_depth=args.mix_depth,
             mix_heads=args.mix_heads,
             mix_mlp_ratio=args.mix_mlp_ratio,
+            mix_local_kernel_size=mix_local_kernel_size,
         )
     model = model.to(device)
     print_param_counts(model)

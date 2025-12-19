@@ -1,0 +1,116 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=cbm_query_sparse_na
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=12:00:00
+#SBATCH --output=jobs/outputs/cbm_query_sparse_na_%j.out
+
+# Use venv (not conda) for this run.
+set -eo pipefail
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd "$HOME/Project_AI/"
+
+mkdir -p jobs/outputs
+
+echo "============================================================"
+echo "Activating project venv"
+echo "============================================================"
+
+set -eo pipefail
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd "$HOME/Project_AI/"
+
+# Activate environment
+export GEOTIFF_CSV="${GEOTIFF_CSV:-}"
+set +u
+source activate streetview
+set -u
+
+wandb_api_key="9073a011764cb23fce5384443a3996ca9c5d9198"
+export WANDB_API_KEY="$wandb_api_key"
+
+
+# Paths
+SPLITS_DIR="data/6921d7831744c5356b098bf7_balanced/splits"
+TRAIN_CSV="${SPLITS_DIR}/dataset_train.csv"
+VAL_CSV="${SPLITS_DIR}/dataset_val.csv"
+
+# Cached embeddings (must already exist)
+CACHED_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip_v2"
+
+# Concept vocab/priors
+CONCEPT_DATA="data/concept_data_v2"
+
+# Output directory
+OUTPUT_DIR="checkpoints/cbm_query_sparse_neighborhood_k5"
+CONCEPT_MAPPING="data/concept_refinement_mapped.csv"
+
+mkdir -p "$OUTPUT_DIR"
+mkdir -p "$CONCEPT_DATA"
+
+echo "============================================================"
+echo "Step 0: Mapping meta_name -> generalized concepts"
+echo "============================================================"
+python scripts/data_processing/map_generalized_concepts.py \
+  --splits-dir "$SPLITS_DIR" \
+  --mapping "$CONCEPT_MAPPING"
+
+echo "============================================================"
+echo "Step 1: Precomputing concept vocab + geo priors"
+echo "============================================================"
+python scripts/data_processing/precompute_geo_priors.py \
+  --train-csv "$TRAIN_CSV" \
+  --output-dir "$CONCEPT_DATA" \
+  --s2-level 8
+
+echo "============================================================"
+echo "Step 2: Ensure cached StreetCLIP embeddings exist"
+echo "============================================================"
+if [[ ! -f "$CACHED_DIR/train_pooled_embeddings.pt" || ! -f "$CACHED_DIR/train_metadata.json" || ! -f "$CACHED_DIR/train_patch_tokens.pt" ]]; then
+  echo "ERROR: Missing cached embeddings in $CACHED_DIR"
+  echo "Run scripts/data_processing/precompute_streetclip_embeddings.py first."
+  exit 1
+fi
+
+echo "============================================================"
+echo "Step 3: Train Phase 1 concept head (Query Sparse + Neighborhood Attention)"
+echo "  - mix_local_kernel_size=5 (Chebyshev KxK neighborhood)"
+echo "============================================================"
+python scripts/training/train_cbm.py \
+  --model query_sparse \
+  --train-csv "$TRAIN_CSV" \
+  --val-csv "$VAL_CSV" \
+  --cached-dir "$CACHED_DIR" \
+  --concept-data-dir "$CONCEPT_DATA" \
+  --output-dir "$OUTPUT_DIR" \
+  --epochs 80 \
+  --batch-size 64 \
+  --lr 7e-5 \
+  --warmup-epochs 5 \
+  --wandb \
+  --init-concepts-from-text \
+  --concept-dim 768 \
+  --concept-prompt-template "a street view photo containing {}" \
+  --text-model-name "geolocal/StreetCLIP" \
+  --attn-tau 0.3 \
+  --mil-topk 4 \
+  --mix-depth 1 --mix-heads 4 --mix-mlp-ratio 2.0 \
+  --mix-local-kernel-size 5 \
+  --dropout 0.3 --weight-decay 0.05 \
+  --selection-metric acc1
+
+echo "============================================================"
+echo "Training complete! (Query Sparse + Neighborhood Attention)"
+echo "Outputs: $OUTPUT_DIR"
+echo "============================================================"
+

@@ -105,9 +105,16 @@ def main():
     # Model config (should match training)
     parser.add_argument("--concept-dim", type=int, default=256, help="Concept dimension")
     parser.add_argument("--dropout", type=float, default=0.3, help="Dropout")
+    parser.add_argument("--attn-tau", type=float, default=0.25, help="Temperature for LogSumExp aggregation")
     parser.add_argument("--mix-depth", type=int, default=1, help="Patch mixer depth")
     parser.add_argument("--mix-heads", type=int, default=4, help="Patch mixer heads")
     parser.add_argument("--mix-mlp-ratio", type=float, default=4.0, help="Patch mixer MLP ratio")
+    parser.add_argument(
+        "--mix-local-kernel-size",
+        type=int,
+        default=0,
+        help="Neighborhood Attention kernel size for patch mixing (0 disables; must be odd, e.g. 3/5/7).",
+    )
     
     # Options
     parser.add_argument("--batch-size", type=int, default=256, help="Batch size")
@@ -157,17 +164,23 @@ def main():
     
     # Initialize model (patch-only)
     print("Initializing model...")
+    mix_local_kernel_size = int(args.mix_local_kernel_size)
+    if mix_local_kernel_size == 0:
+        mix_local_kernel_size = None
     model = CBM_QuerySparse(
         num_concepts=test_ds.num_concepts,
         patch_dim=patch_dim,
         concept_dim=args.concept_dim,
         dropout=args.dropout,
-        attn_type="sparsemax",  # Use sparsemax for evaluation
-        attn_tau=0.2,  # Default tau
+        attn_tau=args.attn_tau,
         mix_depth=args.mix_depth,
         mix_heads=args.mix_heads,
         mix_mlp_ratio=args.mix_mlp_ratio,
+        mix_local_kernel_size=mix_local_kernel_size,
         use_local_scores=True,
+        # Evaluation uses a loaded checkpoint; this init weight is overwritten by state_dict.
+        # Provide a dummy placeholder to satisfy the constructor contract.
+        vision_proj_init_weight=torch.empty(args.concept_dim, patch_dim),
     )
     model = model.to(device)
     

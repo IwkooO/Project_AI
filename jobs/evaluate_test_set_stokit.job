@@ -1,0 +1,106 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=eval_test_stokit
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=2:00:00
+#SBATCH --output=jobs/outputs/evaluate_test_stokit_%j.out
+
+# Use venv (not conda) for this run.
+set -eo pipefail
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd "$HOME/Project_AI/"
+
+mkdir -p jobs/outputs
+
+echo "============================================================"
+echo "Activating project venv"
+echo "============================================================"
+
+set -eo pipefail
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd "$HOME/Project_AI/"
+
+# Activate environment
+export GEOTIFF_CSV="${GEOTIFF_CSV:-}"
+set +u
+source activate streetview
+set -u
+
+# Paths (matching training job)
+SPLITS_DIR="data/6921d7831744c5356b098bf7_balanced/splits"
+TEST_CSV="${SPLITS_DIR}/dataset_test.csv"
+
+# Cached embeddings (must already exist)
+CACHED_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip_v2"
+
+# Concept vocab/priors
+CONCEPT_DATA="data/concept_data_v2"
+
+# Checkpoint path (best model from training)
+CHECKPOINT_DIR="checkpoints/cbm_query_sparse_neighborhood_k5_stokit"
+BEST_CHECKPOINT="${CHECKPOINT_DIR}/phase1/best_phase1.pt"
+
+# Output directory for evaluation results
+EVAL_OUTPUT_DIR="${CHECKPOINT_DIR}/test_evaluation"
+
+mkdir -p "$EVAL_OUTPUT_DIR"
+mkdir -p jobs/outputs
+
+echo "============================================================"
+echo "Evaluating on Test Set with Visualizations"
+echo "============================================================"
+echo "Checkpoint: $BEST_CHECKPOINT"
+echo "Test CSV: $TEST_CSV"
+echo "Output: $EVAL_OUTPUT_DIR"
+echo "============================================================"
+
+# Check if checkpoint exists
+if [[ ! -f "$BEST_CHECKPOINT" ]]; then
+  echo "ERROR: Best checkpoint not found at $BEST_CHECKPOINT"
+  echo "Please ensure training has completed and best_phase1.pt exists."
+  exit 1
+fi
+
+# Check if test CSV exists
+if [[ ! -f "$TEST_CSV" ]]; then
+  echo "ERROR: Test CSV not found at $TEST_CSV"
+  exit 1
+fi
+
+# Run evaluation with visualizations
+python scripts/evaluation/evaluate_concept_head.py \
+  --checkpoint "$BEST_CHECKPOINT" \
+  --test-csv "$TEST_CSV" \
+  --cached-dir "$CACHED_DIR" \
+  --concept-data-dir "$CONCEPT_DATA" \
+  --output-dir "$EVAL_OUTPUT_DIR" \
+  --concept-dim 768 \
+  --dropout 0.3 \
+  --attn-tau 0.3 \
+  --mix-depth 1 \
+  --mix-heads 4 \
+  --mix-mlp-ratio 2.0 \
+  --mix-local-kernel-size 5 \
+  --batch-size 64 \
+  --num-workers 4 \
+  --generate-visualizations \
+  --num-viz-samples 20 \
+  --device cuda
+
+echo "============================================================"
+echo "Evaluation complete!"
+echo "Results saved to: $EVAL_OUTPUT_DIR"
+echo "Metrics: $EVAL_OUTPUT_DIR/metrics.json"
+echo "Visualizations: $EVAL_OUTPUT_DIR/visualizations/"
+echo "============================================================"
+
