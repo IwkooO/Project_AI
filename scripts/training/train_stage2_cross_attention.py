@@ -473,14 +473,22 @@ def visualize_attention_predictions(
             hier_parent_name = "N/A"
         
         # ===== Process Attention =====
-        attn_spatial = model.attention_to_spatial(attn_weights)  # [1, 24, 24]
-        attn_map = attn_spatial[0].cpu().numpy()  # [24, 24]
-        
-        # Upsample attention map to image size
-        img_h, img_w = pil_image.size[1], pil_image.size[0]
-        attn_map_upsampled = Image.fromarray((attn_map * 255).astype(np.uint8))
-        attn_map_upsampled = attn_map_upsampled.resize((img_w, img_h), Image.BILINEAR)
-        attn_map_upsampled = np.array(attn_map_upsampled) / 255.0
+        # Note: in ablation modes ('concept_only', 'image_only') the model does not produce attention weights.
+        attn_map_upsampled = None
+        if attn_weights is not None:
+            attn_spatial = model.attention_to_spatial(attn_weights)  # [1, 24, 24]
+            attn_map = attn_spatial[0].detach().cpu().numpy()  # [24, 24]
+            attn_map = np.clip(attn_map, 0.0, 1.0)
+
+            # Upsample attention map to image size
+            img_h, img_w = pil_image.size[1], pil_image.size[0]
+            attn_map_upsampled = Image.fromarray((attn_map * 255).astype(np.uint8))
+            attn_map_upsampled = attn_map_upsampled.resize((img_w, img_h), Image.BILINEAR)
+            attn_map_upsampled = np.array(attn_map_upsampled) / 255.0
+        else:
+            logger.info(
+                f"Skipping attention overlay for visualization (no attn_weights; ablation_mode={outputs.get('ablation_mode', 'unknown')})"
+            )
         
         # ===== Process Geolocation =====
         pred_cell = cell_logits.argmax(dim=1).item()
@@ -510,7 +518,8 @@ def visualize_attention_predictions(
         # Column 1: Image with attention overlay (spans 2 columns worth of space)
         ax_img = fig.add_subplot(num_samples, 4, row_base + 1)
         ax_img.imshow(pil_image)
-        ax_img.imshow(attn_map_upsampled, cmap=attn_cmap, alpha=0.6)
+        if attn_map_upsampled is not None:
+            ax_img.imshow(attn_map_upsampled, cmap=attn_cmap, alpha=0.6)
         ax_img.axis("off")
         ax_img.set_title(f"Sample {idx+1}: {sample['country']}", fontsize=11, fontweight='bold')
         
@@ -904,7 +913,24 @@ def main():
     # Initialize WandB
     if args.use_wandb:
         import wandb
-        wandb.init(project="streetclip-cbm-stage2", config=vars(args), name=f"stage2-{args.ablation_mode}-{output_dir.name}")
+        # Build tags with key experiment parameters
+        tags = [
+            f"ablation_{args.ablation_mode}",
+            f"coord_dim_{args.coord_output_dim}",
+            f"encoder_{args.encoder_model.split('/')[-1]}",  # Just model name, not full path
+        ]
+        # Add coordinate type tag
+        if args.coord_output_dim == 3:
+            tags.append("coord_xyz")
+        else:
+            tags.append("coord_latlng")
+        
+        wandb.init(
+            project="streetclip-cbm-stage2",
+            config=vars(args),
+            name=f"stage2-{args.ablation_mode}-{output_dir.name}",
+            tags=tags
+        )
     
     # Initialize Image Encoder (frozen, for patch extraction and concept computation)
     logger.info("Initializing frozen image encoder...")
@@ -976,6 +1002,21 @@ def main():
     cell_centers = cell_centers.to(device)
     num_cells = len(cell_centers)
     cell_labels = sample_to_cell
+    
+    # Update WandB tags with dataset-specific information
+    if args.use_wandb:
+        additional_tags = [
+            f"num_cells_{num_cells}",
+            f"dataset_size_{len(image_paths)}",
+            f"min_samples_per_cell_{args.min_samples_per_cell}",
+        ]
+        wandb.run.tags = list(wandb.run.tags) + additional_tags
+        # Also log dataset info to config
+        wandb.config.update({
+            "num_cells": num_cells,
+            "dataset_size": len(image_paths),
+            "num_countries": len(set(countries)),
+        })
     
     # Train/Val Split
     n_samples = len(image_paths)
