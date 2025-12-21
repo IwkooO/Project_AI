@@ -47,7 +47,7 @@ ABLATION_MODE="image_only"
 # Data paths
 DATA_ROOT=/scratch-shared/pnair/Project_AI/data
 CSV_PATH="data/dataset-43k-mapped.csv"
-STAGE1_CHECKPOINT="/scratch-shared/pnair/Project_AI/results/stage1-prototype/2025-12-08_22-58-06/checkpoints/best_model_stage1.pt"
+STAGE1_CHECKPOINT="/scratch-shared/pnair/Project_AI/results/stage1-prototype/geolocal_StreetCLIP/2025-12-15_10-09-20/checkpoints/best_model_stage1.pt"
 
 # Run Stage 2 Training with image_only ablation
 python scripts/training/train_stage2_cross_attention.py \

@@ -19,10 +19,12 @@ Frozen: image_encoder, concept_bottleneck (from Stage 1)
 Data Strategy:
 - Loads images directly and computes all embeddings on-the-fly
 - No precomputed embeddings needed - requires Stage 1 checkpoint
-- TRAIN + VAL for training, TEST for final evaluation
+- Uses same train/val/test splits as Stage 1 (from splits.json in checkpoint directory)
+- TRAIN for training, VAL for validation, TEST for testing
 """
 
 import argparse
+import json
 import logging
 import os
 import re
@@ -899,7 +901,6 @@ def main():
     # Misc
     parser.add_argument("--output_dir", type=str, default=None)
     parser.add_argument("--use_wandb", action="store_true", default=False)
-    parser.add_argument("--val_split", type=float, default=0.2)
     parser.add_argument("--seed", type=int, default=42)
     
     args = parser.parse_args()
@@ -968,24 +969,49 @@ def main():
     # Get transforms from image processor
     transforms = get_transforms_from_processor(image_encoder.image_processor)
     
+    # Load splits.json from Stage 1 checkpoint directory
+    stage1_checkpoint_path = Path(args.stage1_checkpoint)
+    stage1_dir = stage1_checkpoint_path.parent.parent
+    splits_json_path = stage1_dir / "splits.json"
+    
+    if not splits_json_path.exists():
+        raise FileNotFoundError(
+            f"splits.json not found in Stage 1 checkpoint directory: {stage1_dir}\n"
+            f"Expected path: {splits_json_path}\n"
+            f"Please ensure the Stage 1 training run saved splits.json in the checkpoint directory."
+        )
+    
+    logger.info(f"Loading splits from {splits_json_path}")
+    with open(splits_json_path, 'r') as f:
+        splits_data = json.load(f)
+    
+    train_pano_ids = set(splits_data["train_pano_ids"])
+    val_pano_ids = set(splits_data["val_pano_ids"])
+    test_pano_ids = set(splits_data["test_pano_ids"])
+    
+    logger.info(f"Splits from Stage 1: Train={len(train_pano_ids)}, Val={len(val_pano_ids)}, Test={len(test_pano_ids)}")
+    
     # Load dataset from CSV
     logger.info(f"Loading dataset from {args.csv_path}")
     import pandas as pd
     df = pd.read_csv(args.csv_path)
     
-    # Build image paths and extract coordinates/countries
+    # Build image paths and extract coordinates/countries, tracking pano_ids for split assignment
     image_paths = []
     coordinates = []
     countries = []
+    pano_ids = []  # Track pano_id for each sample
     
     for _, row in tqdm(df.iterrows(), total=len(df), desc="Building dataset"):
+        # Get pano_id
+        pano_id = row.get("pano_id") or row.get("panoId")
+        if pd.isna(pano_id):
+            continue
+        
         # Use image_path column if available, otherwise construct from pano_id
         if "image_path" in row and pd.notna(row["image_path"]):
             img_path = Path(row["image_path"])
         else:
-            pano_id = row.get("pano_id") or row.get("panoId")
-            if pd.isna(pano_id):
-                continue
             img_path = Path(args.data_root) / args.geoguessr_id / "export" / f"{pano_id}.jpg"
         
         if not img_path.exists():
@@ -1001,6 +1027,7 @@ def main():
         image_paths.append(str(img_path))
         coordinates.append(torch.tensor([lat, lng], dtype=torch.float32))
         countries.append(country if not pd.isna(country) else "unknown")
+        pano_ids.append(str(pano_id))  # Store as string for matching
     
     if len(coordinates) == 0:
         raise RuntimeError(f"No valid samples found! Check image paths in CSV or data_root/geoguessr_id settings.")
@@ -1022,11 +1049,13 @@ def main():
     cell_labels = sample_to_cell
     
     # Update WandB tags with dataset-specific information
+    encoder_type_tag = "vanilla" if "vanilla" in args.stage1_checkpoint else "finetuned"
     if args.use_wandb:
         additional_tags = [
             f"num_cells_{num_cells}",
             f"dataset_size_{len(image_paths)}",
             f"min_samples_per_cell_{args.min_samples_per_cell}",
+            f"stage1_encoder_type_{encoder_type_tag}",
         ]
         wandb.run.tags = list(wandb.run.tags) + additional_tags
         # Also log dataset info to config
@@ -1034,17 +1063,27 @@ def main():
             "num_cells": num_cells,
             "dataset_size": len(image_paths),
             "num_countries": len(set(countries)),
+            "stage1_encoder_type": encoder_type_tag,
         })
     
-    # Train/Val Split
-    n_samples = len(image_paths)
-    n_val = int(n_samples * args.val_split)
-    indices = list(range(n_samples))
-    np.random.shuffle(indices)
+    # Assign samples to splits based on pano_id matching Stage 1 splits
+    train_indices = []
+    val_indices = []
+    test_indices = []
     
-    train_indices = indices[n_val:]
-    val_indices = indices[:n_val]
+    for i, pano_id in enumerate(pano_ids):
+        if pano_id in train_pano_ids:
+            train_indices.append(i)
+        elif pano_id in val_pano_ids:
+            val_indices.append(i)
+        elif pano_id in test_pano_ids:
+            test_indices.append(i)
     
+    # Log split statistics
+    logger.info(f"Split assignment: Train={len(train_indices)}, Val={len(val_indices)}, Test={len(test_indices)}")
+    logger.info(f"Unmatched samples: {len(image_paths) - len(train_indices) - len(val_indices) - len(test_indices)}")
+    
+    # Use train for training, val for validation, test for testing
     train_dataset = Stage2ImageDataset(
         image_paths=[image_paths[i] for i in train_indices],
         coordinates=coordinates[train_indices],
@@ -1059,8 +1098,15 @@ def main():
         countries=[countries[i] for i in val_indices],
         transforms=transforms,
     )
+    test_dataset = Stage2ImageDataset(
+        image_paths=[image_paths[i] for i in test_indices],
+        coordinates=coordinates[test_indices],
+        cell_labels=cell_labels[test_indices],
+        countries=[countries[i] for i in test_indices],
+        transforms=transforms,
+    )
     
-    logger.info(f"Train: {len(train_dataset)}, Val: {len(val_dataset)}")
+    logger.info(f"Train: {len(train_dataset)}, Val: {len(val_dataset)}, Test: {len(test_dataset)}")
     
     # Create dataloaders
     train_loader = DataLoader(
