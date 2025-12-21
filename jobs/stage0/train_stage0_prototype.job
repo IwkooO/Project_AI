@@ -54,3 +54,5 @@ python scripts/training/train_stage0_prototype.py \
     --use_amp \
     --use_wandb \
     --data_root ${DATA_ROOT}
+
+

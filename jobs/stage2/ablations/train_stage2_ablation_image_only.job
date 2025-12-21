@@ -1,15 +1,16 @@
 #!/bin/bash
 #SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
-#SBATCH --job-name=s2-concept-only
-#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/train_stage2_concept_only.log
+#SBATCH --job-name=s2-image-only
+#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/train_stage2_image_only.log
 #SBATCH --time=24:00:00
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
 
-# ===== ABLATION STUDY: CONCEPT ONLY =====
-# This experiment tests: Only concept embeddings contribute to location prediction
-# No image patch information is used - tests semantic concept strength alone
+# ===== ABLATION STUDY: IMAGE ONLY =====
+# This experiment tests: Only image patch tokens contribute to location prediction
+# No concept embeddings are used - tests raw visual feature strength alone
+# This is essentially a baseline without interpretable concepts
 
 # Activate environment
 module load 2025
@@ -40,15 +41,15 @@ MIN_SAMPLES_PER_CELL=20
 LAMBDA_CELL=1.0
 LAMBDA_OFFSET=5.0
 
-# ABLATION MODE: concept_only
-ABLATION_MODE="concept_only"
+# ABLATION MODE: image_only
+ABLATION_MODE="image_only"
 
 # Data paths
 DATA_ROOT=/scratch-shared/pnair/Project_AI/data
 CSV_PATH="data/dataset-43k-mapped.csv"
 STAGE1_CHECKPOINT="/scratch-shared/pnair/Project_AI/results/stage1-prototype/2025-12-08_22-58-06/checkpoints/best_model_stage1.pt"
 
-# Run Stage 2 Training with concept_only ablation
+# Run Stage 2 Training with image_only ablation
 python scripts/training/train_stage2_cross_attention.py \
     --stage1_checkpoint $STAGE1_CHECKPOINT \
     --csv_path $CSV_PATH \
@@ -67,3 +68,5 @@ python scripts/training/train_stage2_cross_attention.py \
     --ablation_mode $ABLATION_MODE \
     --num_workers 4 \
     --use_wandb
+
+

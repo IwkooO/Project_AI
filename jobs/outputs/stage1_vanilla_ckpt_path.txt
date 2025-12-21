@@ -1,0 +1,1 @@
+/scratch-shared/pnair/Project_AI/results/stage1-prototype/vanilla_streetclip_no_stage0/2025-12-21_10-48-19/checkpoints/best_model_stage1.pt
