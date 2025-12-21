@@ -667,6 +667,7 @@ def validate(
     total_cell_acc = 0.0
     haversine_errors = []
     n_batches = 0
+    gate_values = []
     
     with torch.no_grad():
         for batch in tqdm(val_loader, desc=f"Val Epoch {epoch}"):
@@ -683,9 +684,10 @@ def validate(
             concept_embs = stage1_model.concept_bottleneck(img_features)  # [B, 512]
             
             # Forward pass
-            outputs = model(concept_embs, patch_tokens)
+            outputs = model(concept_embs, patch_tokens, return_attention=False, return_gate=True)
             cell_logits = outputs["cell_logits"]
             pred_offsets = outputs["pred_offsets"]
+            gate = outputs.get("gate")
             
             # Loss computation
             loss_cell = criterion_cell(cell_logits, cell_labels)
@@ -704,6 +706,9 @@ def validate(
             pred_coords = compute_predicted_coords(pred_cells, pred_offsets, cell_centers, coord_output_dim, device)
             dists = haversine_distance(pred_coords, coordinates)
             haversine_errors.extend(dists.cpu().numpy())
+
+            if gate is not None:
+                gate_values.append(gate.detach().cpu())
             
             n_batches += 1
     
@@ -713,6 +718,18 @@ def validate(
     avg_loss = total_loss / n_batches
     avg_cell_acc = total_cell_acc / n_batches
     median_error = np.median(haversine_errors) if haversine_errors else float("inf")
+
+    gate_stats = {}
+    if gate_values:
+        gate_all = torch.cat(gate_values, dim=0).float()  # [N, D]
+        gate_flat = gate_all.flatten()
+        gate_stats = {
+            "gate_mean": gate_flat.mean().item(),
+            "gate_std": gate_flat.std(unbiased=False).item(),
+            "gate_p10": torch.quantile(gate_flat, 0.10).item(),
+            "gate_p50": torch.quantile(gate_flat, 0.50).item(),
+            "gate_p90": torch.quantile(gate_flat, 0.90).item(),
+        }
     
     # Threshold accuracies
     threshold_accs = {}
@@ -731,6 +748,7 @@ def validate(
         "loss": avg_loss,
         "cell_acc": avg_cell_acc,
         "median_error_km": median_error,
+        **gate_stats,
         **threshold_accs,
     }
 
@@ -1116,6 +1134,11 @@ def main():
                 "val_acc_city": val_metrics.get("acc_city", 0),
                 "val_acc_region": val_metrics.get("acc_region", 0),
                 "val_acc_country": val_metrics.get("acc_country", 0),
+                "val_gate_mean": val_metrics.get("gate_mean", float("nan")),
+                "val_gate_std": val_metrics.get("gate_std", float("nan")),
+                "val_gate_p10": val_metrics.get("gate_p10", float("nan")),
+                "val_gate_p50": val_metrics.get("gate_p50", float("nan")),
+                "val_gate_p90": val_metrics.get("gate_p90", float("nan")),
                 "lr": scheduler.get_last_lr()[0],
                 "epoch": epoch,
             })

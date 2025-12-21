@@ -1,0 +1,70 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=s2-bg
+#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/train_stage2_both_gate.log
+#SBATCH --time=24:00:00
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=64G
+
+# ===== ABLATION STUDY: BOTH (DEFAULT) =====
+# This experiment tests: Concept + Image fusion with enforced concept usage
+# Cross-attention between concepts and patches + explicit concept gating
+# This is the full model with interpretability
+
+# Activate environment
+module load 2025
+module load Anaconda3/2025.06-1
+cd /scratch-shared/pnair/Project_AI/
+module load CUDA/12.8.0
+
+source activate streetview_pnair
+export PYTHONNOUSERSITE=1
+export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
+
+# ===== Stage 2 Configuration =====
+EPOCHS=30
+BATCH_SIZE=256
+LR=1e-4
+WEIGHT_DECAY=0.01
+
+# Model architecture
+PATCH_DIM=1024
+CONCEPT_DIM=512
+NUM_HEADS=8
+COORD_OUTPUT_DIM=2
+
+# Geocell generation
+MIN_SAMPLES_PER_CELL=20
+
+# Loss weights
+LAMBDA_CELL=1.0
+LAMBDA_OFFSET=5.0
+
+# ABLATION MODE: both (full model)
+ABLATION_MODE="both"
+
+# Data paths
+DATA_ROOT=/scratch-shared/pnair/Project_AI/data
+CSV_PATH="data/dataset-43k-mapped.csv"
+STAGE1_CHECKPOINT="/scratch-shared/pnair/Project_AI/results/stage1-prototype/2025-12-08_22-58-06/checkpoints/best_model_stage1.pt"
+
+# Run Stage 2 Training with both ablation (full model)
+python scripts/training/train_stage2_cross_attention.py \
+    --stage1_checkpoint $STAGE1_CHECKPOINT \
+    --csv_path $CSV_PATH \
+    --data_root $DATA_ROOT \
+    --epochs $EPOCHS \
+    --batch_size $BATCH_SIZE \
+    --lr $LR \
+    --weight_decay $WEIGHT_DECAY \
+    --patch_dim $PATCH_DIM \
+    --concept_dim $CONCEPT_DIM \
+    --num_heads $NUM_HEADS \
+    --coord_output_dim $COORD_OUTPUT_DIM \
+    --min_samples_per_cell $MIN_SAMPLES_PER_CELL \
+    --lambda_cell $LAMBDA_CELL \
+    --lambda_offset $LAMBDA_OFFSET \
+    --ablation_mode $ABLATION_MODE \
+    --num_workers 4 \
+    --use_wandb

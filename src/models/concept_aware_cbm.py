@@ -1155,14 +1155,14 @@ class Stage2CrossAttentionGeoHead(nn.Module):
         self,
         num_cells: int,
         concept_emb_dim: int = 512,
-        patch_dim: int = 1024,  # ViT-L hidden size
-        num_patches: int = 576,  # 24×24 for 336px image with 14px patches
+        patch_dim: int = 1024,  
+        num_patches: int = 576,  
         num_heads: int = 8,
         coord_output_dim: int = 2,
         dropout: float = 0.1,
         use_residual: bool = True,
-        use_concept_gate: bool = True,  # Gating mechanism to ensure concept usage
-        ablation_mode: str = 'both',  # NEW: Ablation mode for experiments
+        use_concept_gate: bool = True, 
+        ablation_mode: str = 'both', 
     ):
         """
         Args:
@@ -1292,6 +1292,7 @@ class Stage2CrossAttentionGeoHead(nn.Module):
         concept_emb: torch.Tensor,
         patch_tokens: torch.Tensor,
         return_attention: bool = True,
+        return_gate: bool = False,
     ) -> Dict[str, torch.Tensor]:
         """
         Forward pass through cross-attention geo head.
@@ -1316,6 +1317,7 @@ class Stage2CrossAttentionGeoHead(nn.Module):
         """
         batch_size = concept_emb.size(0)
         attn_weights = None
+        gate = None
         
         # =====================================================================
         # ABLATION MODE: concept_only
@@ -1407,6 +1409,9 @@ class Stage2CrossAttentionGeoHead(nn.Module):
         
         if return_attention and attn_weights is not None:
             result["attn_weights"] = attn_weights  # [batch, 1, 576]
+
+        if return_gate and gate is not None:
+            result["gate"] = gate  # [batch, concept_emb_dim]
         
         return result
     
