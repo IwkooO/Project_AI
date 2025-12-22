@@ -56,21 +56,21 @@ class ConceptHeadQueryTopK(nn.Module):
         self.mil_topk = int(mil_topk)
         self.mil_tau = float(mil_tau)
  
-        # Two-stage projection: process at full res, then compress
-        self.patch_proj = nn.Sequential(
-            nn.LayerNorm(patch_dim),
-            nn.Linear(patch_dim, patch_dim), # 1. Process at full res (768 -> 768)
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(patch_dim, concept_dim, bias=False), # 2. Compress (768 -> 256)
-            nn.GELU(), # Optional, usually good for embeddings
-        )
+        # # Two-stage projection: process at full res, then compress
         # self.patch_proj = nn.Sequential(
         #     nn.LayerNorm(patch_dim),
-        #     nn.Linear(patch_dim, concept_dim, bias=False),
+        #     nn.Linear(patch_dim, patch_dim), # 1. Process at full res (768 -> 768)
         #     nn.GELU(),
         #     nn.Dropout(dropout),
+        #     nn.Linear(patch_dim, concept_dim, bias=False), # 2. Compress (768 -> 256)
+        #     nn.GELU(), # Optional, usually good for embeddings
         # )
+        self.patch_proj = nn.Sequential(
+            nn.LayerNorm(patch_dim),
+            nn.Linear(patch_dim, concept_dim, bias=False),
+            nn.GELU(),
+            nn.Dropout(dropout),
+        )
  
         self.patch_mixer = PatchMixer(
             dim=concept_dim,
