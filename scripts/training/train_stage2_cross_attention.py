@@ -236,7 +236,7 @@ def load_stage1_checkpoint(
         concept_info_dict contains: concept_names, parent_names, concept_to_idx, parent_to_idx
     """
     logger.info(f"Loading Stage 1 checkpoint from {checkpoint_path}")
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     
     # Extract required tensors
     T_meta_base = checkpoint["T_meta_base"]
@@ -1060,7 +1060,7 @@ def main():
     )
     
     # Load stage1 checkpoint metadata for propagation
-    stage1_ckpt_data = torch.load(stage1_checkpoint_path, map_location="cpu")
+    stage1_ckpt_data = torch.load(stage1_checkpoint_path, map_location="cpu", weights_only=False)
     stage0_checkpoint = stage1_ckpt_data.get("stage0_checkpoint")
     splits_json_path_str = stage1_ckpt_data.get("splits_json")
     
@@ -1362,7 +1362,7 @@ def main():
         logger.info("Loading best model for final test evaluation...")
         best_ckpt_path = output_dir / "checkpoints" / "best_model_stage2_xattn.pt"
         if best_ckpt_path.exists():
-            best_ckpt = torch.load(best_ckpt_path, map_location=device)
+            best_ckpt = torch.load(best_ckpt_path, map_location=device, weights_only=False)
             model.load_state_dict(best_ckpt["model_state_dict"])
             logger.info("Loaded best model checkpoint")
         
@@ -1386,7 +1386,7 @@ def main():
         
         # Update best checkpoint with test metrics
         if best_ckpt_path.exists():
-            best_ckpt = torch.load(best_ckpt_path, map_location="cpu")
+            best_ckpt = torch.load(best_ckpt_path, map_location="cpu", weights_only=False)
             best_ckpt["test_metrics"] = {k: (v.item() if isinstance(v, torch.Tensor) else v) 
                                         for k, v in test_metrics.items()}
             torch.save(best_ckpt, best_ckpt_path)

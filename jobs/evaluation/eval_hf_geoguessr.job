@@ -1,0 +1,41 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=e-s2-hf
+#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/stage2/eval/eval_hf_geoguessr.log
+#SBATCH --time=6:00:00
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=64G
+
+# Activate environment
+module load 2025
+module load Anaconda3/2025.06-1
+cd /scratch-shared/pnair/Project_AI/
+module load CUDA/12.8.0
+
+source activate streetview_pnair
+export PYTHONNOUSERSITE=1
+export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
+# Ensure the activated env's python is used (module Anaconda may appear earlier in PATH)
+export PATH="$CONDA_PREFIX/bin:$PATH"
+
+# Configuration
+SPLIT="${SPLIT:-train}"
+MAX_SAMPLES="${MAX_SAMPLES:-}"
+RESULTS_ROOT="${RESULTS_ROOT:-results}"
+
+echo "Batch mode: Evaluating all latest Stage 2 checkpoints on HF dataset"
+echo "Results root: $RESULTS_ROOT"
+echo "Using split: $SPLIT"
+if [ -n "$MAX_SAMPLES" ]; then
+    echo "Max samples: $MAX_SAMPLES"
+fi
+
+python scripts/evaluation/eval_hf_geoguessr_locations.py \
+    --batch_mode \
+    --results_root "$RESULTS_ROOT" \
+    --split "$SPLIT" \
+    ${MAX_SAMPLES:+--max_samples $MAX_SAMPLES} \
+    --batch_size 32 \
+    --num_workers 8
+

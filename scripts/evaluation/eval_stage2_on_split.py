@@ -12,8 +12,9 @@ Computes:
 import argparse
 import json
 import logging
+import re
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from collections import Counter
 
 import numpy as np
@@ -39,6 +40,109 @@ from scripts.training.train_stage2_cross_attention import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Datetime pattern for run directories
+DATETIME_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}")
+
+# Ablation modes
+ABLATION_MODES = ["both", "concept_only", "image_only"]
+
+def _is_vanilla_from_stage0(stage0_checkpoint) -> bool:
+    if stage0_checkpoint is None:
+        return True
+    s = str(stage0_checkpoint).strip()
+    return s == "" or s.lower() == "none"
+
+
+def find_latest_datetime_dir(parent_dir: Path, exclude_subdirs: Optional[List[str]] = None) -> Optional[Path]:
+    """Find the subdirectory with the latest datetime timestamp."""
+    if exclude_subdirs is None:
+        exclude_subdirs = []
+    
+    datetime_dirs = []
+    for subdir in parent_dir.iterdir():
+        if subdir.is_dir() and subdir.name not in exclude_subdirs:
+            if DATETIME_PATTERN.match(subdir.name):
+                datetime_dirs.append(subdir)
+    
+    if not datetime_dirs:
+        return None
+    
+    # Sort by name (datetime format sorts chronologically)
+    datetime_dirs.sort(key=lambda x: x.name, reverse=True)
+    return datetime_dirs[0]
+
+
+def find_latest_stage2_checkpoints(results_root: Path) -> List[Tuple[Path, str, str]]:
+    """
+    Find the LATEST Stage 2 checkpoint for each ablation mode and variant.
+    
+    Returns list of (checkpoint_path, variant, ablation_mode) tuples.
+    """
+    checkpoints = []
+    results_root = Path(results_root)
+    
+    for mode in ABLATION_MODES:
+        mode_dir = results_root / f"stage2_cross_attention_{mode}"
+        if not mode_dir.exists():
+            logger.warning(f"Mode directory not found: {mode_dir}")
+            continue
+        
+        # Find LATEST finetuned checkpoint (direct datetime subdirectories, excluding vanilla_stage1)
+        finetuned_dirs = [
+            subdir for subdir in mode_dir.iterdir()
+            if subdir.is_dir() and subdir.name != "vanilla_stage1" and DATETIME_PATTERN.match(subdir.name)
+        ]
+        if finetuned_dirs:
+            finetuned_dirs.sort(key=lambda x: x.name, reverse=True)
+            latest_finetuned = finetuned_dirs[0]
+            ckpt_path = latest_finetuned / "checkpoints" / "best_model_stage2_xattn.pt"
+            if ckpt_path.exists():
+                checkpoints.append((ckpt_path, "finetuned", mode))
+                logger.info(f"Found latest Stage 2 checkpoint: {ckpt_path} (variant=finetuned, mode={mode})")
+        
+        # Find LATEST vanilla checkpoint (inside vanilla_stage1 subdirectory)
+        vanilla_dir = mode_dir / "vanilla_stage1"
+        if vanilla_dir.exists():
+            latest_vanilla_subdir = find_latest_datetime_dir(vanilla_dir)
+            if latest_vanilla_subdir:
+                ckpt_path = latest_vanilla_subdir / "checkpoints" / "best_model_stage2_xattn.pt"
+                if ckpt_path.exists():
+                    checkpoints.append((ckpt_path, "vanilla", mode))
+                    logger.info(f"Found latest Stage 2 checkpoint: {ckpt_path} (variant=vanilla, mode={mode})")
+    
+    return checkpoints
+
+
+def _default_output_dir_for_stage2_checkpoint(checkpoint_path: Path) -> Path:
+    """
+    Create a unique output directory for a checkpoint based on the results folder structure:
+      Finetuned: results/stage2_cross_attention_<mode>/<datetime>/checkpoints/best_model_stage2_xattn.pt
+        -> results/evals/stage2__stage2_cross_attention_<mode>__<datetime>
+      Vanilla:   results/stage2_cross_attention_<mode>/vanilla_stage1/<datetime>/checkpoints/best_model_stage2_xattn.pt
+        -> results/evals/stage2__stage2_cross_attention_<mode>__vanilla_stage1__<datetime>
+    """
+    ckpt = checkpoint_path.resolve()
+    parts = ckpt.parts
+    if "results" in parts:
+        rel = Path(*parts[parts.index("results") + 1 :])
+    else:
+        rel = ckpt
+
+    # Expect: <root>/<datetime>/checkpoints/<file> OR <root>/vanilla_stage1/<datetime>/checkpoints/<file>
+    if len(rel.parts) >= 4 and rel.parts[-2] == "checkpoints":
+        run_dt = rel.parts[-3]
+        maybe_vanilla = rel.parts[-4]
+        stage2_root = rel.parts[-5] if maybe_vanilla == "vanilla_stage1" and len(rel.parts) >= 5 else rel.parts[-4]
+        if maybe_vanilla == "vanilla_stage1":
+            safe = f"stage2__{stage2_root}__vanilla_stage1__{run_dt}"
+        else:
+            safe = f"stage2__{stage2_root}__{run_dt}"
+    else:
+        safe = f"stage2__{checkpoint_path.parent.parent.parent.name}__{checkpoint_path.parent.parent.name}"
+
+    safe = "".join(ch if (ch.isalnum() or ch in ("_", "-", ".")) else "_" for ch in safe)
+    return Path("results") / "evals" / safe
+
 THRESHOLD_ACCURACIES = {
     "street": 1.0,
     "city": 25.0,
@@ -53,7 +157,7 @@ def load_stage2_checkpoint(
 ) -> tuple:
     """Load Stage 2 checkpoint."""
     logger.info(f"Loading Stage 2 checkpoint from {checkpoint_path}")
-    ckpt = torch.load(checkpoint_path, map_location=device)
+    ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
     
     # Load Stage 1 checkpoint
     stage1_ckpt_path = Path(ckpt["stage1_checkpoint"])
@@ -101,6 +205,9 @@ def evaluate_stage2(
     cell_centers: torch.Tensor,
     coord_output_dim: int,
     concept_info: Dict,
+    ablation_mode: str,
+    patch_dim: int,
+    concept_dim: int,
     lambda_cell: float = 1.0,
     lambda_offset: float = 1.0,
 ) -> Dict:
@@ -130,12 +237,19 @@ def evaluate_stage2(
         coordinates = coordinates.to(device)
         cell_labels = cell_labels.to(device)
         
-        # Get patch tokens and image features
-        patch_tokens = image_encoder.get_patch_tokens(images)
-        img_features = image_encoder(images)
-        
-        # Get concept embeddings from Stage 1
-        concept_embs = stage1_model.concept_bottleneck(img_features)
+        # Compute features + patch tokens in a way that matches training ablation logic
+        if ablation_mode == "concept_only":
+            # No patch tokens used in this mode
+            img_features = image_encoder(images)  # [B, 768]
+            concept_embs = stage1_model.concept_bottleneck(img_features.float())
+            patch_tokens = torch.empty((images.size(0), 0, patch_dim), device=device, dtype=img_features.dtype)
+        else:
+            # both / image_only: get features + patches in ONE forward
+            img_features, patch_tokens = image_encoder.get_features_and_patches(images)
+            if ablation_mode == "image_only":
+                concept_embs = torch.zeros((images.size(0), concept_dim), device=device, dtype=img_features.dtype)
+            else:
+                concept_embs = stage1_model.concept_bottleneck(img_features.float())
         
         # Forward pass
         outputs = model(concept_embs, patch_tokens, return_attention=False, return_gate=False)
@@ -235,10 +349,157 @@ def evaluate_stage2(
     }
 
 
+def evaluate_single_stage2_checkpoint(
+    checkpoint_path: Path,
+    variant: str,
+    ablation_mode: str,
+    csv_path: str,
+    splits_json: str,
+    data_root: str,
+    geoguessr_id: str,
+    batch_size: int,
+    num_workers: int,
+    device: torch.device,
+    lambda_cell: float = 1.0,
+    lambda_offset: float = 1.0,
+) -> Optional[Dict]:
+    """Evaluate a single Stage 2 checkpoint and return results dict."""
+    try:
+        # Load checkpoint
+        model, image_encoder, stage1_model, cell_centers, concept_info, ckpt = load_stage2_checkpoint(
+            checkpoint_path, device
+        )
+        
+        # Variant is determined from directory path, trust it
+        
+        # Load splits
+        with open(splits_json, 'r') as f:
+            splits_data = json.load(f)
+        
+        test_pano_ids = set(splits_data["test_pano_ids"])
+        
+        # Load dataset from CSV
+        df = pd.read_csv(csv_path)
+        
+        # Build test samples
+        image_paths = []
+        coordinates = []
+        countries = []
+        
+        for _, row in df.iterrows():
+            pano_id = row.get("pano_id") or row.get("panoId")
+            if pd.isna(pano_id) or str(pano_id) not in test_pano_ids:
+                continue
+            
+            if "image_path" in row and pd.notna(row["image_path"]):
+                img_path = Path(row["image_path"])
+            else:
+                img_path = Path(data_root) / geoguessr_id / "export" / f"{pano_id}.jpg"
+            
+            if not img_path.exists():
+                continue
+            
+            lat = row.get("latitude") or row.get("lat")
+            lng = row.get("longitude") or row.get("lng")
+            country = row.get("country", "unknown")
+            
+            if pd.isna(lat) or pd.isna(lng):
+                continue
+            
+            image_paths.append(str(img_path))
+            coordinates.append(torch.tensor([lat, lng], dtype=torch.float32))
+            countries.append(country if not pd.isna(country) else "unknown")
+        
+        if len(coordinates) == 0:
+            logger.warning(f"No test samples found for {checkpoint_path}")
+            return None
+        
+        coordinates = torch.stack(coordinates)
+        
+        # Assign geocells to nearest cell center
+        coords_np = coordinates.cpu().numpy()
+        centers_np = cell_centers.cpu().numpy()
+        
+        lat_rad = np.deg2rad(coords_np[:, 0])
+        lng_rad = np.deg2rad(coords_np[:, 1])
+        x = np.cos(lat_rad) * np.cos(lng_rad)
+        y = np.cos(lat_rad) * np.sin(lng_rad)
+        z = np.sin(lat_rad)
+        xyz = np.stack([x, y, z], axis=1)
+        
+        distances = np.linalg.norm(xyz[:, None, :] - centers_np[None, :, :], axis=2)
+        cell_labels = torch.tensor(np.argmin(distances, axis=1), dtype=torch.long)
+        
+        # Create dataset and loader
+        transforms = get_transforms_from_processor(image_encoder.image_processor)
+        test_dataset = Stage2ImageDataset(
+            image_paths=image_paths,
+            coordinates=coordinates,
+            cell_labels=cell_labels,
+            countries=countries,
+            transforms=transforms,
+        )
+        
+        test_loader = DataLoader(
+            test_dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=num_workers,
+            collate_fn=stage2_collate_fn,
+            pin_memory=True,
+        )
+        
+        # Evaluate
+        metrics = evaluate_stage2(
+            model,
+            image_encoder,
+            stage1_model,
+            test_loader,
+            device,
+            cell_centers,
+            ckpt["coord_output_dim"],
+            concept_info,
+            ablation_mode=ablation_mode,
+            patch_dim=ckpt["patch_dim"],
+            concept_dim=ckpt["concept_dim"],
+            lambda_cell=lambda_cell,
+            lambda_offset=lambda_offset,
+        )
+        
+        if "error" in metrics:
+            logger.warning(f"Evaluation error for {checkpoint_path}: {metrics['error']}")
+            return None
+        
+        return {
+            "checkpoint": str(checkpoint_path),
+            "checkpoint_name": checkpoint_path.name,
+            "variant": variant,
+            "ablation_mode": ablation_mode,
+            "median_error_km": metrics["median_error_km"],
+            "mean_error_km": metrics["mean_error_km"],
+            "cell_acc": metrics["cell_acc"],
+            "acc_street": metrics["acc_street"],
+            "acc_city": metrics["acc_city"],
+            "acc_region": metrics["acc_region"],
+            "acc_country": metrics["acc_country"],
+            "stage0_checkpoint": str(ckpt.get("stage0_checkpoint", "None")),
+            "stage1_checkpoint": str(ckpt.get("stage1_checkpoint", "None")),
+        }
+    except Exception as e:
+        logger.error(f"Failed to evaluate {checkpoint_path}: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
 def main():
     parser = argparse.ArgumentParser(description="Evaluate Stage 2 checkpoint on test split")
-    parser.add_argument("--stage2_checkpoint", type=str, required=True,
-                        help="Path to Stage 2 checkpoint")
+    parser.add_argument("--stage2_checkpoint", type=str, default=None,
+                        help="Path to Stage 2 checkpoint (required if not using --batch_mode)")
+    parser.add_argument("--batch_mode", action="store_true",
+                        help="Auto-detect and evaluate all latest Stage 2 checkpoints")
+    parser.add_argument("--results_root", type=str, default="results",
+                        help="Root directory containing results (for batch mode)")
     parser.add_argument("--csv_path", type=str, required=True,
                         help="Path to CSV dataset")
     parser.add_argument("--splits_json", type=str, required=True,
@@ -257,12 +518,71 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
     
+    # Batch mode: auto-detect and evaluate all checkpoints
+    if args.batch_mode:
+        logger.info("Batch mode: Auto-detecting latest Stage 2 checkpoints...")
+        results_root = Path(args.results_root)
+        checkpoint_tuples = find_latest_stage2_checkpoints(results_root)
+        
+        if len(checkpoint_tuples) == 0:
+            logger.error("No Stage 2 checkpoints found!")
+            return
+        
+        logger.info(f"Found {len(checkpoint_tuples)} checkpoint(s) to evaluate")
+        
+        # Evaluate all checkpoints
+        all_results = []
+        for ckpt_path, variant, ablation_mode in checkpoint_tuples:
+            logger.info(f"\n{'='*60}")
+            logger.info(f"Evaluating: {ckpt_path}")
+            logger.info(f"Variant: {variant}, Ablation Mode: {ablation_mode}")
+            logger.info(f"{'='*60}")
+            
+            result = evaluate_single_stage2_checkpoint(
+                checkpoint_path=ckpt_path,
+                variant=variant,
+                ablation_mode=ablation_mode,
+                csv_path=args.csv_path,
+                splits_json=args.splits_json,
+                data_root=args.data_root,
+                geoguessr_id=args.geoguessr_id,
+                batch_size=args.batch_size,
+                num_workers=args.num_workers,
+                device=device,
+                lambda_cell=args.lambda_cell,
+                lambda_offset=args.lambda_offset,
+            )
+            
+            if result:
+                all_results.append(result)
+                logger.info(f"  Median Error: {result['median_error_km']:.2f} km")
+                logger.info(f"  Cell Accuracy: {result['cell_acc']:.4f}")
+                logger.info(f"  Country Accuracy: {result['acc_country']:.4f}")
+        
+        # Save consolidated CSV
+        if len(all_results) > 0:
+            output_dir = Path(args.results_root) / "evals"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            consolidated_csv = output_dir / "stage2_test_consolidated.csv"
+            
+            df = pd.DataFrame(all_results)
+            df.to_csv(consolidated_csv, index=False)
+            logger.info(f"\nSaved consolidated CSV to {consolidated_csv}")
+            logger.info(f"Total evaluations: {len(df)}")
+        else:
+            logger.warning("No results to save!")
+        
+        return
+    
+    # Single checkpoint mode (backward compatible)
+    if args.stage2_checkpoint is None:
+        parser.error("--stage2_checkpoint is required when not using --batch_mode")
+    
     # Setup output directory
     if args.output_dir:
         output_dir = Path(args.output_dir)
     else:
-        ckpt_name = Path(args.stage2_checkpoint).stem
-        output_dir = Path("results") / "evals" / ckpt_name
+        output_dir = _default_output_dir_for_stage2_checkpoint(Path(args.stage2_checkpoint))
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Load checkpoint
@@ -270,6 +590,8 @@ def main():
         Path(args.stage2_checkpoint),
         device,
     )
+    ablation_mode = ckpt.get("ablation_mode", "both")
+    variant = "vanilla" if _is_vanilla_from_stage0(ckpt.get("stage0_checkpoint")) else "finetuned"
     
     # Load splits
     logger.info(f"Loading splits from {args.splits_json}")
@@ -319,16 +641,22 @@ def main():
     
     coordinates = torch.stack(coordinates)
     
-    # Assign geocells (need to regenerate or load from checkpoint)
-    # For now, assign to nearest cell center
-    from scripts.training.train_stage2_cross_attention import generate_semantic_geocells
-    _, sample_to_cell = generate_semantic_geocells(
-        coordinates,
-        countries,
-        min_samples_per_cell=500,
-        train_indices=None,  # Use all for assignment only
-    )
-    cell_labels = sample_to_cell
+    # Assign geocells to nearest cell center (geocells already generated during training)
+    # We just need to assign test samples to the existing cell centers
+    coords_np = coordinates.cpu().numpy()
+    centers_np = cell_centers.cpu().numpy()
+    
+    # Convert to 3D for distance computation
+    lat_rad = np.deg2rad(coords_np[:, 0])
+    lng_rad = np.deg2rad(coords_np[:, 1])
+    x = np.cos(lat_rad) * np.cos(lng_rad)
+    y = np.cos(lat_rad) * np.sin(lng_rad)
+    z = np.sin(lat_rad)
+    xyz = np.stack([x, y, z], axis=1)
+    
+    # Find nearest cell center
+    distances = np.linalg.norm(xyz[:, None, :] - centers_np[None, :, :], axis=2)
+    cell_labels = torch.tensor(np.argmin(distances, axis=1), dtype=torch.long)
     
     # Create dataset and loader
     transforms = get_transforms_from_processor(image_encoder.image_processor)
@@ -361,6 +689,9 @@ def main():
         cell_centers,
         ckpt["coord_output_dim"],
         concept_info,
+        ablation_mode=ablation_mode,
+        patch_dim=ckpt["patch_dim"],
+        concept_dim=ckpt["concept_dim"],
         lambda_cell=args.lambda_cell,
         lambda_offset=args.lambda_offset,
     )
@@ -369,6 +700,10 @@ def main():
     results_json = {
         "stage2_checkpoint": str(args.stage2_checkpoint),
         "splits_json": str(args.splits_json),
+        "variant": variant,
+        "ablation_mode": ablation_mode,
+        "stage0_checkpoint": ckpt.get("stage0_checkpoint"),
+        "stage1_checkpoint": ckpt.get("stage1_checkpoint"),
         "test_samples": len(test_dataset),
         "metrics": {k: (float(v) if isinstance(v, (np.ndarray, np.generic)) else v) 
                    for k, v in metrics.items() if k != "concept_summary"},
@@ -383,6 +718,8 @@ def main():
     # Save CSV summary
     csv_data = {
         "checkpoint": [Path(args.stage2_checkpoint).name],
+        "variant": [variant],
+        "ablation_mode": [ablation_mode],
         "median_error_km": [metrics["median_error_km"]],
         "mean_error_km": [metrics["mean_error_km"]],
         "cell_acc": [metrics["cell_acc"]],
@@ -391,7 +728,6 @@ def main():
         "acc_region": [metrics["acc_region"]],
         "acc_country": [metrics["acc_country"]],
         "stage0_checkpoint": [ckpt.get("stage0_checkpoint", "None")],
-        "ablation_mode": [ckpt.get("ablation_mode", "unknown")],
     }
     df_results = pd.DataFrame(csv_data)
     csv_path = output_dir / "test_metrics.csv"
@@ -402,6 +738,13 @@ def main():
     logger.info("\n" + "="*60)
     logger.info("Test Evaluation Results")
     logger.info("="*60)
+    logger.info(f"Checkpoint: {args.stage2_checkpoint}")
+    logger.info(f"Variant: {variant}")
+    logger.info(f"Ablation mode: {ablation_mode}")
+    logger.info(f"Stage0 checkpoint: {ckpt.get('stage0_checkpoint', 'None')}")
+    logger.info(f"Stage1 checkpoint: {ckpt.get('stage1_checkpoint', 'unknown')}")
+    logger.info(f"Splits: {args.splits_json}")
+    logger.info(f"Output dir: {output_dir}")
     logger.info(f"Median Error: {metrics['median_error_km']:.2f} km")
     logger.info(f"Mean Error: {metrics['mean_error_km']:.2f} km")
     logger.info(f"Cell Accuracy: {metrics['cell_acc']:.4f}")

@@ -1,0 +1,35 @@
+#!/bin/bash
+#SBATCH --partition=cbuild
+#SBATCH --job-name=hf
+#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/download_hf_data.log
+#SBATCH --time=4:00:00
+#SBATCH --cpus-per-task=2
+#SBATCH --mem=16G
+
+set -euo pipefail
+
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd /scratch-shared/pnair/Project_AI/
+source activate streetview_pnair
+
+export PYTHONNOUSERSITE=1
+export PYTHONPATH="/scratch-shared/pnair/Project_AI:${PYTHONPATH:-}"
+
+# Hugging Face cache
+export HF_HOME="/scratch-shared/pnair/Project_AI/.cache/huggingface"
+export HF_HUB_DISABLE_XET=1
+export HF_HUB_ENABLE_HF_TRANSFER=0
+
+# Optional but helpful on shared clusters: reduce request burst further
+export HF_HUB_ETAG_TIMEOUT=60
+export HF_HUB_DOWNLOAD_TIMEOUT=600
+
+echo "HF_HOME=$HF_HOME"
+hf version
+
+# Download into HF cache only (no --local-dir)
+hf download fren-gor/geoguessr-locations \
+  --repo-type dataset \
+  --max-workers 1

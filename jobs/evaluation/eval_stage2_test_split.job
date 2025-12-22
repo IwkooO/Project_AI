@@ -1,0 +1,42 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=e-s2-t
+#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/stage2/eval/eval_stage2_test_split.log
+#SBATCH --time=4:00:00
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=64G
+
+# Activate environment
+module load 2025
+module load Anaconda3/2025.06-1
+cd /scratch-shared/pnair/Project_AI/
+module load CUDA/12.8.0
+
+source activate streetview_pnair
+export PYTHONNOUSERSITE=1
+export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
+# Ensure the activated env's python is used (module Anaconda may appear earlier in PATH)
+export PATH="$CONDA_PREFIX/bin:$PATH"
+
+# Configuration
+SPLITS_JSON="${SPLITS_JSON:-/scratch-shared/pnair/Project_AI/results/stage1-prototype/vanilla_streetclip_no_stage0/2025-12-21_10-48-19/splits.json}"
+CSV_PATH="${CSV_PATH:-data/dataset-43k-mapped.csv}"
+DATA_ROOT="${DATA_ROOT:-/scratch-shared/pnair/Project_AI/data}"
+GEOGUESSR_ID="${GEOGUESSR_ID:-6906237dc7731161a37282b2}"
+RESULTS_ROOT="${RESULTS_ROOT:-results}"
+
+echo "Batch mode: Evaluating all latest Stage 2 checkpoints on test split"
+echo "Results root: $RESULTS_ROOT"
+echo "Using splits: $SPLITS_JSON"
+
+python scripts/evaluation/eval_stage2_on_split.py \
+    --batch_mode \
+    --results_root "$RESULTS_ROOT" \
+    --csv_path "$CSV_PATH" \
+    --splits_json "$SPLITS_JSON" \
+    --data_root "$DATA_ROOT" \
+    --geoguessr_id "$GEOGUESSR_ID" \
+    --batch_size 64 \
+    --num_workers 8
+

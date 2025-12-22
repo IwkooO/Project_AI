@@ -3,8 +3,9 @@
 Build consolidated report artifacts from all training runs.
 
 Scans results/**/checkpoints/*.pt and results/evals/**/*.json to create:
-- Master CSV with all metrics
-- Comparison plots
+- Separate master CSVs for Stage 1 and Stage 2
+- Professional matplotlib plots (LaTeX-ready, publishable)
+- Interactive plotly plots
 - Summary markdown
 """
 
@@ -18,12 +19,44 @@ from collections import defaultdict
 import pandas as pd
 import torch
 import matplotlib.pyplot as plt
+import matplotlib
 import seaborn as sns
+
+# Optional plotly import
+PLOTLY_AVAILABLE = False
+try:
+    import plotly.graph_objects as go
+    import plotly.express as px
+    from plotly.subplots import make_subplots
+    PLOTLY_AVAILABLE = True
+except ImportError:
+    pass
+
+# Set matplotlib to use LaTeX-quality backend and configure for publication
+matplotlib.rcParams.update({
+    'font.family': 'serif',
+    'font.serif': ['Times', 'Palatino', 'New Century Schoolbook', 'Bookman', 'Computer Modern Roman'],
+    'font.size': 11,
+    'axes.labelsize': 12,
+    'axes.titlesize': 14,
+    'xtick.labelsize': 10,
+    'ytick.labelsize': 10,
+    'legend.fontsize': 10,
+    'figure.titlesize': 16,
+    'text.usetex': False,  # Set to True if LaTeX is installed
+    'pdf.fonttype': 42,  # TrueType fonts for PDF
+    'ps.fonttype': 42,  # TrueType fonts for PS
+    'figure.dpi': 300,
+    'savefig.dpi': 300,
+    'savefig.bbox': 'tight',
+    'savefig.pad_inches': 0.1,
+})
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 sns.set_style("whitegrid")
+sns.set_palette("colorblind")
 
 
 def is_vanilla(checkpoint_data: Dict) -> bool:
@@ -36,7 +69,7 @@ def is_vanilla(checkpoint_data: Dict) -> bool:
 
 def load_stage1_metrics(checkpoint_path: Path) -> Optional[Dict]:
     """Load metrics from Stage 1 checkpoint."""
-    ckpt = torch.load(checkpoint_path, map_location="cpu")
+    ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     
     variant = "vanilla" if is_vanilla(ckpt) else "finetuned"
     
@@ -60,7 +93,7 @@ def load_stage1_metrics(checkpoint_path: Path) -> Optional[Dict]:
 
 def load_stage2_metrics(checkpoint_path: Path) -> Optional[Dict]:
     """Load metrics from Stage 2 checkpoint."""
-    ckpt = torch.load(checkpoint_path, map_location="cpu")
+    ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     
     variant = "vanilla" if is_vanilla(ckpt) else "finetuned"
     
@@ -94,22 +127,35 @@ def load_stage2_metrics(checkpoint_path: Path) -> Optional[Dict]:
 
 def load_eval_metrics(eval_json_path: Path) -> Optional[Dict]:
     """Load metrics from evaluation JSON file."""
-    with open(eval_json_path, 'r') as f:
-        data = json.load(f)
+    try:
+        with open(eval_json_path, 'r') as f:
+            data = json.load(f)
+    except json.JSONDecodeError as e:
+        # Some older eval outputs may be partially written/corrupted (e.g., concurrent writes).
+        # Skip these rather than failing the entire report generation.
+        logger.warning(f"Skipping invalid JSON eval file: {eval_json_path} ({e})")
+        return None
     
     metrics = data.get("metrics", {})
     
     # Determine variant from checkpoint if available
     variant = "unknown"
-    if "stage2_checkpoint" in data:
-        ckpt_path = Path(data["stage2_checkpoint"])
+    ckpt_path_str = data.get("stage2_checkpoint") or data.get("stage1_checkpoint")
+    if ckpt_path_str:
+        ckpt_path = Path(ckpt_path_str)
         if ckpt_path.exists():
-            ckpt = torch.load(ckpt_path, map_location="cpu")
+            ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
             variant = "vanilla" if is_vanilla(ckpt) else "finetuned"
+        else:
+            # Fallback: check path for "vanilla" keyword
+            if "vanilla" in str(ckpt_path).lower():
+                variant = "vanilla"
+            elif "geolocal" in str(ckpt_path).lower() or "finetuned" in str(ckpt_path).lower():
+                variant = "finetuned"
     
     return {
         "eval_type": "test_split" if "splits_json" in data else "hf_dataset",
-        "checkpoint_path": data.get("stage2_checkpoint") or data.get("stage1_checkpoint"),
+        "checkpoint_path": ckpt_path_str,
         "variant": variant,
         "median_error_km": metrics.get("median_error_km"),
         "mean_error_km": metrics.get("mean_error_km"),
@@ -126,147 +172,609 @@ def load_eval_metrics(eval_json_path: Path) -> Optional[Dict]:
     }
 
 
-def scan_results_directory(results_root: Path) -> pd.DataFrame:
-    """Scan results directory for all checkpoints and eval files."""
+def load_consolidated_csv(csv_path: Path) -> List[Dict]:
+    """Load consolidated CSV and convert to metrics dict format."""
     rows = []
+    df = pd.read_csv(csv_path)
     
-    # Scan for Stage 1 checkpoints
-    logger.info("Scanning for Stage 1 checkpoints...")
-    for ckpt_path in results_root.rglob("**/checkpoints/best_model_stage1.pt"):
-        metrics = load_stage1_metrics(ckpt_path)
-        if metrics:
-            rows.append(metrics)
+    for _, row in df.iterrows():
+        # Determine eval type from CSV path
+        csv_name = csv_path.name
+        if "stage1" in csv_name:
+            eval_type = "test_split"
+            stage = 1
+        elif "stage2" in csv_name and "hf" in csv_name:
+            eval_type = "hf_dataset"
+            stage = 2
+        elif "stage2" in csv_name:
+            eval_type = "test_split"
+            stage = 2
+        else:
+            eval_type = "unknown"
+            stage = None
+        
+        # Convert row to dict
+        row_dict = row.to_dict()
+        
+        # Add metadata
+        row_dict["eval_type"] = eval_type
+        if stage:
+            row_dict["stage"] = stage
+        
+        rows.append(row_dict)
     
-    # Scan for Stage 2 checkpoints
-    logger.info("Scanning for Stage 2 checkpoints...")
-    for ckpt_path in results_root.rglob("**/checkpoints/best_model_stage2_xattn.pt"):
-        metrics = load_stage2_metrics(ckpt_path)
-        if metrics:
-            rows.append(metrics)
+    return rows
+
+
+def scan_results_directory(results_root: Path) -> pd.DataFrame:
+    """Scan results directory for consolidated CSVs only."""
+    rows = []
+    results_root = Path(results_root)
     
-    # Scan for evaluation JSONs
-    logger.info("Scanning for evaluation results...")
-    for eval_json in results_root.rglob("**/evals/**/test_metrics.json"):
-        metrics = load_eval_metrics(eval_json)
-        if metrics:
-            rows.append(metrics)
+    # Only use consolidated CSVs - these are the source of truth
+    logger.info("Loading consolidated CSVs...")
+    consolidated_csvs = [
+        results_root / "evals" / "stage1_test_consolidated.csv",
+        results_root / "evals" / "stage2_test_consolidated.csv",
+        results_root / "evals" / "stage2_hf_consolidated.csv",
+    ]
     
-    for eval_json in results_root.rglob("**/evals/**/hf_test_metrics.json"):
-        metrics = load_eval_metrics(eval_json)
-        if metrics:
-            rows.append(metrics)
+    for csv_path in consolidated_csvs:
+        if csv_path.exists():
+            logger.info(f"Loading consolidated CSV: {csv_path}")
+            csv_rows = load_consolidated_csv(csv_path)
+            rows.extend(csv_rows)
+        else:
+            logger.warning(f"Consolidated CSV not found: {csv_path}")
     
     return pd.DataFrame(rows)
 
 
-def create_comparison_plots(df: pd.DataFrame, output_dir: Path):
-    """Create comparison plots."""
+def create_stage1_plots(df_stage1: pd.DataFrame, output_dir: Path):
+    """Create professional Stage 1 plots."""
+    if len(df_stage1) == 0:
+        logger.warning("No Stage 1 data found for plotting")
+        return
+    
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Filter to stage2 data
-    df_stage2 = df[df["stage"] == 2].copy()
+    # Filter to test split evaluations
+    df_test = df_stage1[df_stage1.get("eval_type") == "test_split"].copy()
+    if len(df_test) == 0:
+        df_test = df_stage1.copy()
+    
+    # Replace "vanilla" with "default" and capitalize
+    df_test = df_test.copy()
+    df_test["variant"] = df_test["variant"].replace("vanilla", "default").str.capitalize()
+    
+    # Matplotlib: Stage 1 Accuracy Comparison - Top-1 and Top-5
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10), sharex=True, sharey='row')
+    variant_order = ["Default", "Finetuned"]
+    palette_map = {"Default": "#4472C4", "Finetuned": "#ED7D31"}  # Default=blue, Finetuned=orange
+    
+    # Top-1 Accuracies
+    if df_test["meta_acc"].notna().any():
+        sns.barplot(data=df_test, x="variant", y="meta_acc", order=variant_order, ax=axes[0, 0], 
+                   palette=[palette_map[v] for v in variant_order], edgecolor="black", linewidth=1.5)
+        axes[0, 0].set_ylabel("Accuracy", fontweight='bold')
+        axes[0, 0].set_xlabel("Model Variant", fontweight='bold')
+        axes[0, 0].set_title("(a) Child Concept (Top-1)", fontweight='bold', pad=10)
+        axes[0, 0].set_ylim([0, 1])
+        axes[0, 0].grid(axis='y', alpha=0.3, linestyle='--')
+        axes[0, 0].spines['top'].set_visible(False)
+        axes[0, 0].spines['right'].set_visible(False)
+        for container in axes[0, 0].containers:
+            axes[0, 0].bar_label(container, fmt='%.3f', label_type='edge', padding=3, fontsize=9)
+    
+    if df_test["parent_acc"].notna().any():
+        sns.barplot(data=df_test, x="variant", y="parent_acc", order=variant_order, ax=axes[0, 1],
+                   palette=[palette_map[v] for v in variant_order], edgecolor="black", linewidth=1.5)
+        axes[0, 1].set_ylabel("Accuracy", fontweight='bold')
+        axes[0, 1].set_xlabel("Model Variant", fontweight='bold')
+        axes[0, 1].set_title("(b) Parent Concept (Top-1)", fontweight='bold', pad=10)
+        axes[0, 1].set_ylim([0, 1])
+        axes[0, 1].grid(axis='y', alpha=0.3, linestyle='--')
+        axes[0, 1].spines['top'].set_visible(False)
+        axes[0, 1].spines['right'].set_visible(False)
+        for container in axes[0, 1].containers:
+            axes[0, 1].bar_label(container, fmt='%.3f', label_type='edge', padding=3, fontsize=9)
+    
+    # Top-5 Accuracies
+    if df_test["meta_acc_top5"].notna().any():
+        sns.barplot(data=df_test, x="variant", y="meta_acc_top5", order=variant_order, ax=axes[1, 0], 
+                   palette=[palette_map[v] for v in variant_order], edgecolor="black", linewidth=1.5)
+        axes[1, 0].set_ylabel("Accuracy", fontweight='bold')
+        axes[1, 0].set_xlabel("Model Variant", fontweight='bold')
+        axes[1, 0].set_title("(c) Child Concept (Top-5)", fontweight='bold', pad=10)
+        axes[1, 0].set_ylim([0, 1])
+        axes[1, 0].grid(axis='y', alpha=0.3, linestyle='--')
+        axes[1, 0].spines['top'].set_visible(False)
+        axes[1, 0].spines['right'].set_visible(False)
+        for container in axes[1, 0].containers:
+            axes[1, 0].bar_label(container, fmt='%.3f', label_type='edge', padding=3, fontsize=9)
+    
+    if df_test["parent_acc_top5"].notna().any():
+        sns.barplot(data=df_test, x="variant", y="parent_acc_top5", order=variant_order, ax=axes[1, 1],
+                   palette=[palette_map[v] for v in variant_order], edgecolor="black", linewidth=1.5)
+        axes[1, 1].set_ylabel("Accuracy", fontweight='bold')
+        axes[1, 1].set_xlabel("Model Variant", fontweight='bold')
+        axes[1, 1].set_title("(d) Parent Concept (Top-5)", fontweight='bold', pad=10)
+        axes[1, 1].set_ylim([0, 1])
+        axes[1, 1].grid(axis='y', alpha=0.3, linestyle='--')
+        axes[1, 1].spines['top'].set_visible(False)
+        axes[1, 1].spines['right'].set_visible(False)
+        for container in axes[1, 1].containers:
+            axes[1, 1].bar_label(container, fmt='%.3f', label_type='edge', padding=3, fontsize=9)
+    
+    plt.suptitle("Stage 1: Concept Classification Performance", fontsize=16, fontweight='bold', y=0.995)
+    plt.tight_layout()
+    plt.savefig(output_dir / "stage1_accuracies.pdf", format='pdf', bbox_inches='tight', dpi=300)
+    plt.savefig(output_dir / "stage1_accuracies.png", format='png', bbox_inches='tight', dpi=300)
+    plt.close()
+    
+    # Plotly: Interactive Stage 1 plot
+    if PLOTLY_AVAILABLE:
+        fig_plotly = make_subplots(
+            rows=1, cols=2,
+            subplot_titles=("Top-1 Accuracy", "Top-5 Accuracy"),
+            specs=[[{"secondary_y": False}, {"secondary_y": False}]]
+        )
+        
+        # Top-1
+        for variant in variant_order:
+            df_var = df_test[df_test["variant"] == variant]
+            meta_mean = df_var["meta_acc"].mean() if df_var["meta_acc"].notna().any() else 0
+            parent_mean = df_var["parent_acc"].mean() if df_var["parent_acc"].notna().any() else 0
+            
+            fig_plotly.add_trace(go.Bar(
+                name=variant,
+                x=["Child Concept", "Parent Concept"],
+                y=[meta_mean, parent_mean],
+                marker_color=palette_map.get(variant, "#808080"),
+                text=[f"{meta_mean:.3f}", f"{parent_mean:.3f}"],
+                textposition='outside',
+                showlegend=True,
+            ), row=1, col=1)
+        
+        # Top-5
+        for variant in variant_order:
+            df_var = df_test[df_test["variant"] == variant]
+            meta_top5_mean = df_var["meta_acc_top5"].mean() if df_var["meta_acc_top5"].notna().any() else 0
+            parent_top5_mean = df_var["parent_acc_top5"].mean() if df_var["parent_acc_top5"].notna().any() else 0
+            
+            fig_plotly.add_trace(go.Bar(
+                name=variant + " (Top-5)",
+                x=["Child Concept", "Parent Concept"],
+                y=[meta_top5_mean, parent_top5_mean],
+                marker_color=palette_map.get(variant, "#808080"),
+                text=[f"{meta_top5_mean:.3f}", f"{parent_top5_mean:.3f}"],
+                textposition='outside',
+                showlegend=False,
+            ), row=1, col=2)
+        
+        fig_plotly.update_layout(
+            title="Stage 1: Concept Classification Performance",
+            height=500,
+            width=1200,
+            barmode='group',
+            template='plotly_white',
+            font=dict(family="Times New Roman", size=12),
+        )
+        fig_plotly.update_xaxes(title_text="Concept Type", row=1, col=1)
+        fig_plotly.update_yaxes(title_text="Accuracy", range=[0, 1], row=1, col=1)
+        fig_plotly.update_xaxes(title_text="Concept Type", row=1, col=2)
+        fig_plotly.update_yaxes(title_text="Accuracy", range=[0, 1], row=1, col=2)
+        
+        fig_plotly.write_html(output_dir / "stage1_accuracies_interactive.html")
+    
+    logger.info(f"Saved Stage 1 plots to {output_dir}")
+
+
+def create_stage2_plots(df_stage2: pd.DataFrame, output_dir: Path):
+    """Create professional Stage 2 plots."""
     if len(df_stage2) == 0:
         logger.warning("No Stage 2 data found for plotting")
         return
     
-    # Plot 1: Median error by variant and ablation mode
-    fig, ax = plt.subplots(figsize=(10, 6))
-    df_plot = df_stage2[df_stage2["val_median_error_km"].notna()]
-    if len(df_plot) > 0:
-        sns.barplot(data=df_plot, x="ablation_mode", y="val_median_error_km", hue="variant", ax=ax)
-        ax.set_ylabel("Median Error (km)")
-        ax.set_xlabel("Ablation Mode")
-        ax.set_title("Stage 2 Validation Median Error: Vanilla vs Finetuned")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Separate test split and HF dataset results
+    df_test_split = df_stage2[df_stage2.get("eval_type") == "test_split"].copy()
+    df_hf = df_stage2[df_stage2.get("eval_type") == "hf_dataset"].copy()
+    
+    # Ablation mode order
+    ablation_order = ["both", "concept_only", "image_only"]
+    ablation_labels = {"both": "Both", "concept_only": "Concept Only", "image_only": "Image Only"}
+    
+    # Threshold accuracy columns and labels
+    threshold_cols = ["acc_city", "acc_region", "acc_country"]
+    threshold_labels = ["City (<25km)", "Region (<200km)", "Country (<750km)"]
+    
+    # Replace "vanilla" with "default" and capitalize variants
+    df_test_split = df_test_split.copy()
+    df_test_split["variant"] = df_test_split["variant"].replace("vanilla", "default").str.capitalize()
+    df_hf = df_hf.copy()
+    df_hf["variant"] = df_hf["variant"].replace("vanilla", "default").str.capitalize()
+    
+    variant_order = ["Default", "Finetuned"]
+    palette_map = {"Default": "#4472C4", "Finetuned": "#ED7D31"}  # Default=blue, Finetuned=orange
+    
+    # Matplotlib: Stage 2 Test Split Results
+    if len(df_test_split) > 0:
+        fig, axes = plt.subplots(2, 2, figsize=(12, 10), sharex=True, sharey=False)
+        
+        # Plot 1: Median Error
+        df_plot = df_test_split[df_test_split["median_error_km"].notna()].copy()
+        if len(df_plot) > 0:
+            sns.barplot(data=df_plot, x="ablation_mode", y="median_error_km", hue="variant",
+                       order=ablation_order, hue_order=variant_order, ax=axes[0, 0], 
+                       palette=[palette_map[v] for v in variant_order],
+                       edgecolor="black", linewidth=1.5)
+            axes[0, 0].set_ylabel("Median Error (km)", fontweight='bold')
+            axes[0, 0].set_xlabel("Ablation Mode", fontweight='bold')
+            axes[0, 0].set_title("(a) Median Distance Error", fontweight='bold', pad=10)
+            axes[0, 0].legend(title="Variant", title_fontsize=10, fontsize=9, labels=[v.capitalize() for v in variant_order])
+            axes[0, 0].grid(axis='y', alpha=0.3, linestyle='--')
+            axes[0, 0].spines['top'].set_visible(False)
+            axes[0, 0].spines['right'].set_visible(False)
+            axes[0, 0].set_xticklabels([ablation_labels.get(x.get_text(), x.get_text()) for x in axes[0, 0].get_xticklabels()])
+            # Annotate bars
+            for container in axes[0, 0].containers:
+                axes[0, 0].bar_label(container, fmt='%.1f', label_type='edge', padding=3, fontsize=9)
+        
+        # Plot 2: Cell Accuracy
+        if df_test_split["cell_acc"].notna().any():
+            sns.barplot(data=df_test_split, x="ablation_mode", y="cell_acc", hue="variant",
+                      order=ablation_order, hue_order=variant_order, ax=axes[0, 1], 
+                      palette=[palette_map[v] for v in variant_order],
+                      edgecolor="black", linewidth=1.5)
+            axes[0, 1].set_ylabel("Cell Accuracy", fontweight='bold')
+            axes[0, 1].set_xlabel("Ablation Mode", fontweight='bold')
+            axes[0, 1].set_title("(b) Cell Classification Accuracy", fontweight='bold', pad=10)
+            axes[0, 1].legend(title="Variant", title_fontsize=10, fontsize=9, labels=[v.capitalize() for v in variant_order])
+            axes[0, 1].set_ylim([0, 1])
+            axes[0, 1].grid(axis='y', alpha=0.3, linestyle='--')
+            axes[0, 1].spines['top'].set_visible(False)
+            axes[0, 1].spines['right'].set_visible(False)
+            axes[0, 1].set_xticklabels([ablation_labels.get(x.get_text(), x.get_text()) for x in axes[0, 1].get_xticklabels()])
+            # Annotate bars
+            for container in axes[0, 1].containers:
+                axes[0, 1].bar_label(container, fmt='%.3f', label_type='edge', padding=3, fontsize=9)
+        
+        # Plot 3: Threshold Accuracies (City, Region, Country)
+        threshold_data = []
+        for _, row in df_test_split.iterrows():
+            for col, label in zip(threshold_cols, threshold_labels):
+                if pd.notna(row.get(col)):
+                    threshold_data.append({
+                        "ablation_mode": row["ablation_mode"],
+                        "variant": row["variant"],
+                        "threshold": label,
+                        "accuracy": row[col]
+                    })
+        
+        if threshold_data:
+            df_threshold = pd.DataFrame(threshold_data)
+            sns.barplot(data=df_threshold, x="ablation_mode", y="accuracy", hue="threshold",
+                       order=ablation_order, ax=axes[1, 0], palette=["#70AD47", "#FFC000", "#7030A0"],
+                       edgecolor="black", linewidth=1.2)
+            axes[1, 0].set_ylabel("Accuracy", fontweight='bold')
+            axes[1, 0].set_xlabel("Ablation Mode", fontweight='bold')
+            axes[1, 0].set_title("(c) Threshold Accuracies", fontweight='bold', pad=10)
+            axes[1, 0].legend(title="Threshold", title_fontsize=10, fontsize=9)
+            axes[1, 0].set_ylim([0, 1])
+            axes[1, 0].grid(axis='y', alpha=0.3, linestyle='--')
+            axes[1, 0].spines['top'].set_visible(False)
+            axes[1, 0].spines['right'].set_visible(False)
+            axes[1, 0].set_xticklabels([ablation_labels.get(x.get_text(), x.get_text()) for x in axes[1, 0].get_xticklabels()])
+            # Annotate bars
+            for container in axes[1, 0].containers:
+                axes[1, 0].bar_label(container, fmt='%.3f', label_type='edge', padding=3, fontsize=8)
+        
+        # Plot 4: Comparison of variants across ablation modes
+        if df_test_split["median_error_km"].notna().any():
+            pivot_data = df_test_split.pivot_table(
+                values="median_error_km", 
+                index="ablation_mode", 
+                columns="variant", 
+                aggfunc='mean'
+            ).reindex(ablation_order)
+            
+            x_pos = range(len(ablation_order))
+            width = 0.35
+            default_vals = pivot_data.get("Default", [])
+            finetuned_vals = pivot_data.get("Finetuned", [])
+            
+            bars1 = axes[1, 1].bar([x - width/2 for x in x_pos], default_vals, 
+                          width, label="Default", color=palette_map["Default"], edgecolor="black", linewidth=1.5)
+            bars2 = axes[1, 1].bar([x + width/2 for x in x_pos], finetuned_vals, 
+                          width, label="Finetuned", color=palette_map["Finetuned"], edgecolor="black", linewidth=1.5)
+            axes[1, 1].set_ylabel("Median Error (km)", fontweight='bold')
+            axes[1, 1].set_xlabel("Ablation Mode", fontweight='bold')
+            axes[1, 1].set_title("(d) Variant Comparison", fontweight='bold', pad=10)
+            axes[1, 1].set_xticks(x_pos)
+            axes[1, 1].set_xticklabels([ablation_labels[mode] for mode in ablation_order])
+            axes[1, 1].legend(title="Variant", title_fontsize=10, fontsize=9)
+            axes[1, 1].grid(axis='y', alpha=0.3, linestyle='--')
+            axes[1, 1].spines['top'].set_visible(False)
+            axes[1, 1].spines['right'].set_visible(False)
+            # Annotate bars
+            for bars in [bars1, bars2]:
+                for bar in bars:
+                    height = bar.get_height()
+                    axes[1, 1].text(bar.get_x() + bar.get_width()/2., height,
+                                   f'{height:.1f}', ha='center', va='bottom', fontsize=9)
+        
+        plt.suptitle("Stage 2: Test Split Evaluation Results", fontsize=16, fontweight='bold', y=0.995)
         plt.tight_layout()
-        plt.savefig(output_dir / "stage2_val_median_error.png", dpi=150)
+        plt.savefig(output_dir / "stage2_test_split_results.pdf", format='pdf', bbox_inches='tight', dpi=300)
+        plt.savefig(output_dir / "stage2_test_split_results.png", format='png', bbox_inches='tight', dpi=300)
         plt.close()
     
-    # Plot 2: Test error comparison (if available)
-    df_test = df_stage2[df_stage2["test_median_error_km"].notna()]
-    if len(df_test) > 0:
-        fig, ax = plt.subplots(figsize=(10, 6))
-        sns.barplot(data=df_test, x="ablation_mode", y="test_median_error_km", hue="variant", ax=ax)
-        ax.set_ylabel("Median Error (km)")
-        ax.set_xlabel("Ablation Mode")
-        ax.set_title("Stage 2 Test Median Error: Vanilla vs Finetuned")
+    # Matplotlib: Stage 2 HF Dataset Results
+    if len(df_hf) > 0:
+        fig, axes = plt.subplots(2, 2, figsize=(12, 10), sharex=True, sharey=False)
+        
+        # Plot 1: Median Error on HF dataset
+        df_plot = df_hf[df_hf["median_error_km"].notna()].copy()
+        if len(df_plot) > 0:
+            sns.barplot(data=df_plot, x="ablation_mode", y="median_error_km", hue="variant",
+                       order=ablation_order, hue_order=variant_order, ax=axes[0, 0], 
+                       palette=[palette_map[v] for v in variant_order],
+                       edgecolor="black", linewidth=1.5)
+            axes[0, 0].set_ylabel("Median Error (km)", fontweight='bold')
+            axes[0, 0].set_xlabel("Ablation Mode", fontweight='bold')
+            axes[0, 0].set_title("(a) Median Distance Error", fontweight='bold', pad=10)
+            axes[0, 0].legend(title="Variant", title_fontsize=10, fontsize=9, labels=[v.capitalize() for v in variant_order])
+            axes[0, 0].grid(axis='y', alpha=0.3, linestyle='--')
+            axes[0, 0].spines['top'].set_visible(False)
+            axes[0, 0].spines['right'].set_visible(False)
+            axes[0, 0].set_xticklabels([ablation_labels.get(x.get_text(), x.get_text()) for x in axes[0, 0].get_xticklabels()])
+            # Annotate bars
+            for container in axes[0, 0].containers:
+                axes[0, 0].bar_label(container, fmt='%.1f', label_type='edge', padding=3, fontsize=9)
+        
+        # Plot 2: Cell Accuracy on HF dataset
+        if df_hf["cell_acc"].notna().any():
+            sns.barplot(data=df_hf, x="ablation_mode", y="cell_acc", hue="variant",
+                      order=ablation_order, hue_order=variant_order, ax=axes[0, 1], 
+                      palette=[palette_map[v] for v in variant_order],
+                      edgecolor="black", linewidth=1.5)
+            axes[0, 1].set_ylabel("Cell Accuracy", fontweight='bold')
+            axes[0, 1].set_xlabel("Ablation Mode", fontweight='bold')
+            axes[0, 1].set_title("(b) Cell Classification Accuracy", fontweight='bold', pad=10)
+            axes[0, 1].legend(title="Variant", title_fontsize=10, fontsize=9, labels=[v.capitalize() for v in variant_order])
+            axes[0, 1].set_ylim([0, 1])
+            axes[0, 1].grid(axis='y', alpha=0.3, linestyle='--')
+            axes[0, 1].spines['top'].set_visible(False)
+            axes[0, 1].spines['right'].set_visible(False)
+            axes[0, 1].set_xticklabels([ablation_labels.get(x.get_text(), x.get_text()) for x in axes[0, 1].get_xticklabels()])
+            # Annotate bars
+            for container in axes[0, 1].containers:
+                axes[0, 1].bar_label(container, fmt='%.3f', label_type='edge', padding=3, fontsize=9)
+        
+        # Plot 3: Threshold Accuracies on HF dataset
+        threshold_data = []
+        for _, row in df_hf.iterrows():
+            for col, label in zip(threshold_cols, threshold_labels):
+                if pd.notna(row.get(col)):
+                    threshold_data.append({
+                        "ablation_mode": row["ablation_mode"],
+                        "variant": row["variant"],
+                        "threshold": label,
+                        "accuracy": row[col]
+                    })
+        
+        if threshold_data:
+            df_threshold = pd.DataFrame(threshold_data)
+            sns.barplot(data=df_threshold, x="ablation_mode", y="accuracy", hue="threshold",
+                       order=ablation_order, ax=axes[1, 0], palette=["#70AD47", "#FFC000", "#7030A0"],
+                       edgecolor="black", linewidth=1.2)
+            axes[1, 0].set_ylabel("Accuracy", fontweight='bold')
+            axes[1, 0].set_xlabel("Ablation Mode", fontweight='bold')
+            axes[1, 0].set_title("(c) Threshold Accuracies", fontweight='bold', pad=10)
+            axes[1, 0].legend(title="Threshold", title_fontsize=10, fontsize=9)
+            axes[1, 0].set_ylim([0, 1])
+            axes[1, 0].grid(axis='y', alpha=0.3, linestyle='--')
+            axes[1, 0].spines['top'].set_visible(False)
+            axes[1, 0].spines['right'].set_visible(False)
+            axes[1, 0].set_xticklabels([ablation_labels.get(x.get_text(), x.get_text()) for x in axes[1, 0].get_xticklabels()])
+            # Annotate bars
+            for container in axes[1, 0].containers:
+                axes[1, 0].bar_label(container, fmt='%.3f', label_type='edge', padding=3, fontsize=8)
+        
+        # Plot 4: Comparison Test Split vs HF Dataset
+        if len(df_test_split) > 0 and len(df_hf) > 0:
+            comparison_data = []
+            for df_source, source_name in [(df_test_split, "Test Split"), (df_hf, "HF Dataset")]:
+                for _, row in df_source.iterrows():
+                    if pd.notna(row.get("median_error_km")):
+                        comparison_data.append({
+                            "ablation_mode": row["ablation_mode"],
+                            "variant": row["variant"],
+                            "dataset": source_name,
+                            "median_error_km": row["median_error_km"]
+                        })
+            
+            if comparison_data:
+                df_comp = pd.DataFrame(comparison_data)
+                sns.barplot(data=df_comp, x="ablation_mode", y="median_error_km", hue="dataset",
+                           order=ablation_order, ax=axes[1, 1], palette=["#5B9BD5", "#E7E6E6"],
+                           edgecolor="black", linewidth=1.2)
+                axes[1, 1].set_ylabel("Median Error (km)", fontweight='bold')
+                axes[1, 1].set_xlabel("Ablation Mode", fontweight='bold')
+                axes[1, 1].set_title("(d) Test Split vs HF Dataset", fontweight='bold', pad=10)
+                axes[1, 1].legend(title="Dataset", title_fontsize=10, fontsize=9)
+                axes[1, 1].grid(axis='y', alpha=0.3, linestyle='--')
+                axes[1, 1].spines['top'].set_visible(False)
+                axes[1, 1].spines['right'].set_visible(False)
+                axes[1, 1].set_xticklabels([ablation_labels.get(x.get_text(), x.get_text()) for x in axes[1, 1].get_xticklabels()])
+                # Annotate bars
+                for container in axes[1, 1].containers:
+                    axes[1, 1].bar_label(container, fmt='%.1f', label_type='edge', padding=3, fontsize=9)
+        
+        plt.suptitle("Stage 2: HF GeoGuessr Dataset Evaluation Results", fontsize=16, fontweight='bold', y=0.995)
         plt.tight_layout()
-        plt.savefig(output_dir / "stage2_test_median_error.png", dpi=150)
+        plt.savefig(output_dir / "stage2_hf_results.pdf", format='pdf', bbox_inches='tight', dpi=300)
+        plt.savefig(output_dir / "stage2_hf_results.png", format='png', bbox_inches='tight', dpi=300)
         plt.close()
     
-    # Plot 3: Stage 1 accuracy comparison
-    df_stage1 = df[df["stage"] == 1].copy()
-    if len(df_stage1) > 0:
-        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    # Plotly: Interactive Stage 2 plots
+    if PLOTLY_AVAILABLE and len(df_test_split) > 0:
+        fig_plotly = make_subplots(
+            rows=2, cols=2,
+            subplot_titles=("Median Error", "Cell Accuracy", "Threshold Accuracies", "Variant Comparison"),
+            specs=[[{"secondary_y": False}, {"secondary_y": False}],
+                   [{"secondary_y": False}, {"secondary_y": False}]]
+        )
         
-        if df_stage1["meta_acc"].notna().any():
-            sns.barplot(data=df_stage1, x="variant", y="meta_acc", ax=axes[0])
-            axes[0].set_ylabel("Meta Accuracy")
-            axes[0].set_title("Stage 1 Meta Accuracy")
+        # Median Error
+        for variant in variant_order:
+            df_var = df_test_split[df_test_split["variant"] == variant]
+            if len(df_var) > 0 and df_var["median_error_km"].notna().any():
+                fig_plotly.add_trace(
+                    go.Bar(name=variant, x=df_var["ablation_mode"], y=df_var["median_error_km"],
+                          marker_color=palette_map.get(variant, "#808080")),
+                    row=1, col=1
+                )
         
-        if df_stage1["parent_acc"].notna().any():
-            sns.barplot(data=df_stage1, x="variant", y="parent_acc", ax=axes[1])
-            axes[1].set_ylabel("Parent Accuracy")
-            axes[1].set_title("Stage 1 Parent Accuracy")
+        # Cell Accuracy
+        for variant in variant_order:
+            df_var = df_test_split[df_test_split["variant"] == variant]
+            if len(df_var) > 0 and df_var["cell_acc"].notna().any():
+                fig_plotly.add_trace(
+                    go.Bar(name=variant, x=df_var["ablation_mode"], y=df_var["cell_acc"],
+                          marker_color=palette_map.get(variant, "#808080"), showlegend=False),
+                    row=1, col=2
+                )
         
-        plt.tight_layout()
-        plt.savefig(output_dir / "stage1_accuracies.png", dpi=150)
-        plt.close()
+        fig_plotly.update_layout(
+            title="Stage 2: Test Split Evaluation Results (Interactive)",
+            height=800,
+            width=1200,
+            template='plotly_white',
+            font=dict(family="Times New Roman", size=12),
+        )
+        fig_plotly.update_xaxes(title_text="Ablation Mode", row=1, col=1)
+        fig_plotly.update_yaxes(title_text="Median Error (km)", row=1, col=1)
+        fig_plotly.update_xaxes(title_text="Ablation Mode", row=1, col=2)
+        fig_plotly.update_yaxes(title_text="Cell Accuracy", row=1, col=2)
+        
+        fig_plotly.write_html(output_dir / "stage2_test_split_interactive.html")
     
-    logger.info(f"Saved plots to {output_dir}")
+    logger.info(f"Saved Stage 2 plots to {output_dir}")
 
 
 def create_summary_markdown(df: pd.DataFrame, output_dir: Path):
     """Create summary markdown report."""
     output_path = output_dir / "summary.md"
     
+    # Replace "vanilla" with "default" and capitalize
+    df = df.copy()
+    df["variant"] = df["variant"].replace("vanilla", "default").str.capitalize()
+    
     with open(output_path, 'w') as f:
         f.write("# Experiment Results Summary\n\n")
+        f.write("This report summarizes the evaluation results for Stage 1 (concept classification) ")
+        f.write("and Stage 2 (geolocation) models.\n\n")
         
         # Stage 1 summary
         df_stage1 = df[df["stage"] == 1].copy()
         if len(df_stage1) > 0:
-            f.write("## Stage 1 Results\n\n")
-            f.write("| Variant | Meta Acc | Parent Acc |\n")
-            f.write("|---------|----------|------------|\n")
-            for variant in ["vanilla", "finetuned"]:
-                df_var = df_stage1[df_stage1["variant"] == variant]
+            f.write("## Stage 1: Concept Classification Results\n\n")
+            f.write("### Test Split Evaluation\n\n")
+            df_stage1_test = df_stage1[df_stage1.get("eval_type") == "test_split"].copy()
+            if len(df_stage1_test) == 0:
+                df_stage1_test = df_stage1.copy()
+            
+            f.write("| Variant | Child Concept (Top-1) | Parent Concept (Top-1) | Child Concept (Top-5) | Parent Concept (Top-5) |\n")
+            f.write("|---------|----------------------|----------------------|---------------------|----------------------|\n")
+            for variant in ["Default", "Finetuned"]:
+                df_var = df_stage1_test[df_stage1_test["variant"] == variant]
                 if len(df_var) > 0:
-                    meta_acc = df_var["meta_acc"].mean()
-                    parent_acc = df_var["parent_acc"].mean()
-                    f.write(f"| {variant} | {meta_acc:.4f} | {parent_acc:.4f} |\n")
+                    meta_acc = df_var["meta_acc"].mean() if df_var["meta_acc"].notna().any() else None
+                    parent_acc = df_var["parent_acc"].mean() if df_var["parent_acc"].notna().any() else None
+                    meta_top5 = df_var["meta_acc_top5"].mean() if df_var["meta_acc_top5"].notna().any() else None
+                    parent_top5 = df_var["parent_acc_top5"].mean() if df_var["parent_acc_top5"].notna().any() else None
+                    
+                    meta_str = f"{meta_acc:.4f}" if meta_acc is not None else "N/A"
+                    parent_str = f"{parent_acc:.4f}" if parent_acc is not None else "N/A"
+                    meta_top5_str = f"{meta_top5:.4f}" if meta_top5 is not None else "N/A"
+                    parent_top5_str = f"{parent_top5:.4f}" if parent_top5 is not None else "N/A"
+                    
+                    f.write(f"| {variant} | {meta_str} | {parent_str} | {meta_top5_str} | {parent_top5_str} |\n")
             f.write("\n")
         
         # Stage 2 summary
         df_stage2 = df[df["stage"] == 2].copy()
         if len(df_stage2) > 0:
-            f.write("## Stage 2 Results\n\n")
-            f.write("### Validation Set\n\n")
-            f.write("| Variant | Ablation | Median Error (km) |\n")
-            f.write("|---------|----------|-------------------|\n")
-            for variant in ["vanilla", "finetuned"]:
-                for ablation in ["concept_only", "image_only", "both"]:
-                    df_subset = df_stage2[
-                        (df_stage2["variant"] == variant) & 
-                        (df_stage2["ablation_mode"] == ablation) &
-                        (df_stage2["val_median_error_km"].notna())
-                    ]
-                    if len(df_subset) > 0:
-                        median_err = df_subset["val_median_error_km"].mean()
-                        f.write(f"| {variant} | {ablation} | {median_err:.2f} |\n")
+            f.write("## Stage 2: Geolocation Results\n\n")
             
-            f.write("\n### Test Set\n\n")
-            f.write("| Variant | Ablation | Median Error (km) |\n")
-            f.write("|---------|----------|-------------------|\n")
-            for variant in ["vanilla", "finetuned"]:
-                for ablation in ["concept_only", "image_only", "both"]:
-                    df_subset = df_stage2[
-                        (df_stage2["variant"] == variant) & 
-                        (df_stage2["ablation_mode"] == ablation) &
-                        (df_stage2["test_median_error_km"].notna())
-                    ]
-                    if len(df_subset) > 0:
-                        median_err = df_subset["test_median_error_km"].mean()
-                        f.write(f"| {variant} | {ablation} | {median_err:.2f} |\n")
+            # Test Split Results
+            df_stage2_test = df_stage2[df_stage2.get("eval_type") == "test_split"].copy()
+            if len(df_stage2_test) > 0:
+                f.write("### Test Split Evaluation\n\n")
+                f.write("| Variant | Ablation | Median Error (km) | Mean Error (km) | Cell Acc | City Acc | Region Acc | Country Acc |\n")
+                f.write("|---------|----------|-------------------|----------------|----------|----------|------------|-------------|\n")
+                # Replace vanilla with default in the dataframe
+                df_stage2_test = df_stage2_test.copy()
+                df_stage2_test["variant"] = df_stage2_test["variant"].replace("vanilla", "default").str.capitalize()
+                for variant in ["Default", "Finetuned"]:
+                    for ablation in ["both", "concept_only", "image_only"]:
+                        df_subset = df_stage2_test[
+                            (df_stage2_test["variant"] == variant) & 
+                            (df_stage2_test["ablation_mode"] == ablation)
+                        ]
+                        if len(df_subset) > 0:
+                            median_err = df_subset["median_error_km"].mean() if df_subset["median_error_km"].notna().any() else None
+                            mean_err = df_subset["mean_error_km"].mean() if df_subset["mean_error_km"].notna().any() else None
+                            cell_acc = df_subset["cell_acc"].mean() if df_subset["cell_acc"].notna().any() else None
+                            city_acc = df_subset["acc_city"].mean() if df_subset["acc_city"].notna().any() else None
+                            region_acc = df_subset["acc_region"].mean() if df_subset["acc_region"].notna().any() else None
+                            country_acc = df_subset["acc_country"].mean() if df_subset["acc_country"].notna().any() else None
+                            
+                            median_str = f"{median_err:.2f}" if median_err is not None else "N/A"
+                            mean_str = f"{mean_err:.2f}" if mean_err is not None else "N/A"
+                            cell_str = f"{cell_acc:.4f}" if cell_acc is not None else "N/A"
+                            city_str = f"{city_acc:.4f}" if city_acc is not None else "N/A"
+                            region_str = f"{region_acc:.4f}" if region_acc is not None else "N/A"
+                            country_str = f"{country_acc:.4f}" if country_acc is not None else "N/A"
+                            
+                            f.write(f"| {variant} | {ablation} | {median_str} | {mean_str} | {cell_str} | {city_str} | {region_str} | {country_str} |\n")
+                f.write("\n")
+            
+            # HF Dataset Results
+            df_stage2_hf = df_stage2[df_stage2.get("eval_type") == "hf_dataset"].copy()
+            if len(df_stage2_hf) > 0:
+                f.write("### Hugging Face GeoGuessr Dataset Evaluation\n\n")
+                f.write("| Variant | Ablation | Median Error (km) | Mean Error (km) | Cell Acc | City Acc | Region Acc | Country Acc |\n")
+                f.write("|---------|----------|-------------------|----------------|----------|----------|------------|-------------|\n")
+                # Replace vanilla with default in the dataframe
+                df_stage2_hf = df_stage2_hf.copy()
+                df_stage2_hf["variant"] = df_stage2_hf["variant"].replace("vanilla", "default").str.capitalize()
+                for variant in ["Default", "Finetuned"]:
+                    for ablation in ["both", "concept_only", "image_only"]:
+                        df_subset = df_stage2_hf[
+                            (df_stage2_hf["variant"] == variant) & 
+                            (df_stage2_hf["ablation_mode"] == ablation)
+                        ]
+                        if len(df_subset) > 0:
+                            median_err = df_subset["median_error_km"].mean() if df_subset["median_error_km"].notna().any() else None
+                            mean_err = df_subset["mean_error_km"].mean() if df_subset["mean_error_km"].notna().any() else None
+                            cell_acc = df_subset["cell_acc"].mean() if df_subset["cell_acc"].notna().any() else None
+                            city_acc = df_subset["acc_city"].mean() if df_subset["acc_city"].notna().any() else None
+                            region_acc = df_subset["acc_region"].mean() if df_subset["acc_region"].notna().any() else None
+                            country_acc = df_subset["acc_country"].mean() if df_subset["acc_country"].notna().any() else None
+                            
+                            median_str = f"{median_err:.2f}" if median_err is not None else "N/A"
+                            mean_str = f"{mean_err:.2f}" if mean_err is not None else "N/A"
+                            cell_str = f"{cell_acc:.4f}" if cell_acc is not None else "N/A"
+                            city_str = f"{city_acc:.4f}" if city_acc is not None else "N/A"
+                            region_str = f"{region_acc:.4f}" if region_acc is not None else "N/A"
+                            country_str = f"{country_acc:.4f}" if country_acc is not None else "N/A"
+                            
+                            f.write(f"| {variant} | {ablation} | {median_str} | {mean_str} | {cell_str} | {city_str} | {region_str} | {country_str} |\n")
+                f.write("\n")
     
     logger.info(f"Saved summary to {output_path}")
 
@@ -294,20 +802,42 @@ def main():
     
     logger.info(f"Found {len(df)} metric entries")
     
-    # Save master CSV
+    # Separate Stage 1 and Stage 2 data
+    df_stage1 = df[df["stage"] == 1].copy()
+    df_stage2 = df[df["stage"] == 2].copy()
+    
+    # Save separate master CSVs
+    if len(df_stage1) > 0:
+        csv_path_stage1 = output_dir / "master_metrics_stage1.csv"
+        df_stage1.to_csv(csv_path_stage1, index=False)
+        logger.info(f"Saved Stage 1 master CSV to {csv_path_stage1}")
+    
+    if len(df_stage2) > 0:
+        csv_path_stage2 = output_dir / "master_metrics_stage2.csv"
+        df_stage2.to_csv(csv_path_stage2, index=False)
+        logger.info(f"Saved Stage 2 master CSV to {csv_path_stage2}")
+    
+    # Also save combined CSV for backward compatibility
     csv_path = output_dir / "master_metrics.csv"
     df.to_csv(csv_path, index=False)
-    logger.info(f"Saved master CSV to {csv_path}")
+    logger.info(f"Saved combined master CSV to {csv_path}")
     
-    # Create plots
-    create_comparison_plots(df, output_dir)
+    # Create separate plots for Stage 1 and Stage 2
+    create_stage1_plots(df_stage1, output_dir)
+    create_stage2_plots(df_stage2, output_dir)
     
     # Create summary markdown
     create_summary_markdown(df, output_dir)
     
     logger.info(f"\nReport artifacts saved to {output_dir}")
-    logger.info(f"  - master_metrics.csv")
-    logger.info(f"  - *.png (plots)")
+    logger.info(f"  - master_metrics_stage1.csv")
+    logger.info(f"  - master_metrics_stage2.csv")
+    logger.info(f"  - master_metrics.csv (combined)")
+    logger.info(f"  - stage1_accuracies.pdf/png (publication-ready)")
+    logger.info(f"  - stage1_accuracies_interactive.html (plotly)")
+    logger.info(f"  - stage2_test_split_results.pdf/png (publication-ready)")
+    logger.info(f"  - stage2_hf_results.pdf/png (publication-ready)")
+    logger.info(f"  - stage2_test_split_interactive.html (plotly)")
     logger.info(f"  - summary.md")
 
 

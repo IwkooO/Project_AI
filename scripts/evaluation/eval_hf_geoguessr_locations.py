@@ -13,7 +13,7 @@ import argparse
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from collections import Counter
 
 import numpy as np
@@ -38,9 +38,16 @@ from scripts.training.train_stage2_cross_attention import (
     compute_offset_targets,
     generate_semantic_geocells,
 )
+from scripts.evaluation.eval_stage2_on_split import find_latest_stage2_checkpoints
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def _is_vanilla_from_stage0(stage0_checkpoint) -> bool:
+    if stage0_checkpoint is None:
+        return True
+    s = str(stage0_checkpoint).strip()
+    return s == "" or s.lower() == "none"
 
 THRESHOLD_ACCURACIES = {
     "street": 1.0,
@@ -63,31 +70,36 @@ class HFGeoGuessrDataset(Dataset):
         self.transforms = transforms
         self.max_samples = max_samples
         
-        # Filter samples with valid coordinates and panorama_360 images
-        self.valid_indices = []
-        for i, sample in enumerate(self.hf_dataset):
-            if "panorama_360" not in sample or sample["panorama_360"] is None:
-                continue
-            if "lat" not in sample or "lng" not in sample:
-                continue
-            if sample["lat"] is None or sample["lng"] is None:
-                continue
-            self.valid_indices.append(i)
-            if max_samples and len(self.valid_indices) >= max_samples:
-                break
+        # Get dataset length
+        try:
+            self.dataset_len = len(self.hf_dataset)
+        except (TypeError, AttributeError):
+            self.dataset_len = None
         
-        logger.info(f"Found {len(self.valid_indices)} valid samples")
+        if self.max_samples and self.dataset_len:
+            self.dataset_len = min(self.max_samples, self.dataset_len)
     
     def __len__(self):
-        return len(self.valid_indices)
+        if self.dataset_len is not None:
+            return self.dataset_len
+        if self.max_samples:
+            return self.max_samples
+        raise RuntimeError("Cannot determine dataset length")
     
     def __getitem__(self, idx):
-        sample_idx = self.valid_indices[idx]
-        sample = self.hf_dataset[sample_idx]
+        # Handle max_samples limit
+        if self.max_samples and idx >= self.max_samples:
+            raise IndexError(f"Index {idx} exceeds max_samples {self.max_samples}")
+        
+        sample = self.hf_dataset[idx]
         
         # Load panorama_360 image
-        panorama_img = sample["panorama_360"]
-        if isinstance(panorama_img, dict) and "bytes" in panorama_img:
+        panorama_img = sample.get("panorama_360")
+        if panorama_img is None:
+            # Create a dummy black image if panorama_360 is missing
+            from PIL import Image as PILImage
+            pil_image = PILImage.new("RGB", (224, 224), color=(0, 0, 0))
+        elif isinstance(panorama_img, dict) and "bytes" in panorama_img:
             img_bytes = panorama_img["bytes"]
             pil_image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
         else:
@@ -101,14 +113,14 @@ class HFGeoGuessrDataset(Dataset):
             img_tensor = transforms.ToTensor()(pil_image)
         
         # Get coordinates
-        lat = float(sample["lat"])
-        lng = float(sample["lng"])
+        lat = float(sample.get("lat", 0.0))
+        lng = float(sample.get("lng", 0.0))
         coords = torch.tensor([lat, lng], dtype=torch.float32)
         
         # Country (may not be available)
         country = sample.get("country", "unknown")
         
-        return img_tensor, coords, country, sample_idx
+        return img_tensor, coords, country, idx
 
 
 def hf_collate_fn(batch):
@@ -126,7 +138,7 @@ def load_stage2_checkpoint(
 ) -> tuple:
     """Load Stage 2 checkpoint."""
     logger.info(f"Loading Stage 2 checkpoint from {checkpoint_path}")
-    ckpt = torch.load(checkpoint_path, map_location=device)
+    ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
     
     # Load Stage 1 checkpoint
     stage1_ckpt_path = Path(ckpt["stage1_checkpoint"])
@@ -174,6 +186,9 @@ def evaluate_on_hf_dataset(
     cell_centers: torch.Tensor,
     coord_output_dim: int,
     concept_info: Dict,
+    ablation_mode: str,
+    patch_dim: int,
+    concept_dim: int,
     lambda_cell: float = 1.0,
     lambda_offset: float = 1.0,
 ) -> Dict:
@@ -203,7 +218,7 @@ def evaluate_on_hf_dataset(
     all_countries_list = []
     
     for batch in tqdm(test_loader, desc="Evaluating"):
-        images, coordinates, countries, _ = batch
+        images, coordinates, countries, sample_indices = batch
         images = images.to(device)
         coordinates = coordinates.to(device)
         
@@ -226,12 +241,19 @@ def evaluate_on_hf_dataset(
         distances = np.linalg.norm(xyz[:, None, :] - centers_np[None, :, :], axis=2)
         cell_labels = torch.tensor(np.argmin(distances, axis=1), dtype=torch.long).to(device)
         
-        # Get patch tokens and image features
-        patch_tokens = image_encoder.get_patch_tokens(images)
-        img_features = image_encoder(images)
-        
-        # Get concept embeddings from Stage 1
-        concept_embs = stage1_model.concept_bottleneck(img_features)
+        # Compute features + patch tokens based on ablation mode
+        if ablation_mode == "concept_only":
+            # No patch tokens used in this mode
+            img_features = image_encoder(images)  # [B, 768]
+            concept_embs = stage1_model.concept_bottleneck(img_features.float())
+            patch_tokens = torch.empty((images.size(0), 0, patch_dim), device=device, dtype=img_features.dtype)
+        else:
+            # both / image_only: get features + patches in ONE forward
+            img_features, patch_tokens = image_encoder.get_features_and_patches(images)
+            if ablation_mode == "image_only":
+                concept_embs = torch.zeros((images.size(0), concept_dim), device=device, dtype=img_features.dtype)
+            else:
+                concept_embs = stage1_model.concept_bottleneck(img_features.float())
         
         # Forward pass
         outputs = model(concept_embs, patch_tokens, return_attention=False, return_gate=False)
@@ -329,10 +351,105 @@ def evaluate_on_hf_dataset(
     }
 
 
+def evaluate_single_stage2_hf_checkpoint(
+    checkpoint_path: Path,
+    variant: str,
+    ablation_mode: str,
+    hf_dataset,  # Pre-loaded HF dataset
+    batch_size: int,
+    num_workers: int,
+    device: torch.device,
+    max_samples: Optional[int] = None,
+    lambda_cell: float = 1.0,
+    lambda_offset: float = 1.0,
+) -> Optional[Dict]:
+    """Evaluate a single Stage 2 checkpoint on HF dataset and return results dict."""
+    try:
+        # Load checkpoint
+        model, image_encoder, stage1_model, cell_centers, concept_info, ckpt = load_stage2_checkpoint(
+            checkpoint_path, device
+        )
+        
+        # Get ablation mode from checkpoint (may differ, use checkpoint's value)
+        ablation_mode_from_ckpt = ckpt.get("ablation_mode", "both")
+        if ablation_mode_from_ckpt != ablation_mode:
+            logger.warning(f"Ablation mode mismatch: expected {ablation_mode}, got {ablation_mode_from_ckpt} from checkpoint")
+            ablation_mode = ablation_mode_from_ckpt
+        
+        # Variant is determined from directory path, trust it
+        
+        # Create dataset (using pre-loaded hf_dataset)
+        transforms = get_transforms_from_processor(image_encoder.image_processor)
+        test_dataset = HFGeoGuessrDataset(
+            hf_dataset,
+            transforms=transforms,
+            max_samples=max_samples,
+        )
+        
+        logger.info(f"Dataset created: {len(test_dataset)} samples")
+        
+        test_loader = DataLoader(
+            test_dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=num_workers,
+            collate_fn=hf_collate_fn,
+            pin_memory=True,
+        )
+        
+        # Evaluate
+        logger.info("Starting evaluation...")
+        metrics = evaluate_on_hf_dataset(
+            model,
+            image_encoder,
+            stage1_model,
+            test_loader,
+            device,
+            cell_centers,
+            ckpt["coord_output_dim"],
+            concept_info,
+            ablation_mode=ablation_mode,
+            patch_dim=ckpt["patch_dim"],
+            concept_dim=ckpt["concept_dim"],
+            lambda_cell=lambda_cell,
+            lambda_offset=lambda_offset,
+        )
+        
+        if "error" in metrics:
+            logger.warning(f"Evaluation error for {checkpoint_path}: {metrics['error']}")
+            return None
+        
+        return {
+            "checkpoint": str(checkpoint_path),
+            "checkpoint_name": checkpoint_path.name,
+            "variant": variant,
+            "ablation_mode": ablation_mode,
+            "median_error_km": metrics["median_error_km"],
+            "mean_error_km": metrics["mean_error_km"],
+            "cell_acc": metrics["cell_acc"],
+            "acc_street": metrics["acc_street"],
+            "acc_city": metrics["acc_city"],
+            "acc_region": metrics["acc_region"],
+            "acc_country": metrics["acc_country"],
+            "stage0_checkpoint": str(ckpt.get("stage0_checkpoint", "None")),
+            "stage1_checkpoint": str(ckpt.get("stage1_checkpoint", "None")),
+            "dataset": "hf_geoguessr_locations",
+        }
+    except Exception as e:
+        logger.error(f"Failed to evaluate {checkpoint_path}: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
 def main():
     parser = argparse.ArgumentParser(description="Evaluate Stage 2 checkpoint on HF GeoGuessr dataset")
-    parser.add_argument("--stage2_checkpoint", type=str, required=True,
-                        help="Path to Stage 2 checkpoint")
+    parser.add_argument("--stage2_checkpoint", type=str, default=None,
+                        help="Path to Stage 2 checkpoint (required if not using --batch_mode)")
+    parser.add_argument("--batch_mode", action="store_true",
+                        help="Auto-detect and evaluate all latest Stage 2 checkpoints")
+    parser.add_argument("--results_root", type=str, default="results",
+                        help="Root directory containing results (for batch mode)")
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--output_dir", type=str, default=None,
@@ -349,6 +466,71 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
     
+    # Batch mode: auto-detect and evaluate all checkpoints
+    if args.batch_mode:
+        logger.info("Batch mode: Auto-detecting latest Stage 2 checkpoints...")
+        results_root = Path(args.results_root)
+        checkpoint_tuples = find_latest_stage2_checkpoints(results_root)
+        
+        if len(checkpoint_tuples) == 0:
+            logger.error("No Stage 2 checkpoints found!")
+            return
+        
+        logger.info(f"Found {len(checkpoint_tuples)} checkpoint(s) to evaluate")
+        
+        # Load HF dataset ONCE before the loop
+        logger.info("Loading HF dataset: fren-gor/geoguessr-locations")
+        logger.info("This may take a few minutes...")
+        hf_dataset = load_dataset("fren-gor/geoguessr-locations", split=args.split)
+        logger.info(f"Loaded {len(hf_dataset)} samples from split '{args.split}'")
+        
+        # Evaluate all checkpoints
+        all_results = []
+        for ckpt_path, variant, ablation_mode in checkpoint_tuples:
+            logger.info(f"\n{'='*60}")
+            logger.info(f"Evaluating: {ckpt_path}")
+            logger.info(f"Variant: {variant}, Ablation Mode: {ablation_mode}")
+            logger.info(f"Dataset: HF GeoGuessr Locations")
+            logger.info(f"{'='*60}")
+            
+            result = evaluate_single_stage2_hf_checkpoint(
+                checkpoint_path=ckpt_path,
+                variant=variant,
+                ablation_mode=ablation_mode,
+                hf_dataset=hf_dataset,  # Pass the pre-loaded dataset
+                batch_size=args.batch_size,
+                num_workers=args.num_workers,
+                device=device,
+                max_samples=args.max_samples,
+                lambda_cell=args.lambda_cell,
+                lambda_offset=args.lambda_offset,
+            )
+            
+            if result:
+                all_results.append(result)
+                logger.info(f"  Median Error: {result['median_error_km']:.2f} km")
+                logger.info(f"  Cell Accuracy: {result['cell_acc']:.4f}")
+                logger.info(f"  Country Accuracy: {result['acc_country']:.4f}")
+        
+        # Save consolidated CSV
+        if len(all_results) > 0:
+            output_dir = Path(args.results_root) / "evals"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            consolidated_csv = output_dir / "stage2_hf_consolidated.csv"
+            
+            df = pd.DataFrame(all_results)
+            df.to_csv(consolidated_csv, index=False)
+            logger.info(f"\nSaved consolidated CSV to {consolidated_csv}")
+            logger.info(f"Total evaluations: {len(df)}")
+        else:
+            logger.warning("No results to save!")
+        
+        return
+    
+    # Single checkpoint mode (backward compatible)
+    if args.stage2_checkpoint is None:
+        parser.error("--stage2_checkpoint is required when not using --batch_mode")
+    
     # Setup output directory
     if args.output_dir:
         output_dir = Path(args.output_dir)
@@ -362,6 +544,8 @@ def main():
         Path(args.stage2_checkpoint),
         device,
     )
+    
+    ablation_mode = ckpt.get("ablation_mode", "both")
     
     # Load HF dataset
     logger.info("Loading HF dataset: fren-gor/geoguessr-locations")
@@ -397,6 +581,9 @@ def main():
         cell_centers,
         ckpt["coord_output_dim"],
         concept_info,
+        ablation_mode=ablation_mode,
+        patch_dim=ckpt["patch_dim"],
+        concept_dim=ckpt["concept_dim"],
         lambda_cell=args.lambda_cell,
         lambda_offset=args.lambda_offset,
     )

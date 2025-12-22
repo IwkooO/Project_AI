@@ -1,0 +1,37 @@
+#!/bin/bash
+#SBATCH --partition=cbuild
+#SBATCH --job-name=build-report
+#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/build_report.log
+#SBATCH --time=1:00:00
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
+
+set -e
+
+# Activate environment
+module load 2025
+module load Anaconda3/2025.06-1
+cd /scratch-shared/pnair/Project_AI/
+
+source activate streetview_pnair
+export PYTHONNOUSERSITE=1
+export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
+# Ensure the activated env's python is used (module Anaconda may appear earlier in PATH)
+export PATH="$CONDA_PREFIX/bin:$PATH"
+
+# Configuration
+RESULTS_ROOT="${RESULTS_ROOT:-results}"
+OUTPUT_DIR="${OUTPUT_DIR:-results/report}"
+
+echo "Building consolidated report artifacts..."
+echo "Results root: $RESULTS_ROOT"
+echo "Output directory: $OUTPUT_DIR"
+
+python scripts/analysis/build_report_artifacts.py \
+    --results_root "$RESULTS_ROOT" \
+    --output_dir "$OUTPUT_DIR"
+
+echo ""
+echo "Report generation complete!"
+echo "Check output directory: $OUTPUT_DIR"
+
