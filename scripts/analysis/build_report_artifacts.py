@@ -248,7 +248,7 @@ def create_stage1_plots(df_stage1: pd.DataFrame, output_dir: Path):
     df_test["variant"] = df_test["variant"].replace("vanilla", "default").str.capitalize()
     
     # Matplotlib: Stage 1 Accuracy Comparison - Top-1 and Top-5
-    fig, axes = plt.subplots(2, 2, figsize=(12, 10), sharex=True, sharey='row')
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
     variant_order = ["Default", "Finetuned"]
     palette_map = {"Default": "#4472C4", "Finetuned": "#ED7D31"}  # Default=blue, Finetuned=orange
     
@@ -263,8 +263,14 @@ def create_stage1_plots(df_stage1: pd.DataFrame, output_dir: Path):
         axes[0, 0].grid(axis='y', alpha=0.3, linestyle='--')
         axes[0, 0].spines['top'].set_visible(False)
         axes[0, 0].spines['right'].set_visible(False)
+        # Annotate bars above error bars
         for container in axes[0, 0].containers:
-            axes[0, 0].bar_label(container, fmt='%.3f', label_type='edge', padding=3, fontsize=9)
+            for bar in container:
+                height = bar.get_height()
+                # Position label above bar with padding
+                y_pos = height + (axes[0, 0].get_ylim()[1] - axes[0, 0].get_ylim()[0]) * 0.03
+                axes[0, 0].text(bar.get_x() + bar.get_width()/2., y_pos,
+                               f'{height:.3f}', ha='center', va='bottom', fontsize=9)
     
     if df_test["parent_acc"].notna().any():
         sns.barplot(data=df_test, x="variant", y="parent_acc", order=variant_order, ax=axes[0, 1],
@@ -276,8 +282,13 @@ def create_stage1_plots(df_stage1: pd.DataFrame, output_dir: Path):
         axes[0, 1].grid(axis='y', alpha=0.3, linestyle='--')
         axes[0, 1].spines['top'].set_visible(False)
         axes[0, 1].spines['right'].set_visible(False)
+        # Annotate bars above error bars
         for container in axes[0, 1].containers:
-            axes[0, 1].bar_label(container, fmt='%.3f', label_type='edge', padding=3, fontsize=9)
+            for bar in container:
+                height = bar.get_height()
+                y_pos = height + (axes[0, 1].get_ylim()[1] - axes[0, 1].get_ylim()[0]) * 0.03
+                axes[0, 1].text(bar.get_x() + bar.get_width()/2., y_pos,
+                               f'{height:.3f}', ha='center', va='bottom', fontsize=9)
     
     # Top-5 Accuracies
     if df_test["meta_acc_top5"].notna().any():
@@ -290,8 +301,13 @@ def create_stage1_plots(df_stage1: pd.DataFrame, output_dir: Path):
         axes[1, 0].grid(axis='y', alpha=0.3, linestyle='--')
         axes[1, 0].spines['top'].set_visible(False)
         axes[1, 0].spines['right'].set_visible(False)
+        # Annotate bars above error bars
         for container in axes[1, 0].containers:
-            axes[1, 0].bar_label(container, fmt='%.3f', label_type='edge', padding=3, fontsize=9)
+            for bar in container:
+                height = bar.get_height()
+                y_pos = height + (axes[1, 0].get_ylim()[1] - axes[1, 0].get_ylim()[0]) * 0.03
+                axes[1, 0].text(bar.get_x() + bar.get_width()/2., y_pos,
+                               f'{height:.3f}', ha='center', va='bottom', fontsize=9)
     
     if df_test["parent_acc_top5"].notna().any():
         sns.barplot(data=df_test, x="variant", y="parent_acc_top5", order=variant_order, ax=axes[1, 1],
@@ -303,8 +319,13 @@ def create_stage1_plots(df_stage1: pd.DataFrame, output_dir: Path):
         axes[1, 1].grid(axis='y', alpha=0.3, linestyle='--')
         axes[1, 1].spines['top'].set_visible(False)
         axes[1, 1].spines['right'].set_visible(False)
+        # Annotate bars above error bars
         for container in axes[1, 1].containers:
-            axes[1, 1].bar_label(container, fmt='%.3f', label_type='edge', padding=3, fontsize=9)
+            for bar in container:
+                height = bar.get_height()
+                y_pos = height + (axes[1, 1].get_ylim()[1] - axes[1, 1].get_ylim()[0]) * 0.03
+                axes[1, 1].text(bar.get_x() + bar.get_width()/2., y_pos,
+                               f'{height:.3f}', ha='center', va='bottom', fontsize=9)
     
     plt.suptitle("Stage 1: Concept Classification Performance", fontsize=16, fontweight='bold', y=0.995)
     plt.tight_layout()
@@ -401,7 +422,7 @@ def create_stage2_plots(df_stage2: pd.DataFrame, output_dir: Path):
     
     # Matplotlib: Stage 2 Test Split Results
     if len(df_test_split) > 0:
-        fig, axes = plt.subplots(2, 2, figsize=(12, 10), sharex=True, sharey=False)
+        fig, axes = plt.subplots(2, 2, figsize=(12, 10))
         
         # Plot 1: Median Error
         df_plot = df_test_split[df_test_split["median_error_km"].notna()].copy()
@@ -413,14 +434,20 @@ def create_stage2_plots(df_stage2: pd.DataFrame, output_dir: Path):
             axes[0, 0].set_ylabel("Median Error (km)", fontweight='bold')
             axes[0, 0].set_xlabel("Ablation Mode", fontweight='bold')
             axes[0, 0].set_title("(a) Median Distance Error", fontweight='bold', pad=10)
-            axes[0, 0].legend(title="Variant", title_fontsize=10, fontsize=9, labels=[v.capitalize() for v in variant_order])
+            # Fix legend with correct colors
+            handles, labels = axes[0, 0].get_legend_handles_labels()
+            axes[0, 0].legend(handles, variant_order, title="Variant", title_fontsize=10, fontsize=9)
             axes[0, 0].grid(axis='y', alpha=0.3, linestyle='--')
             axes[0, 0].spines['top'].set_visible(False)
             axes[0, 0].spines['right'].set_visible(False)
             axes[0, 0].set_xticklabels([ablation_labels.get(x.get_text(), x.get_text()) for x in axes[0, 0].get_xticklabels()])
-            # Annotate bars
+            # Annotate bars above error bars
             for container in axes[0, 0].containers:
-                axes[0, 0].bar_label(container, fmt='%.1f', label_type='edge', padding=3, fontsize=9)
+                for bar in container:
+                    height = bar.get_height()
+                    y_pos = height + (axes[0, 0].get_ylim()[1] - axes[0, 0].get_ylim()[0]) * 0.03
+                    axes[0, 0].text(bar.get_x() + bar.get_width()/2., y_pos,
+                                   f'{height:.1f}', ha='center', va='bottom', fontsize=9)
         
         # Plot 2: Cell Accuracy
         if df_test_split["cell_acc"].notna().any():
@@ -431,15 +458,21 @@ def create_stage2_plots(df_stage2: pd.DataFrame, output_dir: Path):
             axes[0, 1].set_ylabel("Cell Accuracy", fontweight='bold')
             axes[0, 1].set_xlabel("Ablation Mode", fontweight='bold')
             axes[0, 1].set_title("(b) Cell Classification Accuracy", fontweight='bold', pad=10)
-            axes[0, 1].legend(title="Variant", title_fontsize=10, fontsize=9, labels=[v.capitalize() for v in variant_order])
+            # Fix legend with correct colors
+            handles, labels = axes[0, 1].get_legend_handles_labels()
+            axes[0, 1].legend(handles, variant_order, title="Variant", title_fontsize=10, fontsize=9)
             axes[0, 1].set_ylim([0, 1])
             axes[0, 1].grid(axis='y', alpha=0.3, linestyle='--')
             axes[0, 1].spines['top'].set_visible(False)
             axes[0, 1].spines['right'].set_visible(False)
             axes[0, 1].set_xticklabels([ablation_labels.get(x.get_text(), x.get_text()) for x in axes[0, 1].get_xticklabels()])
-            # Annotate bars
+            # Annotate bars above error bars
             for container in axes[0, 1].containers:
-                axes[0, 1].bar_label(container, fmt='%.3f', label_type='edge', padding=3, fontsize=9)
+                for bar in container:
+                    height = bar.get_height()
+                    y_pos = height + (axes[0, 1].get_ylim()[1] - axes[0, 1].get_ylim()[0]) * 0.03
+                    axes[0, 1].text(bar.get_x() + bar.get_width()/2., y_pos,
+                                   f'{height:.3f}', ha='center', va='bottom', fontsize=9)
         
         # Plot 3: Threshold Accuracies (City, Region, Country)
         threshold_data = []
@@ -467,9 +500,13 @@ def create_stage2_plots(df_stage2: pd.DataFrame, output_dir: Path):
             axes[1, 0].spines['top'].set_visible(False)
             axes[1, 0].spines['right'].set_visible(False)
             axes[1, 0].set_xticklabels([ablation_labels.get(x.get_text(), x.get_text()) for x in axes[1, 0].get_xticklabels()])
-            # Annotate bars
+            # Annotate bars above error bars
             for container in axes[1, 0].containers:
-                axes[1, 0].bar_label(container, fmt='%.3f', label_type='edge', padding=3, fontsize=8)
+                for bar in container:
+                    height = bar.get_height()
+                    y_pos = height + (axes[1, 0].get_ylim()[1] - axes[1, 0].get_ylim()[0]) * 0.03
+                    axes[1, 0].text(bar.get_x() + bar.get_width()/2., y_pos,
+                                   f'{height:.3f}', ha='center', va='bottom', fontsize=8)
         
         # Plot 4: Comparison of variants across ablation modes
         if df_test_split["median_error_km"].notna().any():
@@ -498,11 +535,12 @@ def create_stage2_plots(df_stage2: pd.DataFrame, output_dir: Path):
             axes[1, 1].grid(axis='y', alpha=0.3, linestyle='--')
             axes[1, 1].spines['top'].set_visible(False)
             axes[1, 1].spines['right'].set_visible(False)
-            # Annotate bars
+            # Annotate bars above error bars
             for bars in [bars1, bars2]:
                 for bar in bars:
                     height = bar.get_height()
-                    axes[1, 1].text(bar.get_x() + bar.get_width()/2., height,
+                    y_pos = height + (axes[1, 1].get_ylim()[1] - axes[1, 1].get_ylim()[0]) * 0.03
+                    axes[1, 1].text(bar.get_x() + bar.get_width()/2., y_pos,
                                    f'{height:.1f}', ha='center', va='bottom', fontsize=9)
         
         plt.suptitle("Stage 2: Test Split Evaluation Results", fontsize=16, fontweight='bold', y=0.995)
@@ -513,7 +551,7 @@ def create_stage2_plots(df_stage2: pd.DataFrame, output_dir: Path):
     
     # Matplotlib: Stage 2 HF Dataset Results
     if len(df_hf) > 0:
-        fig, axes = plt.subplots(2, 2, figsize=(12, 10), sharex=True, sharey=False)
+        fig, axes = plt.subplots(2, 2, figsize=(12, 10))
         
         # Plot 1: Median Error on HF dataset
         df_plot = df_hf[df_hf["median_error_km"].notna()].copy()
@@ -525,14 +563,20 @@ def create_stage2_plots(df_stage2: pd.DataFrame, output_dir: Path):
             axes[0, 0].set_ylabel("Median Error (km)", fontweight='bold')
             axes[0, 0].set_xlabel("Ablation Mode", fontweight='bold')
             axes[0, 0].set_title("(a) Median Distance Error", fontweight='bold', pad=10)
-            axes[0, 0].legend(title="Variant", title_fontsize=10, fontsize=9, labels=[v.capitalize() for v in variant_order])
+            # Fix legend with correct colors
+            handles, labels = axes[0, 0].get_legend_handles_labels()
+            axes[0, 0].legend(handles, variant_order, title="Variant", title_fontsize=10, fontsize=9)
             axes[0, 0].grid(axis='y', alpha=0.3, linestyle='--')
             axes[0, 0].spines['top'].set_visible(False)
             axes[0, 0].spines['right'].set_visible(False)
             axes[0, 0].set_xticklabels([ablation_labels.get(x.get_text(), x.get_text()) for x in axes[0, 0].get_xticklabels()])
-            # Annotate bars
+            # Annotate bars above error bars
             for container in axes[0, 0].containers:
-                axes[0, 0].bar_label(container, fmt='%.1f', label_type='edge', padding=3, fontsize=9)
+                for bar in container:
+                    height = bar.get_height()
+                    y_pos = height + (axes[0, 0].get_ylim()[1] - axes[0, 0].get_ylim()[0]) * 0.03
+                    axes[0, 0].text(bar.get_x() + bar.get_width()/2., y_pos,
+                                   f'{height:.1f}', ha='center', va='bottom', fontsize=9)
         
         # Plot 2: Cell Accuracy on HF dataset
         if df_hf["cell_acc"].notna().any():
@@ -543,15 +587,21 @@ def create_stage2_plots(df_stage2: pd.DataFrame, output_dir: Path):
             axes[0, 1].set_ylabel("Cell Accuracy", fontweight='bold')
             axes[0, 1].set_xlabel("Ablation Mode", fontweight='bold')
             axes[0, 1].set_title("(b) Cell Classification Accuracy", fontweight='bold', pad=10)
-            axes[0, 1].legend(title="Variant", title_fontsize=10, fontsize=9, labels=[v.capitalize() for v in variant_order])
+            # Fix legend with correct colors
+            handles, labels = axes[0, 1].get_legend_handles_labels()
+            axes[0, 1].legend(handles, variant_order, title="Variant", title_fontsize=10, fontsize=9)
             axes[0, 1].set_ylim([0, 1])
             axes[0, 1].grid(axis='y', alpha=0.3, linestyle='--')
             axes[0, 1].spines['top'].set_visible(False)
             axes[0, 1].spines['right'].set_visible(False)
             axes[0, 1].set_xticklabels([ablation_labels.get(x.get_text(), x.get_text()) for x in axes[0, 1].get_xticklabels()])
-            # Annotate bars
+            # Annotate bars above error bars
             for container in axes[0, 1].containers:
-                axes[0, 1].bar_label(container, fmt='%.3f', label_type='edge', padding=3, fontsize=9)
+                for bar in container:
+                    height = bar.get_height()
+                    y_pos = height + (axes[0, 1].get_ylim()[1] - axes[0, 1].get_ylim()[0]) * 0.03
+                    axes[0, 1].text(bar.get_x() + bar.get_width()/2., y_pos,
+                                   f'{height:.3f}', ha='center', va='bottom', fontsize=9)
         
         # Plot 3: Threshold Accuracies on HF dataset
         threshold_data = []
@@ -579,9 +629,13 @@ def create_stage2_plots(df_stage2: pd.DataFrame, output_dir: Path):
             axes[1, 0].spines['top'].set_visible(False)
             axes[1, 0].spines['right'].set_visible(False)
             axes[1, 0].set_xticklabels([ablation_labels.get(x.get_text(), x.get_text()) for x in axes[1, 0].get_xticklabels()])
-            # Annotate bars
+            # Annotate bars above error bars
             for container in axes[1, 0].containers:
-                axes[1, 0].bar_label(container, fmt='%.3f', label_type='edge', padding=3, fontsize=8)
+                for bar in container:
+                    height = bar.get_height()
+                    y_pos = height + (axes[1, 0].get_ylim()[1] - axes[1, 0].get_ylim()[0]) * 0.03
+                    axes[1, 0].text(bar.get_x() + bar.get_width()/2., y_pos,
+                                   f'{height:.3f}', ha='center', va='bottom', fontsize=8)
         
         # Plot 4: Comparison Test Split vs HF Dataset
         if len(df_test_split) > 0 and len(df_hf) > 0:
@@ -609,9 +663,13 @@ def create_stage2_plots(df_stage2: pd.DataFrame, output_dir: Path):
                 axes[1, 1].spines['top'].set_visible(False)
                 axes[1, 1].spines['right'].set_visible(False)
                 axes[1, 1].set_xticklabels([ablation_labels.get(x.get_text(), x.get_text()) for x in axes[1, 1].get_xticklabels()])
-                # Annotate bars
+                # Annotate bars above error bars
                 for container in axes[1, 1].containers:
-                    axes[1, 1].bar_label(container, fmt='%.1f', label_type='edge', padding=3, fontsize=9)
+                    for bar in container:
+                        height = bar.get_height()
+                        y_pos = height + (axes[1, 1].get_ylim()[1] - axes[1, 1].get_ylim()[0]) * 0.03
+                        axes[1, 1].text(bar.get_x() + bar.get_width()/2., y_pos,
+                                       f'{height:.1f}', ha='center', va='bottom', fontsize=9)
         
         plt.suptitle("Stage 2: HF GeoGuessr Dataset Evaluation Results", fontsize=16, fontweight='bold', y=0.995)
         plt.tight_layout()
