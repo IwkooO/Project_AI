@@ -26,11 +26,9 @@ Data Strategy:
 import argparse
 import json
 import logging
-import os
 import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-from collections import Counter
 from datetime import datetime
 
 import numpy as np
@@ -45,17 +43,12 @@ from matplotlib.patches import Rectangle
 from matplotlib.colors import LinearSegmentedColormap
 from PIL import Image
 
-from src.dataset import (
-    PanoramaCBMDataset,
-    create_splits_stratified,
-    get_transforms_from_processor,
-    SubsetDataset,
-)
+from src.dataset import get_transforms_from_processor
+
 from src.models.streetclip_encoder import StreetCLIPEncoder, StreetCLIPConfig
 from src.models.concept_aware_cbm import Stage2CrossAttentionGeoHead, Stage1ConceptModel
 from src.losses import haversine_distance
-from src.concepts.utils import extract_concepts_from_dataset
-
+import wandb
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -72,6 +65,58 @@ THRESHOLD_ACCURACIES = {
 # CLIP normalization constants
 CLIP_MEAN = [0.48145466, 0.4578275, 0.40821073]
 CLIP_STD = [0.26862954, 0.26130258, 0.27577711]
+
+
+def compute_concept_emb_and_patches(
+    images: torch.Tensor,
+    image_encoder: StreetCLIPEncoder,
+    stage1_model: Stage1ConceptModel,
+    ablation_mode: str,
+    patch_dim: int,
+    concept_dim: int,
+    use_amp: bool,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Compute (concept_embs, patch_tokens) efficiently based on ablation mode.
+
+    Key speed optimization:
+    - Uses StreetCLIPEncoder.get_features_and_patches() to avoid TWO vision forwards
+      (one for patch tokens, one for projected image features).
+    - Skips patch token computation entirely for concept_only.
+    - Skips Stage1 bottleneck entirely for image_only.
+    """
+    bsz = images.size(0)
+
+    if ablation_mode == "concept_only":
+        # No patch tokens needed.
+        if use_amp and images.is_cuda:
+            with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+                img_features = image_encoder(images)  # [B, 768]
+                concept_embs = stage1_model.concept_bottleneck(img_features)  # [B, 512]
+        else:
+            img_features = image_encoder(images)
+            concept_embs = stage1_model.concept_bottleneck(img_features)
+
+        patch_tokens = torch.empty((bsz, 0, patch_dim), device=images.device, dtype=images.dtype)
+        return concept_embs, patch_tokens
+
+    # For both/image_only we need patch tokens. Get both outputs in ONE forward.
+    if use_amp and images.is_cuda:
+        with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+            img_features, patch_tokens = image_encoder.get_features_and_patches(images)
+    else:
+        img_features, patch_tokens = image_encoder.get_features_and_patches(images)
+
+    if ablation_mode == "image_only":
+        # Stage2 ignores concept_emb in this mode (but still needs the batch dim).
+        concept_embs = torch.zeros((bsz, concept_dim), device=images.device, dtype=img_features.dtype)
+        return concept_embs, patch_tokens
+
+    # ablation_mode == "both"
+    # Stage 1 bottleneck expects float32, so cast if needed (AMP may produce bfloat16)
+    img_features_f32 = img_features.float() if img_features.dtype != torch.float32 else img_features
+    concept_embs = stage1_model.concept_bottleneck(img_features_f32)
+    return concept_embs, patch_tokens
 
 
 # ---------- Helper Functions ----------
@@ -376,7 +421,6 @@ def visualize_attention_predictions(
     output_dir: Path,
     coord_output_dim: int = 3,
     num_samples: int = 4,
-    log_to_wandb: bool = False,
     args=None,
 ):
     """
@@ -436,13 +480,37 @@ def visualize_attention_predictions(
         # Get pre-transformed image tensor
         img_tensor = sample["image"].unsqueeze(0).to(device)
         
-        # Get patch tokens and image features
-        patch_tokens = image_encoder.get_patch_tokens(img_tensor)  # [1, 576, 1024]
-        img_features = image_encoder(img_tensor)  # [1, 768]
+        # Efficiently compute inputs for Stage2 (avoid double vision forward)
+        concept_emb, patch_tokens = compute_concept_emb_and_patches(
+            images=img_tensor,
+            image_encoder=image_encoder,
+            stage1_model=stage1_model,
+            ablation_mode=model.ablation_mode,
+            patch_dim=getattr(args, "patch_dim", 1024),
+            concept_dim=getattr(args, "concept_dim", 512),
+            use_amp=getattr(args, "amp", False),
+        )
         
         # Get concept predictions from Stage 1 (full forward pass)
-        stage1_outputs = stage1_model.forward_from_features(img_features)
-        concept_emb = stage1_outputs["concept_emb"]
+        # Note: For image_only, concept_emb is zeros for Stage2; we still compute Stage1
+        # probs for visualization, using the same projected img_features from a single pass.
+        if model.ablation_mode != "concept_only":
+            # In both/image_only paths, compute_concept_emb_and_patches used get_features_and_patches,
+            # so we already have projected features implicitly inside Stage1 bottleneck computation.
+            # For visualization, we recompute Stage1 outputs from projected features by reusing encoder.
+            if getattr(args, "amp", False) and img_tensor.is_cuda:
+                with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+                    img_features_viz = image_encoder(img_tensor)
+            else:
+                img_features_viz = image_encoder(img_tensor)
+        else:
+            # concept_only path used image_encoder(images) already; compute again is cheap relative to IO,
+            # and keeps the code simple here.
+            img_features_viz = image_encoder(img_tensor)
+
+        # Stage 1 expects float32, so cast if needed (AMP may produce bfloat16)
+        img_features_viz_f32 = img_features_viz.float() if img_features_viz.dtype != torch.float32 else img_features_viz
+        stage1_outputs = stage1_model.forward_from_features(img_features_viz_f32)
         meta_probs = stage1_outputs["meta_probs"][0]  # [num_metas]
         parent_probs = stage1_outputs["parent_probs"][0]  # [num_parents]
         
@@ -593,11 +661,12 @@ def visualize_attention_predictions(
     
     logger.info(f"Saved comprehensive visualization to {save_path}")
     
-    if log_to_wandb and args and args.use_wandb:
-        import wandb
+    try:
         wandb.log({
             "comprehensive_predictions": wandb.Image(str(save_path), caption=f"Epoch {epoch}")
         }, step=epoch)
+    except Exception as e:
+        logger.error(f"Error logging to WandB: {e}")
 
 
 # ---------- Training Functions ----------
@@ -678,12 +747,15 @@ def validate(
             coordinates = coordinates.to(device)
             cell_labels = cell_labels.to(device)
             
-            # Get patch tokens and image features from encoder
-            patch_tokens = image_encoder.get_patch_tokens(images)  # [B, 576, 1024]
-            img_features = image_encoder(images)  # [B, 768]
-            
-            # Get concept embeddings from frozen Stage 1
-            concept_embs = stage1_model.concept_bottleneck(img_features)  # [B, 512]
+            concept_embs, patch_tokens = compute_concept_emb_and_patches(
+                images=images,
+                image_encoder=image_encoder,
+                stage1_model=stage1_model,
+                ablation_mode=args.ablation_mode,
+                patch_dim=args.patch_dim,
+                concept_dim=args.concept_dim,
+                use_amp=args.amp,
+            )
             
             # Forward pass
             outputs = model(concept_embs, patch_tokens, return_attention=False, return_gate=True)
@@ -785,12 +857,17 @@ def train_epoch(
         coordinates = coordinates.to(device)
         cell_labels = cell_labels.to(device)
         
-        # Get patch tokens and image features (encoder is frozen)
+        # Get concept embeddings + patch tokens efficiently (encoder + Stage1 are frozen)
         with torch.no_grad():
-            patch_tokens = image_encoder.get_patch_tokens(images)  # [B, 576, 1024]
-            img_features = image_encoder(images)  # [B, 768]
-            # Get concept embeddings from frozen Stage 1
-            concept_embs = stage1_model.concept_bottleneck(img_features)  # [B, 512]
+            concept_embs, patch_tokens = compute_concept_emb_and_patches(
+                images=images,
+                image_encoder=image_encoder,
+                stage1_model=stage1_model,
+                ablation_mode=args.ablation_mode,
+                patch_dim=args.patch_dim,
+                concept_dim=args.concept_dim,
+                use_amp=args.amp,
+            )
         
         # Forward pass through trainable head
         optimizer.zero_grad()
@@ -862,6 +939,8 @@ def main():
                         help="Path to CSV dataset")
     parser.add_argument("--data_root", type=str, default="data")
     parser.add_argument("--geoguessr_id", type=str, default="6906237dc7731161a37282b2")
+    parser.add_argument("--splits_json", type=str, default=None,
+                        help="Path to splits.json file. If not provided, will try to load from stage1 checkpoint directory.")
     
     # Stage 1 checkpoint (required for concept embeddings)
     parser.add_argument("--stage1_checkpoint", type=str, required=True,
@@ -885,6 +964,8 @@ def main():
     parser.add_argument("--weight_decay", type=float, default=0.01)
     parser.add_argument("--min_samples_per_cell", type=int, default=500)
     parser.add_argument("--num_workers", type=int, default=4)
+    parser.add_argument("--amp", action="store_true", default=False,
+                        help="Use autocast (bfloat16) for frozen encoder/Stage1 forward to speed up.")
     
     # Loss weights
     parser.add_argument("--lambda_cell", type=float, default=1.0)
@@ -902,12 +983,24 @@ def main():
     parser.add_argument("--output_dir", type=str, default=None)
     parser.add_argument("--use_wandb", action="store_true", default=False)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--viz_every", type=int, default=1,
+                        help="Run attention/qualitative visualization every N epochs. Set to 0 to disable.")
     
     args = parser.parse_args()
     
     # Set random seeds
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
+
+    # Speed knobs (safe on H100; improves matmul/conv performance)
+    if torch.cuda.is_available():
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+        torch.backends.cudnn.benchmark = True
+        try:
+            torch.set_float32_matmul_precision("high")
+        except Exception:
+            pass
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
@@ -931,7 +1024,6 @@ def main():
     
     # Initialize WandB
     if args.use_wandb:
-        import wandb
         # Build tags with key experiment parameters
         tags = [
             f"ablation_{args.ablation_mode}",
@@ -960,19 +1052,29 @@ def main():
         param.requires_grad = False
     
     # Load Stage 1 model for concept embeddings
+    stage1_checkpoint_path = Path(args.stage1_checkpoint)
     stage1_model, concept_info = load_stage1_checkpoint(
-        Path(args.stage1_checkpoint),
+        stage1_checkpoint_path,
         image_encoder,
         device,
     )
     
+    # Load stage1 checkpoint metadata for propagation
+    stage1_ckpt_data = torch.load(stage1_checkpoint_path, map_location="cpu")
+    stage0_checkpoint = stage1_ckpt_data.get("stage0_checkpoint")
+    splits_json_path_str = stage1_ckpt_data.get("splits_json")
+    
     # Get transforms from image processor
     transforms = get_transforms_from_processor(image_encoder.image_processor)
     
-    # Load splits.json from Stage 1 checkpoint directory
-    stage1_checkpoint_path = Path(args.stage1_checkpoint)
-    stage1_dir = stage1_checkpoint_path.parent.parent
-    splits_json_path = stage1_dir / "splits.json"
+    # Load splits.json
+    if args.splits_json:
+        splits_json_path = Path(args.splits_json)
+    else:
+        # Try to load from Stage 1 checkpoint directory
+        stage1_checkpoint_path = Path(args.stage1_checkpoint)
+        stage1_dir = stage1_checkpoint_path.parent.parent
+        splits_json_path = stage1_dir / "splits.json"
     
     if not splits_json_path.exists():
         raise FileNotFoundError(
@@ -1109,6 +1211,13 @@ def main():
     logger.info(f"Train: {len(train_dataset)}, Val: {len(val_dataset)}, Test: {len(test_dataset)}")
     
     # Create dataloaders
+    dataloader_extra_kwargs = {}
+    if args.num_workers > 0:
+        dataloader_extra_kwargs = {
+            "persistent_workers": True,
+            "prefetch_factor": 4,
+        }
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=args.batch_size,
@@ -1117,6 +1226,7 @@ def main():
         collate_fn=stage2_collate_fn,
         pin_memory=True,
         drop_last=True,
+        **dataloader_extra_kwargs,
     )
     val_loader = DataLoader(
         val_dataset,
@@ -1125,6 +1235,20 @@ def main():
         num_workers=args.num_workers,
         collate_fn=stage2_collate_fn,
         pin_memory=True,
+        **dataloader_extra_kwargs,
+    )
+    test_loader = (
+        DataLoader(
+            test_dataset,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=args.num_workers,
+            collate_fn=stage2_collate_fn,
+            pin_memory=True,
+            **dataloader_extra_kwargs,
+        )
+        if len(test_dataset) > 0
+        else None
     )
     
     # Initialize Stage 2 Cross-Attention Head
@@ -1162,15 +1286,15 @@ def main():
         )
         
         # Visualize every epoch
-        visualize_attention_predictions(
-            model, image_encoder, stage1_model, concept_info, val_loader, device,
-            cell_centers, epoch, output_dir, args.coord_output_dim,
-            num_samples=4, log_to_wandb=args.use_wandb, args=args
-        )
+        if args.viz_every > 0 and (epoch % args.viz_every == 0):
+            visualize_attention_predictions(
+                model, image_encoder, stage1_model, concept_info, val_loader, device,
+                cell_centers, epoch, output_dir, args.coord_output_dim,
+                num_samples=4, args=args
+            )
         
         # Log to WandB
         if args.use_wandb:
-            import wandb
             wandb.log({
                 "train_loss": train_loss,
                 "val_loss": val_metrics["loss"],
@@ -1192,17 +1316,22 @@ def main():
         # Save best checkpoint
         if val_metrics["median_error_km"] < best_val_error:
             best_val_error = val_metrics["median_error_km"]
+            extra_info_dict = {
+                "val_median_error": best_val_error,
+                "val_metrics": val_metrics,
+                "stage1_checkpoint": args.stage1_checkpoint,
+            }
+            if stage0_checkpoint is not None:
+                extra_info_dict["stage0_checkpoint"] = stage0_checkpoint
+            if splits_json_path_str is not None:
+                extra_info_dict["splits_json"] = splits_json_path_str
             save_checkpoint(
                 model,
                 output_dir / "checkpoints" / "best_model_stage2_xattn.pt",
                 cell_centers,
                 args.encoder_model,
                 args.coord_output_dim,
-                extra_info={
-                    "val_median_error": best_val_error,
-                    "val_metrics": val_metrics,
-                    "stage1_checkpoint": args.stage1_checkpoint,
-                },
+                extra_info=extra_info_dict,
                 optimizer=optimizer,
                 scheduler=scheduler,
                 epoch=epoch,
@@ -1210,33 +1339,82 @@ def main():
         
         # Save periodic checkpoint
         if epoch % 10 == 0:
+            extra_info_periodic = {"stage1_checkpoint": args.stage1_checkpoint}
+            if stage0_checkpoint is not None:
+                extra_info_periodic["stage0_checkpoint"] = stage0_checkpoint
+            if splits_json_path_str is not None:
+                extra_info_periodic["splits_json"] = splits_json_path_str
             save_checkpoint(
                 model,
                 output_dir / "checkpoints" / f"checkpoint_epoch_{epoch}.pt",
                 cell_centers,
                 args.encoder_model,
                 args.coord_output_dim,
-                extra_info={"stage1_checkpoint": args.stage1_checkpoint},
+                extra_info=extra_info_periodic,
                 optimizer=optimizer,
                 scheduler=scheduler,
                 epoch=epoch,
             )
     
+    # Final test evaluation (using best model)
+    test_metrics = None
+    if test_loader is not None and len(test_dataset) > 0:
+        logger.info("Loading best model for final test evaluation...")
+        best_ckpt_path = output_dir / "checkpoints" / "best_model_stage2_xattn.pt"
+        if best_ckpt_path.exists():
+            best_ckpt = torch.load(best_ckpt_path, map_location=device)
+            model.load_state_dict(best_ckpt["model_state_dict"])
+            logger.info("Loaded best model checkpoint")
+        
+        logger.info("Running final test evaluation...")
+        test_metrics = validate(
+            model, image_encoder, stage1_model, test_loader, device,
+            cell_centers, args.coord_output_dim, args.epochs - 1, args
+        )
+        logger.info(f"Test Metrics: Median Error={format_distance(test_metrics['median_error_km'])}, "
+                   f"Cell Acc={test_metrics['cell_acc']:.4f}")
+        if args.use_wandb:
+            wandb.log({
+                "test_loss": test_metrics["loss"],
+                "test_cell_acc": test_metrics["cell_acc"],
+                "test_median_error": test_metrics["median_error_km"],
+                "test_acc_street": test_metrics.get("acc_street", 0),
+                "test_acc_city": test_metrics.get("acc_city", 0),
+                "test_acc_region": test_metrics.get("acc_region", 0),
+                "test_acc_country": test_metrics.get("acc_country", 0),
+            })
+        
+        # Update best checkpoint with test metrics
+        if best_ckpt_path.exists():
+            best_ckpt = torch.load(best_ckpt_path, map_location="cpu")
+            best_ckpt["test_metrics"] = {k: (v.item() if isinstance(v, torch.Tensor) else v) 
+                                        for k, v in test_metrics.items()}
+            torch.save(best_ckpt, best_ckpt_path)
+            logger.info("Updated best checkpoint with test metrics")
+    
     # Save final checkpoint
+    final_extra_info = {
+        "final_val_metrics": val_metrics,
+        "test_metrics": test_metrics,
+        "stage1_checkpoint": args.stage1_checkpoint,
+    }
+    if stage0_checkpoint is not None:
+        final_extra_info["stage0_checkpoint"] = stage0_checkpoint
+    if splits_json_path_str is not None:
+        final_extra_info["splits_json"] = splits_json_path_str
     save_checkpoint(
         model,
         output_dir / "checkpoints" / "final_model_stage2_xattn.pt",
         cell_centers,
         args.encoder_model,
         args.coord_output_dim,
-        extra_info={
-            "final_val_metrics": val_metrics,
-            "stage1_checkpoint": args.stage1_checkpoint,
-        },
+        extra_info=final_extra_info,
         epoch=args.epochs - 1,
     )
     
     logger.info(f"Training complete. Best validation median error: {format_distance(best_val_error)}")
+    if test_metrics:
+        logger.info(f"Final test median error: {format_distance(test_metrics['median_error_km'])}")
     logger.info(f"Outputs saved to {output_dir}")
 
 

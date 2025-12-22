@@ -1186,9 +1186,11 @@ def train(args):
     logger.info(f"Countries: {len(full_dataset.country_to_idx)}")
     
     # Split dataset (consistent with Stage 0)
+    splits_path = None
     if args.splits_json and Path(args.splits_json).exists():
         # Load existing splits for consistency across stages
         logger.info(f"Loading splits from {args.splits_json}")
+        splits_path = Path(args.splits_json)
         train_samples, val_samples, test_samples = load_splits_from_json(
             args.splits_json, full_dataset.samples
         )
@@ -1796,6 +1798,8 @@ def train(args):
                     "stage": 1,
                     "meta_acc": val_metric,
                     "parent_acc": val_metrics["parent_acc"],
+                    "stage0_checkpoint": args.resume_from_checkpoint,
+                    "splits_json": str(splits_path) if args.splits_json or splits_path.exists() else None,
                 },
                 optimizer=optimizer,
                 scheduler=scheduler,
@@ -1824,7 +1828,12 @@ def train(args):
                 parent_to_idx=parent_to_idx,
                 country_to_idx=full_dataset.country_to_idx,
                 encoder_model=args.encoder_model,
-                extra_info={"stage": 1, "meta_acc": val_metric},
+                extra_info={
+                    "stage": 1,
+                    "meta_acc": val_metric,
+                    "stage0_checkpoint": args.resume_from_checkpoint,
+                    "splits_json": str(splits_path) if args.splits_json or splits_path.exists() else None,
+                },
                 optimizer=optimizer,
                 scheduler=scheduler,
                 epoch=epoch,
