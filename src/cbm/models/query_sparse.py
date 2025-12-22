@@ -45,21 +45,29 @@ class PatchMixer(nn.Module):
         else:
             self.local_kernel_size = None
 
-        ff_dim = int(dim * mlp_ratio)
-        layer = nn.TransformerEncoderLayer(
-            d_model=dim,
-            nhead=num_heads,
-            dim_feedforward=ff_dim,
-            dropout=dropout,
-            batch_first=True,
-            activation="gelu",
-            norm_first=True,
-        )
-        self.encoder = nn.TransformerEncoder(layer, num_layers=depth)
+        self.depth = int(depth)
+        if self.depth > 0:
+            ff_dim = int(dim * mlp_ratio)
+            layer = nn.TransformerEncoderLayer(
+                d_model=dim,
+                nhead=num_heads,
+                dim_feedforward=ff_dim,
+                dropout=dropout,
+                batch_first=True,
+                activation="gelu",
+                norm_first=True,
+            )
+            self.encoder = nn.TransformerEncoder(layer, num_layers=self.depth)
+        else:
+            # depth=0 => identity mixing
+            self.encoder = None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: [B, P, dim]
+        if self.depth == 0:
+            return x
         if self.local_kernel_size is None:
+            assert self.encoder is not None
             return self.encoder(x)
 
         p = int(x.shape[1])
@@ -70,6 +78,7 @@ class PatchMixer(nn.Module):
             dtype=x.dtype,
         )
         # nn.TransformerEncoder forwards this as the per-layer self-attention mask.
+        assert self.encoder is not None
         return self.encoder(x, mask=attn_bias)
 
 

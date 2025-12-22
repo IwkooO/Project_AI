@@ -43,6 +43,7 @@ class ConceptHeadQueryTopK(nn.Module):
         mix_heads: int = 4,
         mix_mlp_ratio: float = 4.0,
         mix_dropout: float | None = None,
+        mix_local_kernel_size: int | None = None,
     ):
         super().__init__()
         if mil_topk <= 0:
@@ -55,13 +56,21 @@ class ConceptHeadQueryTopK(nn.Module):
         self.mil_topk = int(mil_topk)
         self.mil_tau = float(mil_tau)
  
-        # Match MIL Mixed style projection: LN -> Linear -> GELU -> Dropout
+        # Two-stage projection: process at full res, then compress
         self.patch_proj = nn.Sequential(
             nn.LayerNorm(patch_dim),
-            nn.Linear(patch_dim, concept_dim, bias=False),
+            nn.Linear(patch_dim, patch_dim), # 1. Process at full res (768 -> 768)
             nn.GELU(),
             nn.Dropout(dropout),
+            nn.Linear(patch_dim, concept_dim, bias=False), # 2. Compress (768 -> 256)
+            nn.GELU(), # Optional, usually good for embeddings
         )
+        # self.patch_proj = nn.Sequential(
+        #     nn.LayerNorm(patch_dim),
+        #     nn.Linear(patch_dim, concept_dim, bias=False),
+        #     nn.GELU(),
+        #     nn.Dropout(dropout),
+        # )
  
         self.patch_mixer = PatchMixer(
             dim=concept_dim,
@@ -69,6 +78,7 @@ class ConceptHeadQueryTopK(nn.Module):
             num_heads=mix_heads,
             mlp_ratio=mix_mlp_ratio,
             dropout=(dropout if mix_dropout is None else mix_dropout),
+            local_kernel_size=mix_local_kernel_size,
         )
  
         # One learned concept query per concept: [K, concept_dim]
@@ -133,6 +143,7 @@ class CBM_QueryTopK(nn.Module):
         mix_heads: int = 4,
         mix_mlp_ratio: float = 4.0,
         mix_dropout: float | None = None,
+        mix_local_kernel_size: int | None = None,
         vision_encoder: nn.Module | None = None,
         expected_num_patches: int | None = None,
     ):
@@ -152,6 +163,7 @@ class CBM_QueryTopK(nn.Module):
             mix_heads=mix_heads,
             mix_mlp_ratio=mix_mlp_ratio,
             mix_dropout=mix_dropout,
+            mix_local_kernel_size=mix_local_kernel_size,
         )
  
     def forward(self, patches_or_images: torch.Tensor):

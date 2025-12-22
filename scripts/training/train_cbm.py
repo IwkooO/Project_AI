@@ -149,7 +149,11 @@ def train_epoch(
     if anneal_attn_tau:
         progress = epoch / max(1, total_epochs - 1)
         current_tau = attn_tau_start + (attn_tau_end - attn_tau_start) * progress
-        model.concept_head.attn_tau = current_tau
+        # QuerySparse uses attn_tau; QueryTopK uses mil_tau.
+        if hasattr(model.concept_head, "attn_tau"):
+            model.concept_head.attn_tau = current_tau
+        elif hasattr(model.concept_head, "mil_tau"):
+            model.concept_head.mil_tau = current_tau
     
     total_loss = 0.0
     total_ce_loss = 0.0
@@ -545,7 +549,8 @@ def main():
     epochs_without_improvement = 0
     if args.resume_checkpoint:
         print(f"Loading checkpoint from {args.resume_checkpoint}...")
-        checkpoint = torch.load(args.resume_checkpoint, map_location=device)
+        # weights_only=False needed for PyTorch 2.6+ compatibility with checkpoints containing numpy scalars
+        checkpoint = torch.load(args.resume_checkpoint, map_location=device, weights_only=False)
         model.load_state_dict(checkpoint['model_state_dict'])
         start_epoch = checkpoint.get('epoch', 0) + 1
         best_val_metric = checkpoint.get('best_val_metric', 0.0)
@@ -604,10 +609,22 @@ def main():
         print(f"\nEpoch {epoch+1}/{args.epochs}:")
         print(f"  Train: Loss={train_loss:.4f}, CE={train_ce:.4f}, Acc@1={train_acc1:.4f}, Acc@5={train_acc5:.4f}, GradNorm={grad_norm:.2f}")
         print(f"  Val:   CE={val_ce:.4f}, Acc@1={val_acc1:.4f}, Acc@5={val_acc5:.4f}")
-        print(f"  LR: {current_lr:.6f}, AttnTau={model.concept_head.attn_tau:.3f}")
+        if hasattr(model.concept_head, "attn_tau"):
+            tau_str = f"{float(model.concept_head.attn_tau):.3f}"
+        elif hasattr(model.concept_head, "mil_tau"):
+            tau_str = f"{float(model.concept_head.mil_tau):.3f}"
+        else:
+            tau_str = "N/A"
+        print(f"  LR: {current_lr:.6f}, Tau={tau_str}")
         
         # Log to W&B
         if wandb_run:
+            if hasattr(model.concept_head, "attn_tau"):
+                tau_val = float(model.concept_head.attn_tau)
+            elif hasattr(model.concept_head, "mil_tau"):
+                tau_val = float(model.concept_head.mil_tau)
+            else:
+                tau_val = None
             wandb_run.log({
                 "epoch": epoch + 1,
                 "train/loss": train_loss,
@@ -619,7 +636,7 @@ def main():
                 "val/acc1": val_acc1,
                 "val/acc5": val_acc5,
                 "lr": current_lr,
-                "attn_tau": model.concept_head.attn_tau,
+                "tau": tau_val,
             })
         
         # Save checkpoint (selection_metric for best model selection)
