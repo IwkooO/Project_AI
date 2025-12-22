@@ -165,7 +165,7 @@ def train_epoch(
     
     pbar = tqdm(loader, desc=f"Train Epoch {epoch+1}")
     
-    for batch_input, c_labels, coords, cell_labels, offsets in pbar:
+    for batch_input, c_labels, coords, cell_labels, country_labels, offsets in pbar:
         batch_input = batch_input.to(device)
         c_labels = c_labels.to(device)
         
@@ -244,7 +244,7 @@ def eval_epoch(model, loader, device, criterion):
     pred_counts = {}
     first_batch_debug = True
     
-    for batch_input, c_labels, coords, cell_labels, offsets in tqdm(loader, desc="Eval"):
+    for batch_input, c_labels, coords, cell_labels, country_labels, offsets in tqdm(loader, desc="Eval"):
         batch_input = batch_input.to(device)
         c_labels = c_labels.to(device)
         
