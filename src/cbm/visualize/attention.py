@@ -72,7 +72,7 @@ def visualize_attention_overlays(
     Args:
         attn_weights: [K, P] attention weights
         image_path: Path to source image
-        dataset: Dataset instance (for get_concept_name)
+        dataset: Dataset instance (must have idx_to_concept attribute)
         concept_indices: List of concept indices to visualize
         concept_probs: Optional list of probabilities for each concept
         concept_tags: Optional list of tags (e.g., "gt", "top1", "top2")
@@ -97,7 +97,7 @@ def visualize_attention_overlays(
             for j, concept_idx in enumerate(concept_indices[:3]):
                 if concept_idx < attn_np.shape[0]:
                     weights = attn_np[concept_idx]
-                    concept_name = dataset.get_concept_name(concept_idx)
+                    concept_name = dataset.idx_to_concept[concept_idx]
                     plt.figure(figsize=(3, 3))
                     plt.bar(range(P), weights)
                     plt.title(f"Attn {concept_name}")
@@ -145,7 +145,7 @@ def visualize_attention_overlays(
             )
             grid_up_np = grid_up.squeeze(0).squeeze(0).cpu().numpy()
             
-            concept_name = dataset.get_concept_name(concept_idx)
+            concept_name = dataset.idx_to_concept[concept_idx]
             
             # Create overlay visualization
             plt.figure(figsize=(5, 5))
@@ -209,7 +209,7 @@ def visualize_predictions_summary(
     
     for i, idx in enumerate(indices):
         # Load sample (patch-only: no pooled)
-        patches, c_label, coords, cell_label, offset = dataset[idx]
+        patches, c_label, coords, cell_label, country_label, offset = dataset[idx]
         
         # Forward pass (patch-only)
         with torch.no_grad():
@@ -219,9 +219,9 @@ def visualize_predictions_summary(
         
         # Top 5 Concepts
         top5_prob, top5_idx = torch.topk(c_probs[0], 5)
-        top5_concepts = [dataset.get_concept_name(idx.item()) for idx in top5_idx]
+        top5_concepts = [dataset.idx_to_concept[idx.item()] for idx in top5_idx]
         # c_label from dataset is already a Python int, not a tensor
-        gt_concept = dataset.get_concept_name(int(c_label))
+        gt_concept = dataset.idx_to_concept[int(c_label)]
         
         # Get Image Path
         img_path = dataset.df.iloc[idx]['image_path']
