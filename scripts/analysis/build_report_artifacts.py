@@ -20,7 +20,10 @@ import pandas as pd
 import torch
 import matplotlib.pyplot as plt
 import matplotlib
+from matplotlib.patches import Circle
+from matplotlib.lines import Line2D
 import seaborn as sns
+import numpy as np
 
 # Optional plotly import
 PLOTLY_AVAILABLE = False
@@ -391,6 +394,183 @@ def create_stage1_plots(df_stage1: pd.DataFrame, output_dir: Path):
     logger.info(f"Saved Stage 1 plots to {output_dir}")
 
 
+def create_finetuned_comparison_charts(df_test_split: pd.DataFrame, output_dir: Path, 
+                                      ablation_order: List[str], ablation_labels: Dict[str, str],
+                                      variant_order: List[str], palette_map: Dict[str, str]):
+    """Create radar and lollipop charts showing finetuned performance improvements."""
+    if len(df_test_split) == 0:
+        return
+    
+    # Prepare data for comparison
+    metrics_to_compare = {
+        "Median Error (km)": "median_error_km",
+        "Mean Error (km)": "mean_error_km",
+        "Cell Accuracy": "cell_acc",
+        "City Accuracy": "acc_city",
+        "Region Accuracy": "acc_region",
+        "Country Accuracy": "acc_country"
+    }
+    
+    # Calculate improvements (lower is better for errors, higher is better for accuracies)
+    comparison_data = []
+    for ablation in ablation_order:
+        df_ablation = df_test_split[df_test_split["ablation_mode"] == ablation]
+        default_row = df_ablation[df_ablation["variant"] == "Default"].iloc[0] if len(df_ablation[df_ablation["variant"] == "Default"]) > 0 else None
+        finetuned_row = df_ablation[df_ablation["variant"] == "Finetuned"].iloc[0] if len(df_ablation[df_ablation["variant"] == "Finetuned"]) > 0 else None
+        
+        if default_row is not None and finetuned_row is not None:
+            for metric_name, metric_col in metrics_to_compare.items():
+                default_val = default_row.get(metric_col)
+                finetuned_val = finetuned_row.get(metric_col)
+                
+                if pd.notna(default_val) and pd.notna(finetuned_val):
+                    if "Error" in metric_name:
+                        # For errors, improvement = reduction (negative change is good)
+                        improvement = ((default_val - finetuned_val) / default_val) * 100
+                    else:
+                        # For accuracies, improvement = increase (positive change is good)
+                        improvement = ((finetuned_val - default_val) / default_val) * 100 if default_val > 0 else 0
+                    
+                    comparison_data.append({
+                        "ablation": ablation_labels[ablation],
+                        "metric": metric_name,
+                        "improvement": improvement,
+                        "default": default_val,
+                        "finetuned": finetuned_val
+                    })
+    
+    if not comparison_data:
+        return
+    
+    df_comp = pd.DataFrame(comparison_data)
+    
+    # Radar Chart - show all 3 ablation modes
+    fig, axes = plt.subplots(1, 3, figsize=(20, 7), subplot_kw=dict(projection='polar'))
+    
+    # Prepare data for radar chart - one per ablation mode
+    angles = np.linspace(0, 2 * np.pi, len(metrics_to_compare), endpoint=False).tolist()
+    angles += angles[:1]  # Complete the circle
+    
+    for idx, ablation in enumerate(ablation_order):  # Show all 3 ablation modes
+        ax = axes[idx]
+        ablation_label = ablation_labels[ablation]
+        
+        # Get values for this ablation mode
+        df_ablation_comp = df_comp[df_comp["ablation"] == ablation_label]
+        
+        default_values = []
+        finetuned_values = []
+        metric_names = []
+        
+        for metric_name in metrics_to_compare.keys():
+            metric_data = df_ablation_comp[df_ablation_comp["metric"] == metric_name]
+            if len(metric_data) > 0:
+                default_values.append(metric_data.iloc[0]["default"])
+                finetuned_values.append(metric_data.iloc[0]["finetuned"])
+                metric_names.append(metric_name)
+        
+        if not default_values:
+            continue
+        
+        # Normalize values to 0-1 scale for radar chart
+        def normalize_error(val, max_val, min_val):
+            if max_val == min_val:
+                return 0.5
+            return 1 - (val - min_val) / (max_val - min_val)  # Invert so lower error = higher value
+        
+        def normalize_accuracy(val):
+            return val  # Already 0-1
+        
+        all_vals = default_values + finetuned_values
+        
+        normalized_default = []
+        normalized_finetuned = []
+        
+        for i, (metric_name, def_val, fin_val) in enumerate(zip(metric_names, default_values, finetuned_values)):
+            if "Error" in metric_name:
+                max_val = max(all_vals[i], all_vals[i + len(metric_names)])
+                min_val = min(all_vals[i], all_vals[i + len(metric_names)])
+                normalized_default.append(normalize_error(def_val, max_val, min_val))
+                normalized_finetuned.append(normalize_error(fin_val, max_val, min_val))
+            else:
+                normalized_default.append(normalize_accuracy(def_val))
+                normalized_finetuned.append(normalize_accuracy(fin_val))
+        
+        normalized_default += normalized_default[:1]  # Complete the circle
+        normalized_finetuned += normalized_finetuned[:1]
+        
+        # Plot
+        ax.plot(angles, normalized_default, 'o-', linewidth=2, label='Default', 
+               color=palette_map["Default"], markersize=8)
+        ax.fill(angles, normalized_default, alpha=0.25, color=palette_map["Default"])
+        
+        ax.plot(angles, normalized_finetuned, 'o-', linewidth=2, label='Finetuned',
+               color=palette_map["Finetuned"], markersize=8)
+        ax.fill(angles, normalized_finetuned, alpha=0.25, color=palette_map["Finetuned"])
+        
+        ax.set_xticks(angles[:-1])
+        ax.set_xticklabels(metric_names, fontsize=9)
+        ax.set_ylim(0, 1)
+        ax.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0])
+        ax.set_yticklabels(['0.2', '0.4', '0.6', '0.8', '1.0'], fontsize=8)
+        ax.grid(True, linestyle='--', alpha=0.3)
+        ax.set_title(f"{ablation_label} Mode", fontweight='bold', pad=20, fontsize=12)
+        ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1), fontsize=9)
+    
+    plt.suptitle("Radar Chart: Finetuned vs Default Performance", fontsize=16, fontweight='bold', y=1.02)
+    plt.tight_layout()
+    plt.savefig(output_dir / "stage2_finetuned_radar.pdf", format='pdf', bbox_inches='tight', dpi=300)
+    plt.savefig(output_dir / "stage2_finetuned_radar.png", format='png', bbox_inches='tight', dpi=300)
+    plt.close()
+    
+    # Lollipop Chart - showing improvement percentages
+    fig, ax = plt.subplots(figsize=(12, 8))
+    
+    # Group by metric and calculate average improvement across ablation modes
+    metric_improvements = df_comp.groupby("metric")["improvement"].mean().sort_values()
+    
+    y_pos = np.arange(len(metric_improvements))
+    colors = [palette_map["Finetuned"] if val > 0 else palette_map["Default"] for val in metric_improvements.values]
+    
+    # Create lollipop chart
+    for i, (metric, improvement) in enumerate(metric_improvements.items()):
+        # Stem
+        ax.plot([0, improvement], [i, i], color=colors[i], linewidth=2.5, alpha=0.7)
+        # Circle at end
+        circle = Circle((improvement, i), radius=0.15, color=colors[i], zorder=5)
+        ax.add_patch(circle)
+        # Value label
+        ax.text(improvement + (2 if improvement > 0 else -2), i, 
+               f'{improvement:+.1f}%', va='center', fontsize=10, fontweight='bold',
+               color=colors[i])
+    
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(metric_improvements.index, fontsize=11, fontweight='bold')
+    ax.set_xlabel("Improvement (%)", fontweight='bold', fontsize=12)
+    ax.set_title("Finetuned Performance Improvement Over Default", fontweight='bold', fontsize=14, pad=15)
+    ax.axvline(x=0, color='black', linestyle='--', linewidth=1, alpha=0.5)
+    ax.grid(axis='x', alpha=0.3, linestyle='--')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    
+    # Add legend
+    legend_elements = [
+        Line2D([0], [0], marker='o', color='w', markerfacecolor=palette_map["Finetuned"], 
+               markersize=10, label='Improvement'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor=palette_map["Default"], 
+               markersize=10, label='Degradation')
+    ]
+    ax.legend(handles=legend_elements, loc='lower right', fontsize=10)
+    
+    plt.tight_layout()
+    plt.savefig(output_dir / "stage2_finetuned_lollipop.pdf", format='pdf', bbox_inches='tight', dpi=300)
+    plt.savefig(output_dir / "stage2_finetuned_lollipop.png", format='png', bbox_inches='tight', dpi=300)
+    plt.close()
+    
+    logger.info(f"Saved finetuned comparison charts to {output_dir}")
+
+
 def create_stage2_plots(df_stage2: pd.DataFrame, output_dir: Path):
     """Create professional Stage 2 plots."""
     if len(df_stage2) == 0:
@@ -508,36 +688,25 @@ def create_stage2_plots(df_stage2: pd.DataFrame, output_dir: Path):
                     axes[1, 0].text(bar.get_x() + bar.get_width()/2., y_pos,
                                    f'{height:.3f}', ha='center', va='bottom', fontsize=8)
         
-        # Plot 4: Comparison of variants across ablation modes
-        if df_test_split["median_error_km"].notna().any():
-            pivot_data = df_test_split.pivot_table(
-                values="median_error_km", 
-                index="ablation_mode", 
-                columns="variant", 
-                aggfunc='mean'
-            ).reindex(ablation_order)
-            
-            x_pos = range(len(ablation_order))
-            width = 0.35
-            default_vals = pivot_data.get("Default", [])
-            finetuned_vals = pivot_data.get("Finetuned", [])
-            
-            bars1 = axes[1, 1].bar([x - width/2 for x in x_pos], default_vals, 
-                          width, label="Default", color=palette_map["Default"], edgecolor="black", linewidth=1.5)
-            bars2 = axes[1, 1].bar([x + width/2 for x in x_pos], finetuned_vals, 
-                          width, label="Finetuned", color=palette_map["Finetuned"], edgecolor="black", linewidth=1.5)
-            axes[1, 1].set_ylabel("Median Error (km)", fontweight='bold')
+        # Plot 4: Mean Error comparison
+        if df_test_split["mean_error_km"].notna().any():
+            sns.barplot(data=df_test_split, x="ablation_mode", y="mean_error_km", hue="variant",
+                       order=ablation_order, hue_order=variant_order, ax=axes[1, 1], 
+                       palette=[palette_map[v] for v in variant_order],
+                       edgecolor="black", linewidth=1.5)
+            axes[1, 1].set_ylabel("Mean Error (km)", fontweight='bold')
             axes[1, 1].set_xlabel("Ablation Mode", fontweight='bold')
-            axes[1, 1].set_title("(d) Variant Comparison", fontweight='bold', pad=10)
-            axes[1, 1].set_xticks(x_pos)
-            axes[1, 1].set_xticklabels([ablation_labels[mode] for mode in ablation_order])
-            axes[1, 1].legend(title="Variant", title_fontsize=10, fontsize=9)
+            axes[1, 1].set_title("(d) Mean Distance Error", fontweight='bold', pad=10)
+            # Fix legend with correct colors
+            handles, labels = axes[1, 1].get_legend_handles_labels()
+            axes[1, 1].legend(handles, variant_order, title="Variant", title_fontsize=10, fontsize=9)
             axes[1, 1].grid(axis='y', alpha=0.3, linestyle='--')
             axes[1, 1].spines['top'].set_visible(False)
             axes[1, 1].spines['right'].set_visible(False)
+            axes[1, 1].set_xticklabels([ablation_labels.get(x.get_text(), x.get_text()) for x in axes[1, 1].get_xticklabels()])
             # Annotate bars above error bars
-            for bars in [bars1, bars2]:
-                for bar in bars:
+            for container in axes[1, 1].containers:
+                for bar in container:
                     height = bar.get_height()
                     y_pos = height + (axes[1, 1].get_ylim()[1] - axes[1, 1].get_ylim()[0]) * 0.03
                     axes[1, 1].text(bar.get_x() + bar.get_width()/2., y_pos,
@@ -676,6 +845,9 @@ def create_stage2_plots(df_stage2: pd.DataFrame, output_dir: Path):
         plt.savefig(output_dir / "stage2_hf_results.pdf", format='pdf', bbox_inches='tight', dpi=300)
         plt.savefig(output_dir / "stage2_hf_results.png", format='png', bbox_inches='tight', dpi=300)
         plt.close()
+        
+        # Create radar and lollipop charts for finetuned performance on HF dataset
+        create_finetuned_comparison_charts(df_hf, output_dir, ablation_order, ablation_labels, variant_order, palette_map)
     
     # Plotly: Interactive Stage 2 plots
     if PLOTLY_AVAILABLE and len(df_test_split) > 0:
@@ -782,8 +954,8 @@ def create_summary_markdown(df: pd.DataFrame, output_dir: Path):
                         df_subset = df_stage2_test[
                             (df_stage2_test["variant"] == variant) & 
                             (df_stage2_test["ablation_mode"] == ablation)
-                        ]
-                        if len(df_subset) > 0:
+                    ]
+                    if len(df_subset) > 0:
                             median_err = df_subset["median_error_km"].mean() if df_subset["median_error_km"].notna().any() else None
                             mean_err = df_subset["mean_error_km"].mean() if df_subset["mean_error_km"].notna().any() else None
                             cell_acc = df_subset["cell_acc"].mean() if df_subset["cell_acc"].notna().any() else None
@@ -815,8 +987,8 @@ def create_summary_markdown(df: pd.DataFrame, output_dir: Path):
                         df_subset = df_stage2_hf[
                             (df_stage2_hf["variant"] == variant) & 
                             (df_stage2_hf["ablation_mode"] == ablation)
-                        ]
-                        if len(df_subset) > 0:
+                    ]
+                    if len(df_subset) > 0:
                             median_err = df_subset["median_error_km"].mean() if df_subset["median_error_km"].notna().any() else None
                             mean_err = df_subset["mean_error_km"].mean() if df_subset["mean_error_km"].notna().any() else None
                             cell_acc = df_subset["cell_acc"].mean() if df_subset["cell_acc"].notna().any() else None

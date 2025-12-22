@@ -379,6 +379,61 @@ def generate_semantic_geocells(
     return cell_centers, sample_to_cell
 
 
+def assign_samples_to_train_geocells(
+    coordinates: torch.Tensor,
+    countries: List[str],
+    train_cell_centers: torch.Tensor,
+    train_cell_ids_by_country: Dict[str, torch.Tensor],
+) -> Tuple[torch.Tensor, Dict[str, float]]:
+    """
+    Assign each sample to the nearest TRAIN geocell center in 3D.
+
+    Preference: if a sample's country exists in train, search only that country's centers;
+    otherwise fall back to global nearest across all train centers.
+    """
+    if coordinates.numel() == 0:
+        return torch.empty((0,), dtype=torch.long), {
+            "fallback_country_unseen": 0.0,
+            "dot_mean": float("nan"),
+            "dot_p50": float("nan"),
+            "dot_p95": float("nan"),
+        }
+
+    # Convert sample coords to unit xyz
+    xyz = latlng_to_cartesian(coordinates).float()
+    xyz = F.normalize(xyz, p=2, dim=1)
+
+    # Ensure centers are unit vectors
+    centers = F.normalize(train_cell_centers.float(), p=2, dim=1)
+
+    assigned = torch.empty((xyz.size(0),), dtype=torch.long)
+    best_dot = torch.empty((xyz.size(0),), dtype=torch.float32)
+
+    fallback_count = 0
+    all_center_ids = torch.arange(centers.size(0), dtype=torch.long)
+
+    for i in range(xyz.size(0)):
+        country = countries[i]
+        candidate_ids = train_cell_ids_by_country.get(country)
+        if candidate_ids is None or candidate_ids.numel() == 0:
+            candidate_ids = all_center_ids
+            fallback_count += 1
+
+        cand = centers.index_select(0, candidate_ids)
+        dots = torch.mv(cand, xyz[i])  # [C]
+        j = torch.argmax(dots).item()
+        assigned[i] = candidate_ids[j]
+        best_dot[i] = dots[j].item()
+
+    stats = {
+        "fallback_country_unseen": float(fallback_count),
+        "dot_mean": best_dot.mean().item(),
+        "dot_p50": torch.quantile(best_dot, 0.50).item(),
+        "dot_p95": torch.quantile(best_dot, 0.95).item(),
+    }
+    return assigned, stats
+
+
 # ---------- Coordinate Utilities ----------
 def cell_center_to_latlng(cell_centers: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
     """Convert cell centers from 3D Cartesian to lat/lng."""
@@ -1135,39 +1190,10 @@ def main():
         raise RuntimeError(f"No valid samples found! Check image paths in CSV or data_root/geoguessr_id settings.")
     
     coordinates = torch.stack(coordinates)
-    cell_labels = torch.zeros(len(image_paths), dtype=torch.long)  # Will be updated after geocell generation
+    cell_labels = torch.full((len(image_paths),), -1, dtype=torch.long)  # Will be updated after geocell generation
     
     logger.info(f"Loaded {len(image_paths)} valid samples")
-    
-    # Generate Semantic Geocells
-    cell_centers, sample_to_cell = generate_semantic_geocells(
-        coordinates,
-        countries,
-        min_samples_per_cell=args.min_samples_per_cell,
-        output_dir=output_dir / "visualizations",
-    )
-    cell_centers = cell_centers.to(device)
-    num_cells = len(cell_centers)
-    cell_labels = sample_to_cell
-    
-    # Update WandB tags with dataset-specific information
-    encoder_type_tag = "vanilla" if "vanilla" in args.stage1_checkpoint else "finetuned"
-    if args.use_wandb:
-        additional_tags = [
-            f"num_cells_{num_cells}",
-            f"dataset_size_{len(image_paths)}",
-            f"min_samples_per_cell_{args.min_samples_per_cell}",
-            f"stage1_encoder_type_{encoder_type_tag}",
-        ]
-        wandb.run.tags = list(wandb.run.tags) + additional_tags
-        # Also log dataset info to config
-        wandb.config.update({
-            "num_cells": num_cells,
-            "dataset_size": len(image_paths),
-            "num_countries": len(set(countries)),
-            "stage1_encoder_type": encoder_type_tag,
-        })
-    
+
     # Assign samples to splits based on pano_id matching Stage 1 splits
     train_indices = []
     val_indices = []
@@ -1184,6 +1210,146 @@ def main():
     # Log split statistics
     logger.info(f"Split assignment: Train={len(train_indices)}, Val={len(val_indices)}, Test={len(test_indices)}")
     logger.info(f"Unmatched samples: {len(image_paths) - len(train_indices) - len(val_indices) - len(test_indices)}")
+
+    # -------- Split-consistent Semantic Geocells (fit on TRAIN only) --------
+    if len(train_indices) == 0:
+        raise RuntimeError("No TRAIN samples matched splits.json; cannot fit geocells on train split.")
+
+    train_coords = coordinates[train_indices]
+    train_countries = [countries[i] for i in train_indices]
+
+    cell_centers_train, train_sample_to_cell = generate_semantic_geocells(
+        train_coords,
+        train_countries,
+        min_samples_per_cell=args.min_samples_per_cell,
+        output_dir=output_dir / "visualizations",
+    )
+    cell_centers = cell_centers_train.to(device)
+    num_cells = len(cell_centers_train)
+
+    # Fill TRAIN labels (train_sample_to_cell aligns with train_indices order)
+    cell_labels[train_indices] = train_sample_to_cell
+
+    # Build country -> train cell ids mapping (for per-country nearest assignment)
+    train_cell_ids_by_country: Dict[str, torch.Tensor] = {}
+    for country in set(train_countries):
+        ids = train_sample_to_cell[
+            torch.tensor([c == country for c in train_countries], dtype=torch.bool)
+        ].unique()
+        train_cell_ids_by_country[country] = ids
+
+    # Assign VAL/TEST samples to nearest TRAIN geocell
+    val_assign_stats = {}
+    test_assign_stats = {}
+
+    if len(val_indices) > 0:
+        val_coords = coordinates[val_indices]
+        val_countries = [countries[i] for i in val_indices]
+        val_assigned, val_assign_stats = assign_samples_to_train_geocells(
+            coordinates=val_coords,
+            countries=val_countries,
+            train_cell_centers=cell_centers_train,
+            train_cell_ids_by_country=train_cell_ids_by_country,
+        )
+        cell_labels[val_indices] = val_assigned
+
+    if len(test_indices) > 0:
+        test_coords = coordinates[test_indices]
+        test_countries = [countries[i] for i in test_indices]
+        test_assigned, test_assign_stats = assign_samples_to_train_geocells(
+            coordinates=test_coords,
+            countries=test_countries,
+            train_cell_centers=cell_centers_train,
+            train_cell_ids_by_country=train_cell_ids_by_country,
+        )
+        cell_labels[test_indices] = test_assigned
+
+    # -------- Sanity checks: all split labels must be valid --------
+    def assert_valid_split_labels(split_name: str, idxs: List[int]) -> None:
+        if len(idxs) == 0:
+            return
+        labels = cell_labels[idxs]
+        if (labels < 0).any():
+            bad = int((labels < 0).sum().item())
+            raise RuntimeError(f"Found {bad} negative geocell labels in split='{split_name}'.")
+        if (labels >= num_cells).any():
+            bad = int((labels >= num_cells).sum().item())
+            raise RuntimeError(f"Found {bad} out-of-range geocell labels in split='{split_name}' (num_cells={num_cells}).")
+
+    assert_valid_split_labels("train", train_indices)
+    assert_valid_split_labels("val", val_indices)
+    assert_valid_split_labels("test", test_indices)
+
+    logger.info(
+        f"Geocells fit on TRAIN only: num_cells={num_cells}. "
+        f"VAL assigned via nearest-train (country fallback={int(val_assign_stats.get('fallback_country_unseen', 0.0))}). "
+        f"TEST assigned via nearest-train (country fallback={int(test_assign_stats.get('fallback_country_unseen', 0.0))})."
+    )
+
+    # -------- W&B logging: geocells + split stats --------
+    encoder_type_tag = "vanilla" if "vanilla" in args.stage1_checkpoint else "finetuned"
+    if args.use_wandb:
+        additional_tags = [
+            f"num_cells_{num_cells}",
+            f"dataset_size_{len(image_paths)}",
+            f"min_samples_per_cell_{args.min_samples_per_cell}",
+            f"stage1_encoder_type_{encoder_type_tag}",
+        ]
+        wandb.run.tags = list(wandb.run.tags) + additional_tags
+        wandb.config.update(
+            {
+                "num_cells": num_cells,
+                "dataset_size": len(image_paths),
+                "num_countries": len(set(countries)),
+                "stage1_encoder_type": encoder_type_tag,
+                "split_train_size": len(train_indices),
+                "split_val_size": len(val_indices),
+                "split_test_size": len(test_indices),
+            }
+        )
+
+        # Assignment diagnostics
+        n_unmatched = len(image_paths) - len(train_indices) - len(val_indices) - len(test_indices)
+        val_country_unseen = float(val_assign_stats.get("fallback_country_unseen", 0.0))
+        test_country_unseen = float(test_assign_stats.get("fallback_country_unseen", 0.0))
+
+        wandb.log(
+            {
+                "geocells_num_cells": num_cells,
+                "splits_unmatched_samples": n_unmatched,
+                "geocells_val_country_unseen_fallback": val_country_unseen,
+                "geocells_test_country_unseen_fallback": test_country_unseen,
+                "geocells_val_dot_mean": val_assign_stats.get("dot_mean", float("nan")),
+                "geocells_val_dot_p50": val_assign_stats.get("dot_p50", float("nan")),
+                "geocells_val_dot_p95": val_assign_stats.get("dot_p95", float("nan")),
+                "geocells_test_dot_mean": test_assign_stats.get("dot_mean", float("nan")),
+                "geocells_test_dot_p50": test_assign_stats.get("dot_p50", float("nan")),
+                "geocells_test_dot_p95": test_assign_stats.get("dot_p95", float("nan")),
+            }
+        )
+
+        # Split/country table: {split, country, n_samples, n_unique_cells}
+        split_country_rows = []
+        for split_name, idxs in [("train", train_indices), ("val", val_indices), ("test", test_indices)]:
+            if len(idxs) == 0:
+                continue
+            split_countries = [countries[i] for i in idxs]
+            split_labels = cell_labels[idxs]
+            for country in sorted(set(split_countries)):
+                mask = torch.tensor([c == country for c in split_countries], dtype=torch.bool)
+                n_samples = int(mask.sum().item())
+                n_unique_cells = int(split_labels[mask].unique().numel())
+                split_country_rows.append([split_name, country, n_samples, n_unique_cells])
+
+        if split_country_rows:
+            wandb.log(
+                {
+                    "geocells_split_country_summary": wandb.Table(
+                        columns=["split", "country", "n_samples", "n_unique_cells"],
+                        data=split_country_rows,
+                    )
+                }
+            )
     
     # Use train for training, val for validation, test for testing
     train_dataset = Stage2ImageDataset(
