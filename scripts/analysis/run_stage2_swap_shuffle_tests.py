@@ -75,7 +75,7 @@ def evaluate_variant(
     variant:
       - baseline
       - concept_shuffled
-      - patches_shuffled
+      - patches_shuffled  (legacy name; now shuffles CLS image features)
     """
     model.eval()
     stage1_model.eval()
@@ -88,9 +88,8 @@ def evaluate_variant(
         images = images.to(device)
         coordinates = coordinates.to(device)
 
-        patch_tokens = image_encoder.get_patch_tokens(images)  # [B, 576, 1024]
         img_features = image_encoder(images)  # [B, 768]
-        concept_embs = stage1_model.concept_bottleneck(img_features)  # [B, 512]
+        concept_embs = stage1_model.concept_bottleneck(img_features.float())  # [B, 512]
 
         bsz = concept_embs.size(0)
         if variant == "concept_shuffled":
@@ -98,11 +97,11 @@ def evaluate_variant(
             concept_embs = concept_embs[perm]
         elif variant == "patches_shuffled":
             perm = torch.randperm(bsz, device=device)
-            patch_tokens = patch_tokens[perm]
+            img_features = img_features[perm]
         elif variant != "baseline":
             raise ValueError(f"Unknown variant: {variant}")
 
-        outputs = model(concept_embs, patch_tokens, return_attention=False, return_gate=False)
+        outputs = model(concept_embs, img_features, return_attention=False, return_gate=False)
         cell_logits = outputs["cell_logits"]
         pred_offsets = outputs["pred_offsets"]
 
@@ -233,6 +232,7 @@ def main():
         num_cells=num_cells,
         coord_output_dim=coord_output_dim,
         num_heads=int(ckpt.get("num_heads", 8)),
+        image_feature_dim=int(ckpt.get("image_feature_dim", 768)),
         ablation_mode=ablation_mode,
     )
     model.load_state_dict(ckpt["model_state_dict"])

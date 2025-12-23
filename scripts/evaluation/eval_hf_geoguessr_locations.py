@@ -165,6 +165,7 @@ def load_stage2_checkpoint(
         num_cells=ckpt["num_cells"],
         coord_output_dim=ckpt["coord_output_dim"],
         num_heads=ckpt["num_heads"],
+        image_feature_dim=int(ckpt.get("image_feature_dim", 768)),
         ablation_mode=ckpt.get("ablation_mode", "both"),
     )
     model.load_state_dict(ckpt["model_state_dict"])
@@ -241,27 +242,20 @@ def evaluate_on_hf_dataset(
         distances = np.linalg.norm(xyz[:, None, :] - centers_np[None, :, :], axis=2)
         cell_labels = torch.tensor(np.argmin(distances, axis=1), dtype=torch.long).to(device)
         
-        # Compute features + patch tokens based on ablation mode
-        if ablation_mode == "concept_only":
-            # No patch tokens used in this mode
-            img_features = image_encoder(images)  # [B, 768]
-            concept_embs = stage1_model.concept_bottleneck(img_features.float())
-            patch_tokens = torch.empty((images.size(0), 0, patch_dim), device=device, dtype=img_features.dtype)
+        # Compute features based on Stage2 CLS-fusion logic
+        img_features = image_encoder(images)  # [B, 768]
+        if ablation_mode == "image_only":
+            concept_embs = torch.zeros((images.size(0), concept_dim), device=device, dtype=img_features.dtype)
         else:
-            # both / image_only: get features + patches in ONE forward
-            img_features, patch_tokens = image_encoder.get_features_and_patches(images)
-            if ablation_mode == "image_only":
-                concept_embs = torch.zeros((images.size(0), concept_dim), device=device, dtype=img_features.dtype)
-            else:
-                concept_embs = stage1_model.concept_bottleneck(img_features.float())
+            concept_embs = stage1_model.concept_bottleneck(img_features.float())
         
         # Forward pass
-        outputs = model(concept_embs, patch_tokens, return_attention=False, return_gate=False)
+        outputs = model(concept_embs, img_features, return_attention=False, return_gate=False)
         cell_logits = outputs["cell_logits"]
         pred_offsets = outputs["pred_offsets"]
         
         # Get concept predictions from Stage 1
-        stage1_outputs = stage1_model.forward_from_features(img_features)
+        stage1_outputs = stage1_model.forward_from_features(img_features.float())
         meta_probs = stage1_outputs["meta_probs"]
         parent_probs = stage1_outputs["parent_probs"]
         

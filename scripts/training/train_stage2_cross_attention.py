@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
 """
-Stage 2 Cross-Attention Training Script: Interpretable Geolocation Prediction
+Stage 2 Training Script: Stage1 Concepts + CLS Feature Fusion
 
-This script implements Stage 2 training for geolocation prediction with interpretability:
-- Cross-attention between concept embeddings (query) and image patch tokens (keys/values)
-- Attention visualization showing which image patches drive predictions
+This script implements Stage 2 training for geolocation prediction:
+- Fuses Stage1 concept embeddings with StreetCLIP projected CLS image features (no patch tokens)
 - Semantic Geocell classification + coordinate offset regression
 - Uses frozen Stage 1 Concept Bottleneck loaded from checkpoint
 
 Architecture:
-- concept_emb [B, 512] as query (computed on-the-fly via frozen Stage 1 bottleneck)
-- patch_tokens [B, 576, 1024] projected to [B, 576, 512] as keys/values
-- cross_attn output -> cell_head, offset_head
+- concept_emb [B, 512] computed on-the-fly via frozen Stage 1 bottleneck
+- image_features [B, 768] projected CLS features from StreetCLIPEncoder
+- fusion(concept_emb, image_features) -> cell_head, offset_head
 
-Trainable: patch_proj, cross_attn, cell_head, offset_head
+Trainable: image_proj, fusion, cell_head, offset_head
 Frozen: image_encoder, concept_bottleneck (from Stage 1)
 
 Data Strategy:
@@ -40,7 +39,6 @@ from tqdm import tqdm
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
-from matplotlib.colors import LinearSegmentedColormap
 from PIL import Image
 
 from src.dataset import get_transforms_from_processor
@@ -67,56 +65,38 @@ CLIP_MEAN = [0.48145466, 0.4578275, 0.40821073]
 CLIP_STD = [0.26862954, 0.26130258, 0.27577711]
 
 
-def compute_concept_emb_and_patches(
+def compute_concept_emb_and_image_features(
     images: torch.Tensor,
     image_encoder: StreetCLIPEncoder,
     stage1_model: Stage1ConceptModel,
     ablation_mode: str,
-    patch_dim: int,
     concept_dim: int,
     use_amp: bool,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
-    Compute (concept_embs, patch_tokens) efficiently based on ablation mode.
+    Compute (concept_embs, image_features) efficiently based on ablation mode.
 
-    Key speed optimization:
-    - Uses StreetCLIPEncoder.get_features_and_patches() to avoid TWO vision forwards
-      (one for patch tokens, one for projected image features).
-    - Skips patch token computation entirely for concept_only.
-    - Skips Stage1 bottleneck entirely for image_only.
+    - image_features: projected CLS features from StreetCLIPEncoder [B, 768]
+    - concept_embs: Stage1 bottleneck output [B, 512] (skipped for image_only)
     """
     bsz = images.size(0)
 
-    if ablation_mode == "concept_only":
-        # No patch tokens needed.
-        if use_amp and images.is_cuda:
-            with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-                img_features = image_encoder(images)  # [B, 768]
-                concept_embs = stage1_model.concept_bottleneck(img_features)  # [B, 512]
-        else:
-            img_features = image_encoder(images)
-            concept_embs = stage1_model.concept_bottleneck(img_features)
-
-        patch_tokens = torch.empty((bsz, 0, patch_dim), device=images.device, dtype=images.dtype)
-        return concept_embs, patch_tokens
-
-    # For both/image_only we need patch tokens. Get both outputs in ONE forward.
     if use_amp and images.is_cuda:
         with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-            img_features, patch_tokens = image_encoder.get_features_and_patches(images)
+            image_features = image_encoder(images)  # [B, 768]
     else:
-        img_features, patch_tokens = image_encoder.get_features_and_patches(images)
+        image_features = image_encoder(images)
 
     if ablation_mode == "image_only":
         # Stage2 ignores concept_emb in this mode (but still needs the batch dim).
-        concept_embs = torch.zeros((bsz, concept_dim), device=images.device, dtype=img_features.dtype)
-        return concept_embs, patch_tokens
+        concept_embs = torch.zeros((bsz, concept_dim), device=images.device, dtype=image_features.dtype)
+        return concept_embs, image_features
 
-    # ablation_mode == "both"
+    # ablation_mode == "both" or "concept_only"
     # Stage 1 bottleneck expects float32, so cast if needed (AMP may produce bfloat16)
-    img_features_f32 = img_features.float() if img_features.dtype != torch.float32 else img_features
-    concept_embs = stage1_model.concept_bottleneck(img_features_f32)
-    return concept_embs, patch_tokens
+    image_features_f32 = image_features.float() if image_features.dtype != torch.float32 else image_features
+    concept_embs = stage1_model.concept_bottleneck(image_features_f32)
+    return concept_embs, image_features
 
 
 # ---------- Helper Functions ----------
@@ -159,8 +139,8 @@ class Stage2ImageDataset(Dataset):
     """
     Dataset that loads images directly for Stage 2 training.
     
-    Computes on-the-fly:
-    - patch_tokens: [576, 1024] from StreetCLIP ViT
+    Computes on-the-fly (in the training loop):
+    - image_features: [768] projected CLS features from StreetCLIP
     - concept_emb: [512] from frozen Stage 1 concept bottleneck
     
     This avoids storing large precomputed embeddings.
@@ -464,7 +444,7 @@ def cartesian_to_latlng(cart: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]
 
 # ---------- Visualization ----------
 @torch.no_grad()
-def visualize_attention_predictions(
+def visualize_comprehensive_predictions(
     model: Stage2CrossAttentionGeoHead,
     image_encoder: StreetCLIPEncoder,
     stage1_model: Stage1ConceptModel,
@@ -477,148 +457,96 @@ def visualize_attention_predictions(
     coord_output_dim: int = 3,
     num_samples: int = 4,
     args=None,
-):
+) -> None:
     """
-    Comprehensive Stage 2 visualization showing:
-    - Original image with attention heatmap overlay
-    - Top-5 predicted concepts bar chart
-    - GT vs Pred parent/child concepts
-    - Geocell predictions (GT cell, Pred cell)
-    - Coordinate predictions (GT coords, Pred coords, Distance error)
+    Stage2 qualitative visualization (no patch attention):
+    - Original image
+    - Top-5 predicted child concepts bar chart (Stage1)
+    - Top-5 predicted parent concepts bar chart (Stage1)
+    - GT vs Pred geocell + coordinate error summary (Stage2)
+
+    Logs as wandb key: 'comprehensive_predictions' if args.use_wandb.
     """
     model.eval()
     stage1_model.eval()
+
     viz_dir = output_dir / "visualizations"
     viz_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Get concept name mappings
+
     idx_to_concept = concept_info.get("idx_to_concept", {})
     idx_to_parent = concept_info.get("idx_to_parent", {})
     meta_to_parent_idx = concept_info.get("meta_to_parent_idx", None)
-    
-    # Collect samples
+
     all_samples = []
     for batch in dataloader:
         images, coords, cell_labels, countries, image_paths = batch
         for i in range(len(images)):
             if Path(image_paths[i]).exists():
-                all_samples.append({
-                    "image": images[i],
-                    "coords": coords[i],
-                    "cell_label": cell_labels[i],
-                    "country": countries[i],
-                    "image_path": image_paths[i],
-                })
+                all_samples.append(
+                    {
+                        "image": images[i],
+                        "coords": coords[i],
+                        "cell_label": cell_labels[i],
+                        "country": countries[i],
+                        "image_path": image_paths[i],
+                    }
+                )
         if len(all_samples) >= num_samples * 2:
             break
-    
+
     if not all_samples:
         logger.warning("No valid samples found for visualization")
         return
-    
-    # Random sample selection
+
     np.random.shuffle(all_samples)
     samples = all_samples[:num_samples]
-    
-    # Create attention colormap (transparent to red)
-    colors = [(1, 0, 0, 0), (1, 0, 0, 0.7)]
-    attn_cmap = LinearSegmentedColormap.from_list("attention", colors, N=256)
-    
-    # Create figure: 4 samples, each with 2 columns (image+attention, bar chart)
+
     fig = plt.figure(figsize=(24, 6 * num_samples))
-    
+
     for idx, sample in enumerate(samples):
-        # Load original image for display
         image_path = Path(sample["image_path"])
         pil_image = Image.open(image_path).convert("RGB")
-        
-        # Get pre-transformed image tensor
+
         img_tensor = sample["image"].unsqueeze(0).to(device)
-        
-        # Efficiently compute inputs for Stage2 (avoid double vision forward)
-        concept_emb, patch_tokens = compute_concept_emb_and_patches(
+
+        concept_emb, image_features = compute_concept_emb_and_image_features(
             images=img_tensor,
             image_encoder=image_encoder,
             stage1_model=stage1_model,
             ablation_mode=model.ablation_mode,
-            patch_dim=getattr(args, "patch_dim", 1024),
             concept_dim=getattr(args, "concept_dim", 512),
             use_amp=getattr(args, "amp", False),
         )
-        
-        # Get concept predictions from Stage 1 (full forward pass)
-        # Note: For image_only, concept_emb is zeros for Stage2; we still compute Stage1
-        # probs for visualization, using the same projected img_features from a single pass.
-        if model.ablation_mode != "concept_only":
-            # In both/image_only paths, compute_concept_emb_and_patches used get_features_and_patches,
-            # so we already have projected features implicitly inside Stage1 bottleneck computation.
-            # For visualization, we recompute Stage1 outputs from projected features by reusing encoder.
-            if getattr(args, "amp", False) and img_tensor.is_cuda:
-                with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-                    img_features_viz = image_encoder(img_tensor)
-            else:
-                img_features_viz = image_encoder(img_tensor)
-        else:
-            # concept_only path used image_encoder(images) already; compute again is cheap relative to IO,
-            # and keeps the code simple here.
-            img_features_viz = image_encoder(img_tensor)
 
-        # Stage 1 expects float32, so cast if needed (AMP may produce bfloat16)
-        img_features_viz_f32 = img_features_viz.float() if img_features_viz.dtype != torch.float32 else img_features_viz
-        stage1_outputs = stage1_model.forward_from_features(img_features_viz_f32)
-        meta_probs = stage1_outputs["meta_probs"][0]  # [num_metas]
-        parent_probs = stage1_outputs["parent_probs"][0]  # [num_parents]
-        
-        # Forward through Stage 2 model
-        outputs = model(concept_emb, patch_tokens)
+        image_features_f32 = image_features.float() if image_features.dtype != torch.float32 else image_features
+        stage1_outputs = stage1_model.forward_from_features(image_features_f32)
+        meta_probs = stage1_outputs["meta_probs"][0]
+        parent_probs = stage1_outputs["parent_probs"][0]
+
+        outputs = model(concept_emb, image_features, return_attention=False, return_gate=False)
         cell_logits = outputs["cell_logits"]
         pred_offsets = outputs["pred_offsets"]
-        attn_weights = outputs.get("attn_weights")
-        
-        # ===== Process Concept Predictions =====
-        # Top-5 meta concepts
+
         top5_meta_probs, top5_meta_idx = torch.topk(meta_probs, min(5, len(meta_probs)))
         top5_meta_names = [idx_to_concept.get(i.item(), f"Meta-{i.item()}")[:30] for i in top5_meta_idx]
-        
-        # Top-5 parent concepts
+
         top5_parent_probs, top5_parent_idx = torch.topk(parent_probs, min(5, len(parent_probs)))
         top5_parent_names = [idx_to_parent.get(i.item(), f"Parent-{i.item()}")[:30] for i in top5_parent_idx]
-        
-        # Predicted meta and parent
+
         pred_meta_idx = meta_probs.argmax().item()
         pred_meta_name = idx_to_concept.get(pred_meta_idx, f"Meta-{pred_meta_idx}")
         pred_parent_idx = parent_probs.argmax().item()
         pred_parent_name = idx_to_parent.get(pred_parent_idx, f"Parent-{pred_parent_idx}")
-        
-        # Get predicted parent from meta (hierarchical)
+
         if meta_to_parent_idx is not None:
             hier_parent_idx = meta_to_parent_idx[pred_meta_idx].item()
             hier_parent_name = idx_to_parent.get(hier_parent_idx, f"Parent-{hier_parent_idx}")
         else:
             hier_parent_name = "N/A"
-        
-        # ===== Process Attention =====
-        # Note: in ablation modes ('concept_only', 'image_only') the model does not produce attention weights.
-        attn_map_upsampled = None
-        if attn_weights is not None:
-            attn_spatial = model.attention_to_spatial(attn_weights)  # [1, 24, 24]
-            attn_map = attn_spatial[0].detach().cpu().numpy()  # [24, 24]
-            attn_map = np.clip(attn_map, 0.0, 1.0)
 
-            # Upsample attention map to image size
-            img_h, img_w = pil_image.size[1], pil_image.size[0]
-            attn_map_upsampled = Image.fromarray((attn_map * 255).astype(np.uint8))
-            attn_map_upsampled = attn_map_upsampled.resize((img_w, img_h), Image.BILINEAR)
-            attn_map_upsampled = np.array(attn_map_upsampled) / 255.0
-        else:
-            logger.info(
-                f"Skipping attention overlay for visualization (no attn_weights; ablation_mode={outputs.get('ablation_mode', 'unknown')})"
-            )
-        
-        # ===== Process Geolocation =====
         pred_cell = cell_logits.argmax(dim=1).item()
         pred_cell_center = cell_centers[pred_cell].to(device).unsqueeze(0)
-        
+
         if coord_output_dim == 3:
             pred_cart = pred_cell_center + pred_offsets
             pred_lat, pred_lng = cartesian_to_latlng(pred_cart)
@@ -627,62 +555,50 @@ def visualize_attention_predictions(
             pred_lat = c_lat + pred_offsets[0, 0]
             pred_lng = c_lng + pred_offsets[0, 1]
             pred_lng = ((pred_lng + 180) % 360) - 180
-        
+
         pred_coords = torch.stack([pred_lat, pred_lng], dim=1)
         gt_coords = sample["coords"].unsqueeze(0).to(device)
         dist_error = haversine_distance(pred_coords, gt_coords).item()
-        
+
         gt_cell = sample["cell_label"].item()
         gt_lat, gt_lng = sample["coords"][0].item(), sample["coords"][1].item()
         p_lat, p_lng = pred_lat.item(), pred_lng.item()
-        
-        # ===== Create Subplots for this sample =====
-        # Row layout: [Image+Attention (wide), Top-5 Meta Bar, Top-5 Parent Bar, Info Text]
+
         row_base = idx * 4
-        
-        # Column 1: Image with attention overlay (spans 2 columns worth of space)
+
         ax_img = fig.add_subplot(num_samples, 4, row_base + 1)
         ax_img.imshow(pil_image)
-        if attn_map_upsampled is not None:
-            ax_img.imshow(attn_map_upsampled, cmap=attn_cmap, alpha=0.6)
         ax_img.axis("off")
-        ax_img.set_title(f"Sample {idx+1}: {sample['country']}", fontsize=11, fontweight='bold')
-        
-        # Column 2: Top-5 Meta Concepts Bar Chart
+        ax_img.set_title(f"Sample {idx+1}: {sample['country']}", fontsize=11, fontweight="bold")
+
         ax_meta = fig.add_subplot(num_samples, 4, row_base + 2)
         y_pos = np.arange(len(top5_meta_names))
-        bars_meta = ax_meta.barh(y_pos, top5_meta_probs.cpu().numpy(), color='steelblue', alpha=0.8)
+        bars_meta = ax_meta.barh(y_pos, top5_meta_probs.cpu().numpy(), color="steelblue", alpha=0.8)
         ax_meta.set_yticks(y_pos)
         ax_meta.set_yticklabels(top5_meta_names, fontsize=8)
         ax_meta.set_xlabel("Probability", fontsize=9)
-        ax_meta.set_title("Top-5 Child Concepts", fontsize=10, fontweight='bold')
+        ax_meta.set_title("Top-5 Child Concepts", fontsize=10, fontweight="bold")
         ax_meta.set_xlim(0, 1)
         ax_meta.invert_yaxis()
-        # Highlight top prediction
         if len(bars_meta) > 0:
-            bars_meta[0].set_color('darkblue')
-        
-        # Column 3: Top-5 Parent Concepts Bar Chart
+            bars_meta[0].set_color("darkblue")
+
         ax_parent = fig.add_subplot(num_samples, 4, row_base + 3)
         y_pos = np.arange(len(top5_parent_names))
-        bars_parent = ax_parent.barh(y_pos, top5_parent_probs.cpu().numpy(), color='darkorange', alpha=0.8)
+        bars_parent = ax_parent.barh(y_pos, top5_parent_probs.cpu().numpy(), color="darkorange", alpha=0.8)
         ax_parent.set_yticks(y_pos)
         ax_parent.set_yticklabels(top5_parent_names, fontsize=8)
         ax_parent.set_xlabel("Probability", fontsize=9)
-        ax_parent.set_title("Top-5 Parent Concepts", fontsize=10, fontweight='bold')
+        ax_parent.set_title("Top-5 Parent Concepts", fontsize=10, fontweight="bold")
         ax_parent.set_xlim(0, 1)
         ax_parent.invert_yaxis()
         if len(bars_parent) > 0:
-            bars_parent[0].set_color('darkorange')
-        
-        # Column 4: Prediction Summary Text
+            bars_parent[0].set_color("darkorange")
+
         ax_text = fig.add_subplot(num_samples, 4, row_base + 4)
         ax_text.axis("off")
-        
-        # Determine accuracy colors
+
         cell_correct = gt_cell == pred_cell
-        cell_color = "green" if cell_correct else "red"
-        
         summary_text = (
             f"═══ CONCEPT PREDICTIONS ═══\n"
             f"Pred Child:  {pred_meta_name[:35]}\n"
@@ -704,24 +620,25 @@ def visualize_attention_predictions(
             f"Region (<200km): {'✓' if dist_error <= 200 else '✗'}\n"
             f"Country (<750km):{'✓' if dist_error <= 750 else '✗'}"
         )
-        
-        ax_text.text(0.05, 0.95, summary_text, transform=ax_text.transAxes,
-                     fontsize=9, verticalalignment='top', fontfamily='monospace',
-                     bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-    
+        ax_text.text(
+            0.05,
+            0.95,
+            summary_text,
+            transform=ax_text.transAxes,
+            fontsize=9,
+            verticalalignment="top",
+            fontfamily="monospace",
+            bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
+        )
+
     plt.tight_layout()
     save_path = viz_dir / f"epoch_{epoch}_comprehensive_predictions.png"
     plt.savefig(save_path, dpi=VIZ_DPI, bbox_inches="tight")
     plt.close(fig)
-    
     logger.info(f"Saved comprehensive visualization to {save_path}")
-    
-    try:
-        wandb.log({
-            "comprehensive_predictions": wandb.Image(str(save_path), caption=f"Epoch {epoch}")
-        }, step=epoch)
-    except Exception as e:
-        logger.error(f"Error logging to WandB: {e}")
+
+    if getattr(args, "use_wandb", False) and wandb.run is not None:
+        wandb.log({"comprehensive_predictions": wandb.Image(str(save_path), caption=f"Epoch {epoch}")}, step=epoch)
 
 
 # ---------- Training Functions ----------
@@ -802,18 +719,17 @@ def validate(
             coordinates = coordinates.to(device)
             cell_labels = cell_labels.to(device)
             
-            concept_embs, patch_tokens = compute_concept_emb_and_patches(
+            concept_embs, image_features = compute_concept_emb_and_image_features(
                 images=images,
                 image_encoder=image_encoder,
                 stage1_model=stage1_model,
                 ablation_mode=args.ablation_mode,
-                patch_dim=args.patch_dim,
                 concept_dim=args.concept_dim,
                 use_amp=args.amp,
             )
             
             # Forward pass
-            outputs = model(concept_embs, patch_tokens, return_attention=False, return_gate=True)
+            outputs = model(concept_embs, image_features, return_attention=False, return_gate=True)
             cell_logits = outputs["cell_logits"]
             pred_offsets = outputs["pred_offsets"]
             gate = outputs.get("gate")
@@ -912,14 +828,13 @@ def train_epoch(
         coordinates = coordinates.to(device)
         cell_labels = cell_labels.to(device)
         
-        # Get concept embeddings + patch tokens efficiently (encoder + Stage1 are frozen)
+        # Get concept embeddings + CLS image features efficiently (encoder + Stage1 are frozen)
         with torch.no_grad():
-            concept_embs, patch_tokens = compute_concept_emb_and_patches(
+            concept_embs, image_features = compute_concept_emb_and_image_features(
                 images=images,
                 image_encoder=image_encoder,
                 stage1_model=stage1_model,
                 ablation_mode=args.ablation_mode,
-                patch_dim=args.patch_dim,
                 concept_dim=args.concept_dim,
                 use_amp=args.amp,
             )
@@ -927,7 +842,7 @@ def train_epoch(
         # Forward pass through trainable head
         optimizer.zero_grad()
         
-        outputs = model(concept_embs, patch_tokens)
+        outputs = model(concept_embs, image_features)
         cell_logits = outputs["cell_logits"]
         pred_offsets = outputs["pred_offsets"]
         
@@ -968,9 +883,12 @@ def save_checkpoint(
         "num_cells": len(cell_centers),
         "coord_output_dim": coord_output_dim,
         "encoder_model": encoder_model,
-        "patch_dim": model.patch_proj[0].in_features,
-        "concept_dim": model.cross_attn.embed_dim,
-        "num_heads": model.cross_attn.num_heads,
+        # Kept for compatibility with downstream scripts/job configs
+        "patch_dim": getattr(model, "patch_dim", None),
+        "concept_dim": getattr(model, "concept_emb_dim", None),
+        "num_heads": getattr(model, "num_heads", None),
+        "image_feature_dim": getattr(model, "image_feature_dim", None),
+        "stage2_input": "cls",
         "ablation_mode": model.ablation_mode,  # Save ablation mode for reproducibility
     }
     if optimizer is not None:
@@ -1032,14 +950,14 @@ def main():
                         help="Ablation mode for experiments: "
                              "'both' = concept + image fusion (default), "
                              "'concept_only' = only concept embedding, "
-                             "'image_only' = only image patches")
+                             "'image_only' = only CLS image features")
     
     # Misc
     parser.add_argument("--output_dir", type=str, default=None)
     parser.add_argument("--use_wandb", action="store_true", default=False)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--viz_every", type=int, default=1,
-                        help="Run attention/qualitative visualization every N epochs. Set to 0 to disable.")
+                        help="Run qualitative visualization every N epochs (no patch attention; logs comprehensive_predictions). Set to 0 to disable.")
     
     args = parser.parse_args()
     
@@ -1092,7 +1010,7 @@ def main():
             tags.append("coord_latlng")
         
         wandb.init(
-            project="streetclip-cbm-stage2",
+            project="streetclip-cbm-stage2-cls",
             config=vars(args),
             name=f"stage2-{args.ablation_mode}-{output_dir.name}",
             tags=tags
@@ -1451,12 +1369,21 @@ def main():
             cell_centers, args.coord_output_dim, epoch, args
         )
         
-        # Visualize every epoch
+        # Visualization
         if args.viz_every > 0 and (epoch % args.viz_every == 0):
-            visualize_attention_predictions(
-                model, image_encoder, stage1_model, concept_info, val_loader, device,
-                cell_centers, epoch, output_dir, args.coord_output_dim,
-                num_samples=4, args=args
+            visualize_comprehensive_predictions(
+                model=model,
+                image_encoder=image_encoder,
+                stage1_model=stage1_model,
+                concept_info=concept_info,
+                dataloader=val_loader,
+                device=device,
+                cell_centers=cell_centers,
+                epoch=epoch,
+                output_dir=output_dir,
+                coord_output_dim=args.coord_output_dim,
+                num_samples=4,
+                args=args,
             )
         
         # Log to WandB
