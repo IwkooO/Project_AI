@@ -33,9 +33,12 @@ from scripts.training.train_stage2_cross_attention import (
     Stage2ImageDataset,
     stage2_collate_fn,
     load_stage1_checkpoint,
+    load_image_encoder_weights_from_stage0_checkpoint,
+    is_missing_or_none_path,
     compute_predicted_coords,
     compute_offset_targets,
 )
+from src.utils.torch_compat import torch_load_checkpoint
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -154,19 +157,36 @@ THRESHOLD_ACCURACIES = {
 def load_stage2_checkpoint(
     checkpoint_path: Path,
     device: torch.device,
+    force_vanilla_encoder_for_patches: bool = False,
 ) -> tuple:
     """Load Stage 2 checkpoint."""
     logger.info(f"Loading Stage 2 checkpoint from {checkpoint_path}")
-    ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    ckpt = torch_load_checkpoint(checkpoint_path, map_location=device)
     
     # Load Stage 1 checkpoint
     stage1_ckpt_path = Path(ckpt["stage1_checkpoint"])
+    stage1_ckpt_data = torch_load_checkpoint(stage1_ckpt_path, map_location="cpu")
     encoder_config = StreetCLIPConfig(
         model_name=ckpt["encoder_model"],
         finetune=False,
         device=device,
     )
     image_encoder = StreetCLIPEncoder(encoder_config)
+
+    if force_vanilla_encoder_for_patches:
+        logger.info("force_vanilla_encoder_for_patches=True: using base encoder weights for patch extraction")
+    else:
+        embedded_enc = stage1_ckpt_data.get("image_encoder_state_dict")
+        if embedded_enc is not None:
+            logger.info("Using image_encoder_state_dict embedded in Stage1 checkpoint for patch extraction")
+            image_encoder.load_state_dict(embedded_enc, strict=False)
+        else:
+            stage0_checkpoint = stage1_ckpt_data.get("stage0_checkpoint")
+            if not is_missing_or_none_path(stage0_checkpoint):
+                load_image_encoder_weights_from_stage0_checkpoint(Path(stage0_checkpoint), image_encoder)
+            else:
+                logger.info("Stage1 indicates vanilla lineage (no Stage0 checkpoint); using base encoder weights")
+
     image_encoder.model.eval()
     for param in image_encoder.model.parameters():
         param.requires_grad = False
@@ -362,12 +382,13 @@ def evaluate_single_stage2_checkpoint(
     device: torch.device,
     lambda_cell: float = 1.0,
     lambda_offset: float = 1.0,
+    force_vanilla_encoder_for_patches: bool = False,
 ) -> Optional[Dict]:
     """Evaluate a single Stage 2 checkpoint and return results dict."""
     try:
         # Load checkpoint
         model, image_encoder, stage1_model, cell_centers, concept_info, ckpt = load_stage2_checkpoint(
-            checkpoint_path, device
+            checkpoint_path, device, force_vanilla_encoder_for_patches=force_vanilla_encoder_for_patches
         )
         
         # Variant is determined from directory path, trust it
@@ -512,6 +533,12 @@ def main():
                         help="Output directory for results. Default: results/evals/<checkpoint_name>")
     parser.add_argument("--lambda_cell", type=float, default=1.0)
     parser.add_argument("--lambda_offset", type=float, default=1.0)
+    parser.add_argument(
+        "--force_vanilla_encoder_for_patches",
+        action="store_true",
+        default=False,
+        help="If set, ignore Stage1/Stage0 lineage and use base StreetCLIP weights for patch extraction (for before/after comparison).",
+    )
     
     args = parser.parse_args()
     
@@ -551,6 +578,7 @@ def main():
                 device=device,
                 lambda_cell=args.lambda_cell,
                 lambda_offset=args.lambda_offset,
+                force_vanilla_encoder_for_patches=args.force_vanilla_encoder_for_patches,
             )
             
             if result:
@@ -589,6 +617,7 @@ def main():
     model, image_encoder, stage1_model, cell_centers, concept_info, ckpt = load_stage2_checkpoint(
         Path(args.stage2_checkpoint),
         device,
+        force_vanilla_encoder_for_patches=args.force_vanilla_encoder_for_patches,
     )
     ablation_mode = ckpt.get("ablation_mode", "both")
     variant = "vanilla" if _is_vanilla_from_stage0(ckpt.get("stage0_checkpoint")) else "finetuned"

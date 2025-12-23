@@ -71,6 +71,7 @@ from src.losses import (
     compute_semantic_close_accuracy,
 )
 from src.concepts.utils import extract_concepts_from_dataset
+from src.utils.torch_compat import torch_load_checkpoint
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -1233,7 +1234,7 @@ def train(args):
         checkpoint_path = Path(args.resume_from_checkpoint)
         if checkpoint_path.exists():
             logger.info(f"Loading Stage 0 checkpoint from {checkpoint_path}")
-            checkpoint = torch.load(checkpoint_path, map_location=device)
+            checkpoint = torch_load_checkpoint(checkpoint_path, map_location=device)
             
             # Load only image encoder weights
             state_dict = checkpoint.get("model_state_dict", checkpoint)
@@ -1798,8 +1799,8 @@ def train(args):
                     "stage": 1,
                     "meta_acc": val_metric,
                     "parent_acc": val_metrics["parent_acc"],
-                    "stage0_checkpoint": args.resume_from_checkpoint,
-                    "splits_json": str(splits_path) if args.splits_json or splits_path.exists() else None,
+                    "stage0_checkpoint": str(args.resume_from_checkpoint) if args.resume_from_checkpoint else None,
+                    "splits_json": str(splits_path) if splits_path is not None else None,
                 },
                 optimizer=optimizer,
                 scheduler=scheduler,
@@ -1831,8 +1832,8 @@ def train(args):
                 extra_info={
                     "stage": 1,
                     "meta_acc": val_metric,
-                    "stage0_checkpoint": args.resume_from_checkpoint,
-                    "splits_json": str(splits_path) if args.splits_json or splits_path.exists() else None,
+                    "stage0_checkpoint": str(args.resume_from_checkpoint) if args.resume_from_checkpoint else None,
+                    "splits_json": str(splits_path) if splits_path is not None else None,
                 },
                 optimizer=optimizer,
                 scheduler=scheduler,
@@ -1852,7 +1853,7 @@ def train(args):
         # Load best model
         best_ckpt_path = output_dir / "checkpoints" / "best_model_stage1.pt"
         if best_ckpt_path.exists():
-            best_ckpt = torch.load(best_ckpt_path, map_location=device)
+            best_ckpt = torch_load_checkpoint(best_ckpt_path, map_location=device)
             model.load_state_dict(best_ckpt["model_state_dict"])
             logger.info(f"Loaded best model from {best_ckpt_path}")
         

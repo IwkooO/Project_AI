@@ -48,6 +48,7 @@ from src.dataset import get_transforms_from_processor
 from src.models.streetclip_encoder import StreetCLIPEncoder, StreetCLIPConfig
 from src.models.concept_aware_cbm import Stage2CrossAttentionGeoHead, Stage1ConceptModel
 from src.losses import haversine_distance
+from src.utils.torch_compat import torch_load_checkpoint
 import wandb
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -70,7 +71,7 @@ CLIP_STD = [0.26862954, 0.26130258, 0.27577711]
 def compute_concept_emb_and_patches(
     images: torch.Tensor,
     image_encoder: StreetCLIPEncoder,
-    stage1_model: Stage1ConceptModel,
+    stage1_model: Optional[Stage1ConceptModel],
     ablation_mode: str,
     patch_dim: int,
     concept_dim: int,
@@ -86,6 +87,10 @@ def compute_concept_emb_and_patches(
     - Skips Stage1 bottleneck entirely for image_only.
     """
     bsz = images.size(0)
+    if stage1_model is None and ablation_mode in {"both", "concept_only"}:
+        raise ValueError(
+            f"ablation_mode={ablation_mode} requires --stage1_checkpoint (concept embeddings)."
+        )
 
     if ablation_mode == "concept_only":
         # No patch tokens needed.
@@ -236,7 +241,7 @@ def load_stage1_checkpoint(
         concept_info_dict contains: concept_names, parent_names, concept_to_idx, parent_to_idx
     """
     logger.info(f"Loading Stage 1 checkpoint from {checkpoint_path}")
-    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    checkpoint = torch_load_checkpoint(checkpoint_path, map_location=device)
     
     # Extract required tensors
     T_meta_base = checkpoint["T_meta_base"]
@@ -277,6 +282,41 @@ def load_stage1_checkpoint(
     
     logger.info(f"Loaded Stage 1 model with {checkpoint['num_concepts']} concepts, {len(concept_info['parent_names'])} parents")
     return model, concept_info
+
+
+def is_missing_or_none_path(p: Optional[str]) -> bool:
+    if p is None:
+        return True
+    s = str(p).strip()
+    return s == "" or s.lower() == "none"
+
+
+def load_image_encoder_weights_from_stage0_checkpoint(
+    stage0_checkpoint_path: Path,
+    image_encoder: StreetCLIPEncoder,
+) -> None:
+    """
+    Load ONLY the StreetCLIP encoder weights from a Stage0 checkpoint into `image_encoder`.
+
+    Stage0 checkpoints store the full Stage0PretrainingModel state dict, whose keys include
+    the StreetCLIP encoder under the `image_encoder.` prefix. We strip that prefix and load
+    into the Stage2 `StreetCLIPEncoder`, so patch tokens + global features are computed with
+    the same encoder weights used to train Stage1 when Stage1 was resumed from Stage0.
+    """
+    logger.info(f"Loading Stage0 encoder weights from {stage0_checkpoint_path}")
+    stage0_ckpt = torch_load_checkpoint(stage0_checkpoint_path, map_location="cpu")
+    state = stage0_ckpt.get("model_state_dict")
+    if state is None:
+        raise KeyError(f"Stage0 checkpoint missing model_state_dict: {stage0_checkpoint_path}")
+
+    encoder_state = {k[len('image_encoder.'):]: v for k, v in state.items() if k.startswith("image_encoder.")}
+    load_res = image_encoder.load_state_dict(encoder_state, strict=False)
+    missing = getattr(load_res, "missing_keys", [])
+    unexpected = getattr(load_res, "unexpected_keys", [])
+    logger.info(
+        f"Loaded Stage0 encoder weights into Stage2 image_encoder "
+        f"(missing={len(missing)}, unexpected={len(unexpected)})"
+    )
 
 
 # ---------- Geocell Generation ----------
@@ -467,7 +507,7 @@ def cartesian_to_latlng(cart: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]
 def visualize_attention_predictions(
     model: Stage2CrossAttentionGeoHead,
     image_encoder: StreetCLIPEncoder,
-    stage1_model: Stage1ConceptModel,
+    stage1_model: Optional[Stage1ConceptModel],
     concept_info: Dict,
     dataloader: DataLoader,
     device: torch.device,
@@ -486,6 +526,9 @@ def visualize_attention_predictions(
     - Geocell predictions (GT cell, Pred cell)
     - Coordinate predictions (GT coords, Pred coords, Distance error)
     """
+    if stage1_model is None:
+        logger.info("Skipping visualization: no Stage1 checkpoint/model available")
+        return
     model.eval()
     stage1_model.eval()
     viz_dir = output_dir / "visualizations"
@@ -775,7 +818,7 @@ def compute_predicted_coords(
 def validate(
     model: Stage2CrossAttentionGeoHead,
     image_encoder: StreetCLIPEncoder,
-    stage1_model: Stage1ConceptModel,
+    stage1_model: Optional[Stage1ConceptModel],
     val_loader: DataLoader,
     device: torch.device,
     cell_centers: torch.Tensor,
@@ -785,7 +828,8 @@ def validate(
 ) -> Dict[str, float]:
     """Run validation with on-the-fly embedding computation."""
     model.eval()
-    stage1_model.eval()
+    if stage1_model is not None:
+        stage1_model.eval()
     
     criterion_cell = nn.CrossEntropyLoss()
     
@@ -885,7 +929,7 @@ def validate(
 def train_epoch(
     model: Stage2CrossAttentionGeoHead,
     image_encoder: StreetCLIPEncoder,
-    stage1_model: Stage1ConceptModel,
+    stage1_model: Optional[Stage1ConceptModel],
     train_loader: DataLoader,
     optimizer: torch.optim.Optimizer,
     device: torch.device,
@@ -897,7 +941,8 @@ def train_epoch(
     """Train for one epoch with on-the-fly embedding computation."""
     model.train()
     image_encoder.model.eval()  # Keep encoder frozen
-    stage1_model.eval()  # Keep Stage 1 frozen
+    if stage1_model is not None:
+        stage1_model.eval()  # Keep Stage 1 frozen
     
     criterion_cell = nn.CrossEntropyLoss()
     
@@ -997,9 +1042,17 @@ def main():
     parser.add_argument("--splits_json", type=str, default=None,
                         help="Path to splits.json file. If not provided, will try to load from stage1 checkpoint directory.")
     
-    # Stage 1 checkpoint (required for concept embeddings)
-    parser.add_argument("--stage1_checkpoint", type=str, required=True,
-                        help="Path to Stage 1 model checkpoint")
+    # Stage 1 checkpoint (optional; required for concept embeddings)
+    parser.add_argument(
+        "--stage1_checkpoint",
+        type=str,
+        default=None,
+        help=(
+            "Path to Stage 1 model checkpoint. If provided, Stage2 will use the encoder lineage "
+            "associated with this checkpoint for BOTH global features and patch tokens. "
+            "If omitted, Stage2 can only run with --ablation_mode image_only using a fresh vanilla encoder."
+        ),
+    )
     
     # Model
     parser.add_argument("--encoder_model", type=str, default="geolocal/StreetCLIP")
@@ -1098,26 +1151,56 @@ def main():
             tags=tags
         )
     
-    # Initialize Image Encoder (frozen, for patch extraction and concept computation)
-    logger.info("Initializing frozen image encoder...")
+    if args.stage1_checkpoint is None and args.ablation_mode != "image_only":
+        raise ValueError(
+            "No --stage1_checkpoint provided. Only --ablation_mode image_only is supported "
+            "(concept embeddings require Stage1)."
+        )
+
+    # Initialize Image Encoder (frozen). If a Stage1 checkpoint is provided, we load encoder
+    # weights tied to that Stage1 checkpoint lineage so patch tokens come from the correct encoder.
+    logger.info("Initializing image encoder for patch extraction...")
     encoder_config = StreetCLIPConfig(model_name=args.encoder_model, finetune=False, device=device)
     image_encoder = StreetCLIPEncoder(encoder_config)
-    image_encoder.model.eval()
-    for param in image_encoder.model.parameters():
-        param.requires_grad = False
-    
-    # Load Stage 1 model for concept embeddings
-    stage1_checkpoint_path = Path(args.stage1_checkpoint)
-    stage1_model, concept_info = load_stage1_checkpoint(
-        stage1_checkpoint_path,
-        image_encoder,
-        device,
-    )
-    
-    # Load stage1 checkpoint metadata for propagation
-    stage1_ckpt_data = torch.load(stage1_checkpoint_path, map_location="cpu", weights_only=False)
-    stage0_checkpoint = stage1_ckpt_data.get("stage0_checkpoint")
-    splits_json_path_str = stage1_ckpt_data.get("splits_json")
+
+    stage1_model: Optional[Stage1ConceptModel] = None
+    concept_info: Dict = {}
+    stage1_ckpt_data: Optional[Dict] = None
+    splits_json_path_str = None
+    stage0_checkpoint: Optional[str] = None
+
+    if args.stage1_checkpoint is not None:
+        stage1_checkpoint_path = Path(args.stage1_checkpoint)
+        stage1_ckpt_data = torch_load_checkpoint(stage1_checkpoint_path, map_location="cpu")
+        stage0_checkpoint = stage1_ckpt_data.get("stage0_checkpoint")
+
+        # Prefer encoder weights embedded directly in Stage1 checkpoint (if present).
+        embedded_enc = stage1_ckpt_data.get("image_encoder_state_dict")
+        if embedded_enc is not None:
+            logger.info("Using image_encoder_state_dict embedded in Stage1 checkpoint for patch extraction")
+            load_res = image_encoder.load_state_dict(embedded_enc, strict=False)
+            missing = getattr(load_res, "missing_keys", [])
+            unexpected = getattr(load_res, "unexpected_keys", [])
+            logger.info(f"Loaded embedded encoder weights (missing={len(missing)}, unexpected={len(unexpected)})")
+        else:
+            if not is_missing_or_none_path(stage0_checkpoint):
+                load_image_encoder_weights_from_stage0_checkpoint(Path(stage0_checkpoint), image_encoder)
+            else:
+                logger.info("Stage1 checkpoint indicates vanilla encoder lineage (no Stage0 checkpoint); using base encoder weights")
+
+        # Freeze encoder
+        image_encoder.model.eval()
+        for param in image_encoder.model.parameters():
+            param.requires_grad = False
+
+        # Load Stage 1 model for concept embeddings (uses the same image_encoder instance)
+        stage1_model, concept_info = load_stage1_checkpoint(stage1_checkpoint_path, image_encoder, device)
+        splits_json_path_str = stage1_ckpt_data.get("splits_json")
+    else:
+        logger.info("No Stage1 checkpoint provided: using vanilla image encoder weights for image_only mode")
+        image_encoder.model.eval()
+        for param in image_encoder.model.parameters():
+            param.requires_grad = False
     
     # Get transforms from image processor
     transforms = get_transforms_from_processor(image_encoder.image_processor)
@@ -1126,17 +1209,15 @@ def main():
     if args.splits_json:
         splits_json_path = Path(args.splits_json)
     else:
+        if args.stage1_checkpoint is None:
+            raise ValueError("No --stage1_checkpoint and no --splits_json provided. Provide --splits_json.")
         # Try to load from Stage 1 checkpoint directory
         stage1_checkpoint_path = Path(args.stage1_checkpoint)
         stage1_dir = stage1_checkpoint_path.parent.parent
         splits_json_path = stage1_dir / "splits.json"
     
     if not splits_json_path.exists():
-        raise FileNotFoundError(
-            f"splits.json not found in Stage 1 checkpoint directory: {stage1_dir}\n"
-            f"Expected path: {splits_json_path}\n"
-            f"Please ensure the Stage 1 training run saved splits.json in the checkpoint directory."
-        )
+        raise FileNotFoundError(f"splits.json not found: {splits_json_path}")
     
     logger.info(f"Loading splits from {splits_json_path}")
     with open(splits_json_path, 'r') as f:
@@ -1451,8 +1532,8 @@ def main():
             cell_centers, args.coord_output_dim, epoch, args
         )
         
-        # Visualize every epoch
-        if args.viz_every > 0 and (epoch % args.viz_every == 0):
+        # Visualize every epoch (requires Stage1 for concept predictions)
+        if stage1_model is not None and args.viz_every > 0 and (epoch % args.viz_every == 0):
             visualize_attention_predictions(
                 model, image_encoder, stage1_model, concept_info, val_loader, device,
                 cell_centers, epoch, output_dir, args.coord_output_dim,
@@ -1528,7 +1609,7 @@ def main():
         logger.info("Loading best model for final test evaluation...")
         best_ckpt_path = output_dir / "checkpoints" / "best_model_stage2_xattn.pt"
         if best_ckpt_path.exists():
-            best_ckpt = torch.load(best_ckpt_path, map_location=device, weights_only=False)
+            best_ckpt = torch_load_checkpoint(best_ckpt_path, map_location=device)
             model.load_state_dict(best_ckpt["model_state_dict"])
             logger.info("Loaded best model checkpoint")
         
@@ -1552,7 +1633,7 @@ def main():
         
         # Update best checkpoint with test metrics
         if best_ckpt_path.exists():
-            best_ckpt = torch.load(best_ckpt_path, map_location="cpu", weights_only=False)
+            best_ckpt = torch_load_checkpoint(best_ckpt_path, map_location="cpu")
             best_ckpt["test_metrics"] = {k: (v.item() if isinstance(v, torch.Tensor) else v) 
                                         for k, v in test_metrics.items()}
             torch.save(best_ckpt, best_ckpt_path)

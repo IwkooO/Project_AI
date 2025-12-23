@@ -20,6 +20,8 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from src.utils.torch_compat import torch_load_checkpoint
+
 from src.dataset import (
     PanoramaCBMDataset,
     get_transforms_from_processor,
@@ -120,7 +122,7 @@ def load_stage1_checkpoint_for_eval(
 ) -> tuple:
     """Load Stage 1 checkpoint for evaluation."""
     logger.info(f"Loading Stage 1 checkpoint from {checkpoint_path}")
-    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    checkpoint = torch_load_checkpoint(checkpoint_path, map_location=device)
     
     # Initialize encoder
     encoder_model = checkpoint.get("encoder_model", "geolocal/StreetCLIP")

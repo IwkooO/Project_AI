@@ -15,7 +15,7 @@ import torch
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
-from torchvision.transforms import InterpolationMode
+from PIL import Image as PILImage
 from transformers import AutoImageProcessor
 import os
 
@@ -27,6 +27,10 @@ from bs4 import BeautifulSoup
 
 CLIP_IMAGE_MEAN = (0.48145466, 0.4578275, 0.40821073)
 CLIP_IMAGE_STD = (0.26862954, 0.26130258, 0.27577711)
+
+# Torchvision compatibility: older torchvision may not expose InterpolationMode.
+# Resize/RandomResizedCrop accept PIL interpolation enums/ints, so use PIL constants.
+_BICUBIC = getattr(PILImage, "BICUBIC", getattr(PILImage, "Resampling").BICUBIC)
 
 @lru_cache(maxsize=10000)
 def parse_html_note(html_text: str) -> str:
@@ -165,7 +169,7 @@ def get_transforms_from_processor(
     # Validation/test transforms (no augmentation)
     if not is_training or augmentation_strength == "none":
         transform_list = [
-            transforms.Resize(target_size, interpolation=InterpolationMode.BICUBIC),
+            transforms.Resize(target_size, interpolation=_BICUBIC),
             transforms.CenterCrop(target_size),  # Center crop for consistency
             transforms.ToTensor(),
             transforms.Normalize(mean, std),
@@ -180,7 +184,7 @@ def get_transforms_from_processor(
     if augmentation_strength == "light":
         # Light: simple resize + horizontal flip
         transform_list.extend([
-            transforms.Resize(target_size, interpolation=InterpolationMode.BICUBIC),
+            transforms.Resize(target_size, interpolation=_BICUBIC),
             transforms.RandomHorizontalFlip(p=0.5),
         ])
     elif augmentation_strength == "medium":
@@ -190,7 +194,7 @@ def get_transforms_from_processor(
                 target_size,
                 scale=(0.8, 1.0),  # Crop 80-100% of image
                 ratio=(0.9, 1.1),  # Slight aspect ratio variation
-                interpolation=InterpolationMode.BICUBIC,
+                interpolation=_BICUBIC,
             ),
             transforms.RandomHorizontalFlip(p=0.5),
             transforms.ColorJitter(
@@ -207,7 +211,7 @@ def get_transforms_from_processor(
                 target_size,
                 scale=(0.6, 1.0),  # More aggressive crop (60-100%)
                 ratio=(0.8, 1.2),  # More aspect ratio variation
-                interpolation=InterpolationMode.BICUBIC,
+                interpolation=_BICUBIC,
             ),
             transforms.RandomHorizontalFlip(p=0.5),
             transforms.ColorJitter(
