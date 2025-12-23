@@ -48,7 +48,6 @@ from src.dataset import get_transforms_from_processor
 from src.models.streetclip_encoder import StreetCLIPEncoder, StreetCLIPConfig
 from src.models.concept_aware_cbm import Stage2CrossAttentionGeoHead, Stage1ConceptModel
 from src.losses import haversine_distance
-from src.utils.torch_compat import torch_load_checkpoint
 import wandb
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -241,7 +240,7 @@ def load_stage1_checkpoint(
         concept_info_dict contains: concept_names, parent_names, concept_to_idx, parent_to_idx
     """
     logger.info(f"Loading Stage 1 checkpoint from {checkpoint_path}")
-    checkpoint = torch_load_checkpoint(checkpoint_path, map_location=device)
+    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     
     # Extract required tensors
     T_meta_base = checkpoint["T_meta_base"]
@@ -304,7 +303,7 @@ def load_image_encoder_weights_from_stage0_checkpoint(
     the same encoder weights used to train Stage1 when Stage1 was resumed from Stage0.
     """
     logger.info(f"Loading Stage0 encoder weights from {stage0_checkpoint_path}")
-    stage0_ckpt = torch_load_checkpoint(stage0_checkpoint_path, map_location="cpu")
+    stage0_ckpt = torch.load(stage0_checkpoint_path, map_location="cpu", weights_only=False)
     state = stage0_ckpt.get("model_state_dict")
     if state is None:
         raise KeyError(f"Stage0 checkpoint missing model_state_dict: {stage0_checkpoint_path}")
@@ -1171,7 +1170,7 @@ def main():
 
     if args.stage1_checkpoint is not None:
         stage1_checkpoint_path = Path(args.stage1_checkpoint)
-        stage1_ckpt_data = torch_load_checkpoint(stage1_checkpoint_path, map_location="cpu")
+        stage1_ckpt_data = torch.load(stage1_checkpoint_path, map_location="cpu", weights_only=False)
         stage0_checkpoint = stage1_ckpt_data.get("stage0_checkpoint")
 
         # Prefer encoder weights embedded directly in Stage1 checkpoint (if present).
@@ -1609,7 +1608,7 @@ def main():
         logger.info("Loading best model for final test evaluation...")
         best_ckpt_path = output_dir / "checkpoints" / "best_model_stage2_xattn.pt"
         if best_ckpt_path.exists():
-            best_ckpt = torch_load_checkpoint(best_ckpt_path, map_location=device)
+            best_ckpt = torch.load(best_ckpt_path, map_location=device, weights_only=False)
             model.load_state_dict(best_ckpt["model_state_dict"])
             logger.info("Loaded best model checkpoint")
         
@@ -1633,7 +1632,7 @@ def main():
         
         # Update best checkpoint with test metrics
         if best_ckpt_path.exists():
-            best_ckpt = torch_load_checkpoint(best_ckpt_path, map_location="cpu")
+            best_ckpt = torch.load(best_ckpt_path, map_location="cpu", weights_only=False)
             best_ckpt["test_metrics"] = {k: (v.item() if isinstance(v, torch.Tensor) else v) 
                                         for k, v in test_metrics.items()}
             torch.save(best_ckpt, best_ckpt_path)

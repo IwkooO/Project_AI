@@ -16,6 +16,7 @@ module load CUDA/12.8.0
 source activate streetview_pnair
 export PYTHONNOUSERSITE=1
 export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
+export PATH="$CONDA_PREFIX/bin:$PATH"
 
 # ===== Stage 0 Configuration =====
 STAGE0_EPOCHS=20
@@ -28,14 +29,20 @@ LAMBDA_GPS=1.0
 LAMBDA_CHILD=1.0
 LAMBDA_PARENT=0.5
 LAMBDA_HIERARCHY=0.3
+LAMBDA_PATCH_GPS=0.2
+LAMBDA_ANCHOR=0.01
 TEMPERATURE=0.07
 
 DATA_ROOT=/scratch-shared/pnair/Project_AI/data
+
+TIMESTAMP="$(date +%Y-%m-%d_%H-%M-%S)"
+OUTPUT_DIR="/scratch-shared/pnair/Project_AI/results/stage0-prototype/geolocal_StreetCLIP/${TIMESTAMP}"
 
 # Run Stage 0 Training: Domain Contrastive Pretraining
 python scripts/training/train_stage0_prototype.py \
     --csv_path "/scratch-shared/pnair/Project_AI/data/dataset-43k-mapped.csv" \
     --encoder_model "geolocal/StreetCLIP" \
+    --output_dir "${OUTPUT_DIR}" \
     --stage0_epochs ${STAGE0_EPOCHS} \
     --batch_size ${BATCH_SIZE} \
     --lr ${LR} \
@@ -46,6 +53,8 @@ python scripts/training/train_stage0_prototype.py \
     --lambda_child ${LAMBDA_CHILD} \
     --lambda_parent ${LAMBDA_PARENT} \
     --lambda_hierarchy ${LAMBDA_HIERARCHY} \
+    --lambda_patch_gps ${LAMBDA_PATCH_GPS} \
+    --lambda_anchor ${LAMBDA_ANCHOR} \
     --temperature ${TEMPERATURE} \
     --gradient_accumulation_steps 1 \
     --max_grad_norm 1.0 \
@@ -54,6 +63,10 @@ python scripts/training/train_stage0_prototype.py \
     --use_amp \
     --use_wandb \
     --data_root ${DATA_ROOT}
+
+STAGE0_CKPT="${OUTPUT_DIR}/checkpoints/best_model_stage0.pt"
+echo "${STAGE0_CKPT}" > /scratch-shared/pnair/Project_AI/jobs/outputs/stage0_ckpt_path.txt
+echo "Wrote Stage 0 checkpoint path: ${STAGE0_CKPT}"
 
 
 

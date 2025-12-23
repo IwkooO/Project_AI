@@ -38,7 +38,6 @@ from scripts.training.train_stage2_cross_attention import (
     compute_predicted_coords,
     compute_offset_targets,
 )
-from src.utils.torch_compat import torch_load_checkpoint
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -161,11 +160,11 @@ def load_stage2_checkpoint(
 ) -> tuple:
     """Load Stage 2 checkpoint."""
     logger.info(f"Loading Stage 2 checkpoint from {checkpoint_path}")
-    ckpt = torch_load_checkpoint(checkpoint_path, map_location=device)
+    ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
     
     # Load Stage 1 checkpoint
     stage1_ckpt_path = Path(ckpt["stage1_checkpoint"])
-    stage1_ckpt_data = torch_load_checkpoint(stage1_ckpt_path, map_location="cpu")
+    stage1_ckpt_data = torch.load(stage1_ckpt_path, map_location="cpu", weights_only=False)
     encoder_config = StreetCLIPConfig(
         model_name=ckpt["encoder_model"],
         finetune=False,

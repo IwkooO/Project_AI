@@ -16,6 +16,7 @@ module load CUDA/12.8.0
 source activate streetview_pnair
 export PYTHONNOUSERSITE=1
 export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
+export PATH="$CONDA_PREFIX/bin:$PATH"
 
 # ===== Stage 1 Configuration =====
 STAGE1_EPOCHS=25
@@ -43,14 +44,23 @@ INIT_LOGIT_SCALE_LOW=4.0
 INIT_LOGIT_SCALE_HIGH=14.0
 
 DATA_ROOT=/scratch-shared/pnair/Project_AI/data
-STAGE0_CKPT="/scratch-shared/pnair/Project_AI/results/stage0-prototype/geolocal_StreetCLIP/2025-12-11_14-11-11/checkpoints/best_model_stage0.pt"
+STAGE0_CKPT_FILE="/scratch-shared/pnair/Project_AI/jobs/outputs/stage0_ckpt_path.txt"
+if [ -f "${STAGE0_CKPT_FILE}" ]; then
+  STAGE0_CKPT="$(cat "${STAGE0_CKPT_FILE}")"
+else
+  STAGE0_CKPT="/scratch-shared/pnair/Project_AI/results/stage0-prototype/geolocal_StreetCLIP/REPLACE_WITH_LATEST/checkpoints/best_model_stage0.pt"
+fi
 EMBEDDING_CACHE_DIR="/scratch-shared/pnair/Project_AI/data/precomputed_embeddings"
+
+TIMESTAMP="$(date +%Y-%m-%d_%H-%M-%S)"
+OUTPUT_DIR="/scratch-shared/pnair/Project_AI/results/stage1-prototype/geolocal_StreetCLIP/${TIMESTAMP}"
 
 # Run Stage 1 Training with Precomputed Embeddings + Transformer Bottleneck
 python scripts/training/train_stage1_prototype.py \
     --csv_path "/scratch-shared/pnair/Project_AI/data/dataset-43k-mapped.csv" \
     --encoder_model "geolocal/StreetCLIP" \
     --resume_from_checkpoint ${STAGE0_CKPT} \
+    --output_dir "${OUTPUT_DIR}" \
     --stage1_epochs ${STAGE1_EPOCHS} \
     --batch_size ${BATCH_SIZE} \
     --lr ${LR} \
@@ -84,5 +94,9 @@ python scripts/training/train_stage1_prototype.py \
     --data_root ${DATA_ROOT} \
     --precompute_embeddings \
     --use_embedding_cache
+
+STAGE1_CKPT="${OUTPUT_DIR}/checkpoints/best_model_stage1.pt"
+echo "${STAGE1_CKPT}" > /scratch-shared/pnair/Project_AI/jobs/outputs/stage1_ckpt_path.txt
+echo "Wrote Stage 1 checkpoint path: ${STAGE1_CKPT}"
 
 

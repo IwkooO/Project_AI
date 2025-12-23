@@ -37,7 +37,6 @@ import numpy as np
 import wandb
 from geoclip import LocationEncoder
 
-from src.utils.torch_compat import torch_load_checkpoint
 from src.dataset import (
     PanoramaCBMDataset,
     create_splits_stratified_strict,

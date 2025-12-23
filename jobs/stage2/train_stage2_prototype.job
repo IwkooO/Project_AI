@@ -16,6 +16,7 @@ module load CUDA/12.8.0
 source activate streetview_pnair
 export PYTHONNOUSERSITE=1
 export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
+export PATH="$CONDA_PREFIX/bin:$PATH"
 
 # ===== Stage 2 Cross-Attention Configuration =====
 EPOCHS=30
@@ -47,7 +48,12 @@ ABLATION_MODE="both"
 DATA_ROOT=/scratch-shared/pnair/Project_AI/data
 CSV_PATH="data/dataset-43k-mapped.csv"
 # Stage 1 checkpoint for computing concept embeddings on-the-fly
-STAGE1_CHECKPOINT="/scratch-shared/pnair/Project_AI/results/stage1-prototype/2025-12-08_22-58-06/checkpoints/best_model_stage1.pt"
+STAGE1_CKPT_FILE="/scratch-shared/pnair/Project_AI/jobs/outputs/stage1_ckpt_path.txt"
+if [ -f "${STAGE1_CKPT_FILE}" ]; then
+  STAGE1_CHECKPOINT="$(cat "${STAGE1_CKPT_FILE}")"
+else
+  STAGE1_CHECKPOINT="/scratch-shared/pnair/Project_AI/results/stage1-prototype/geolocal_StreetCLIP/REPLACE_WITH_LATEST/checkpoints/best_model_stage1.pt"
+fi
 
 # Run Stage 2 Cross-Attention Training
 python scripts/training/train_stage2_cross_attention.py \

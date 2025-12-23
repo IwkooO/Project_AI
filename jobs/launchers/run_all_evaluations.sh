@@ -35,7 +35,20 @@ DEFAULT_DATA_ROOT="/scratch-shared/pnair/Project_AI/data"
 DEFAULT_RESULTS_ROOT="results"
 
 # Use provided or defaults
-SPLITS_JSON="${SPLITS_JSON:-$DEFAULT_SPLITS_JSON}"
+if [ -z "${SPLITS_JSON:-}" ]; then
+  # If user has a latest Stage1 checkpoint path file, prefer its splits.json for consistency.
+  if [ -f "jobs/outputs/stage1_ckpt_path.txt" ]; then
+    S1_DIR="$(dirname "$(dirname "$(cat jobs/outputs/stage1_ckpt_path.txt)")")"
+    SPLITS_JSON="${S1_DIR}/splits.json"
+  elif [ -f "jobs/outputs/stage1_vanilla_ckpt_path.txt" ]; then
+    S1_DIR="$(dirname "$(dirname "$(cat jobs/outputs/stage1_vanilla_ckpt_path.txt)")")"
+    SPLITS_JSON="${S1_DIR}/splits.json"
+  else
+    SPLITS_JSON="$DEFAULT_SPLITS_JSON"
+  fi
+else
+  SPLITS_JSON="${SPLITS_JSON}"
+fi
 CSV_PATH="${CSV_PATH:-$DEFAULT_CSV_PATH}"
 DATA_ROOT="${DATA_ROOT:-$DEFAULT_DATA_ROOT}"
 RESULTS_ROOT="${RESULTS_ROOT:-$DEFAULT_RESULTS_ROOT}"
