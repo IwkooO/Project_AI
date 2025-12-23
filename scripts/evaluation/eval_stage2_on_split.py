@@ -16,6 +16,7 @@ import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from collections import Counter
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -555,7 +556,8 @@ def main():
         
         # Save consolidated CSV
         if len(all_results) > 0:
-            output_dir = Path(args.results_root) / "evals"
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            output_dir = Path(args.results_root) / "evals" / timestamp
             output_dir.mkdir(parents=True, exist_ok=True)
             consolidated_csv = output_dir / "stage2_test_consolidated.csv"
             

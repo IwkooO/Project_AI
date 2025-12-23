@@ -15,7 +15,7 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from collections import Counter
-
+from datetime import datetime
 import numpy as np
 import pandas as pd
 import torch
@@ -531,6 +531,9 @@ def main():
     else:
         ckpt_name = Path(args.stage2_checkpoint).stem
         output_dir = Path("results") / "evals" / "hf_geoguessr" / ckpt_name
+    
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    output_dir = output_dir / timestamp
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Load checkpoint
