@@ -63,7 +63,7 @@ echo "============================================================"
 # Verify Phase1 checkpoint exists
 if [[ ! -f "$PHASE1_CHECKPOINT" ]]; then
   echo "ERROR: Phase1 checkpoint not found: $PHASE1_CHECKPOINT"
-  echo "Please train Phase1 first using train_cbm.py with --model query_topk"
+  echo "Please train Phase1 first using scripts/training/train_cbm.py"
   exit 1
 fi
 

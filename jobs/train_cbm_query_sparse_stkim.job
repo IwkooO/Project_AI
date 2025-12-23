@@ -76,7 +76,6 @@ echo "  - STKIM regularization: mask_prob=0.5, k_mask=1"
 echo "  - mil_topk=16, attn_tau=0.3"
 echo "============================================================"
 python scripts/training/train_cbm.py \
-  --model query_sparse \
   --train-csv "$TRAIN_CSV" \
   --val-csv "$VAL_CSV" \
   --cached-dir "$CACHED_DIR" \

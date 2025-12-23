@@ -77,7 +77,6 @@ echo "  - concept_dim=256 (learned projection + concept queries from scratch)"
 echo "  - mix_local_kernel_size=5 (Chebyshev KxK neighborhood)"
 echo "============================================================"
 python scripts/training/train_cbm.py \
-  --model query_topk \
   --train-csv "$TRAIN_CSV" \
   --val-csv "$VAL_CSV" \
   --cached-dir "$CACHED_DIR" \
@@ -129,7 +128,6 @@ echo "============================================================"
 mkdir -p "$EVAL_OUTPUT_DIR"
 
 python scripts/evaluation/evaluate_concept_head.py \
-  --model query_topk \
   --checkpoint "$BEST_CHECKPOINT" \
   --test-csv "$TEST_CSV" \
   --cached-dir "$CACHED_DIR" \
@@ -137,7 +135,7 @@ python scripts/evaluation/evaluate_concept_head.py \
   --output-dir "$EVAL_OUTPUT_DIR" \
   --concept-dim 256 \
   --dropout 0.3 \
-  --attn-tau 0.3 \
+  --mil-tau 0.3 \
   --mix-depth 1 \
   --mix-heads 4 \
   --mix-mlp-ratio 2.0 \

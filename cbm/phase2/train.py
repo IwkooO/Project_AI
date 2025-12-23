@@ -4,7 +4,7 @@ Train Stage 2 geolocation model.
 
 Stage 2 consumes:
 - Cached StreetCLIP embeddings (pooled + patch tokens)
-- Frozen Phase1 concept model (query_topk_256)
+- Frozen Phase1 concept model (Phase1CBMTopKMil)
 - Concept embeddings from Phase1 logits
 
 Outputs:
@@ -20,20 +20,15 @@ from torch.utils.data import DataLoader
 from pathlib import Path
 from tqdm import tqdm
 import numpy as np
-import sys
 import json
 from datetime import datetime
 
-# Add project root to path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-
-from src.cbm.models.query_topk_256 import CBM_QueryTopK
-from src.cbm.stage2.models import ConceptEmbeddingAdapter, Stage2CrossAttentionGeoHead
-from src.cbm.stage2.dataset import Stage2Dataset, collate_fn_stage2
-from src.cbm.stage2.geocells import fit_semantic_geocells, assign_geocells, compute_offsets, latlng_to_xyz
-from src.cbm.stage2.metrics import haversine_km, threshold_accuracies_km, cell_accuracy, xyz_to_latlng
-from src.cbm.stage2.visualize import visualize_predictions_map, dump_predictions, visualize_geocell_centers
+from cbm.phase1.model import Phase1CBMTopKMil
+from cbm.phase2.model import ConceptEmbeddingAdapter, Stage2CrossAttentionGeoHead
+from cbm.phase2.data import Stage2Dataset, collate_fn_stage2
+from cbm.phase2.geocells import fit_semantic_geocells, assign_geocells, compute_offsets, latlng_to_xyz
+from cbm.phase2.metrics import haversine_km, threshold_accuracies_km, cell_accuracy, xyz_to_latlng
+from cbm.viz.maps import visualize_predictions_map, dump_predictions, visualize_geocell_centers
 
 try:
     import wandb
@@ -97,12 +92,12 @@ def load_phase1_checkpoint(
     mix_mlp_ratio: float = 4.0,
     mix_dropout: float | None = None,
     mix_local_kernel_size: int | None = None,
-) -> CBM_QueryTopK:
+) -> Phase1CBMTopKMil:
     """Load and freeze Phase1 checkpoint."""
     print(f"Loading Phase1 checkpoint from {checkpoint_path}...")
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     
-    model = CBM_QueryTopK(
+    model = Phase1CBMTopKMil(
         num_concepts=num_concepts,
         patch_dim=patch_dim,
         concept_dim=concept_dim,
@@ -128,7 +123,7 @@ def load_phase1_checkpoint(
 
 
 def build_concept_vectors(
-    phase1_model: CBM_QueryTopK,
+    phase1_model: Phase1CBMTopKMil,
     concept_names: list[str],
     device: torch.device,
     text_model_name: str = "geolocal/StreetCLIP",
@@ -164,7 +159,7 @@ def build_concept_vectors(
 def train_epoch(
     model: Stage2CrossAttentionGeoHead,
     concept_adapter: ConceptEmbeddingAdapter,
-    phase1_model: CBM_QueryTopK,
+    phase1_model: Phase1CBMTopKMil,
     loader: DataLoader,
     device: torch.device,
     cell_criterion: nn.Module,
@@ -211,7 +206,7 @@ def train_epoch(
         concept_emb = concept_adapter(phase1_logits)  # [B, concept_dim]
         
         # Forward through Stage2
-        cell_logits, offset_pred = model(concept_emb, patch_tokens, pooled_emb)  # [B, num_cells], [B, 3]
+        cell_logits, offset_pred, gate = model(concept_emb, patch_tokens, pooled_emb)  # [B, num_cells], [B, 3], [B, hidden_dim] | None
         
         # Losses
         cell_loss = cell_criterion(cell_logits, cell_labels)
@@ -233,14 +228,21 @@ def train_epoch(
         
         weighted_cell_loss = cell_loss_weight * cell_loss.item()
         weighted_offset_loss = offset_loss_weight * offset_loss.item()
-        pbar.set_postfix({
+        
+        # Print mean gate weight if available
+        gate_mean = gate.mean().item() if gate is not None else None
+        
+        postfix_dict = {
             "Loss": f"{loss.item():.4f}",
             "Cell": f"{cell_loss.item():.4f}",
             "Offset": f"{offset_loss.item():.4f}",
             "WCell": f"{weighted_cell_loss:.4f}",
             "WOffset": f"{weighted_offset_loss:.4f}",
             "CellAcc": f"{correct_cells/total_samples:.3f}",
-        })
+        }
+        if gate_mean is not None:
+            postfix_dict["GateMean"] = f"{gate_mean:.4f}"
+        pbar.set_postfix(postfix_dict)
     
     return (
         total_loss / total_samples,
@@ -254,7 +256,7 @@ def train_epoch(
 def eval_epoch(
     model: Stage2CrossAttentionGeoHead,
     concept_adapter: ConceptEmbeddingAdapter,
-    phase1_model: CBM_QueryTopK,
+    phase1_model: Phase1CBMTopKMil,
     loader: DataLoader,
     device: torch.device,
     cell_criterion: nn.Module,
@@ -296,7 +298,7 @@ def eval_epoch(
             continue
         
         concept_emb = concept_adapter(phase1_logits)
-        cell_logits, offset_pred = model(concept_emb, patch_tokens, pooled_emb)
+        cell_logits, offset_pred, gate = model(concept_emb, patch_tokens, pooled_emb)
         
         # Losses
         cell_loss = cell_criterion(cell_logits, cell_labels)
@@ -364,7 +366,7 @@ def main():
     parser.add_argument("--val-csv", required=True, help="Validation CSV path")
     parser.add_argument("--test-csv", default=None, help="Test CSV path (optional)")
     parser.add_argument("--cached-dir", required=True, help="Directory with cached StreetCLIP embeddings")
-    parser.add_argument("--phase1-checkpoint", required=True, help="Phase1 checkpoint path (query_topk_256)")
+    parser.add_argument("--phase1-checkpoint", required=True, help="Phase1 checkpoint path (Phase1CBMTopKMil)")
     parser.add_argument("--concept-data-dir", required=True, help="Directory with concept vocab")
     parser.add_argument("--output-dir", required=True, help="Output directory for checkpoints")
     

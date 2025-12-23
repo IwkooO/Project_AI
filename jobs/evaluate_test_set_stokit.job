@@ -86,7 +86,7 @@ python scripts/evaluation/evaluate_concept_head.py \
   --output-dir "$EVAL_OUTPUT_DIR" \
   --concept-dim 768 \
   --dropout 0.3 \
-  --attn-tau 0.3 \
+  --mil-tau 0.3 \
   --mix-depth 1 \
   --mix-heads 4 \
   --mix-mlp-ratio 2.0 \

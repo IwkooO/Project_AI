@@ -87,7 +87,6 @@ echo "Step 3: Train Phase 1 concept head (Query Sparse + Neighborhood Attention)
 echo "  - mix_local_kernel_size=5 (Chebyshev KxK neighborhood)"
 echo "============================================================"
 python scripts/training/train_cbm.py \
-  --model query_sparse \
   --train-csv "$TRAIN_CSV" \
   --val-csv "$VAL_CSV" \
   --cached-dir "$CACHED_DIR" \

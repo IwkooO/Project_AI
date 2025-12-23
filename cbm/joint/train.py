@@ -15,22 +15,17 @@ from torch.utils.data import DataLoader
 from pathlib import Path
 from tqdm import tqdm
 import numpy as np
-import sys
 import json
 from datetime import datetime
 
-# Add project root to path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-
-from src.cbm.models.query_topk_256 import CBM_QueryTopK
-from src.cbm.stage2.models import ConceptEmbeddingAdapter, Stage2CrossAttentionGeoHead
-from src.cbm.data.concept_dataset import ConceptDataset, collate_fn
-from src.cbm.stage2.dataset import Stage2Dataset, collate_fn_stage2
-from src.cbm.stage2.geocells import fit_semantic_geocells, assign_geocells, compute_offsets
-from src.cbm.stage2.metrics import haversine_km, threshold_accuracies_km, cell_accuracy, xyz_to_latlng
-from src.cbm.stage2.visualize import visualize_predictions_map, dump_predictions, visualize_geocell_centers
-from src.cbm.visualize.attention import visualize_predictions_summary
+from cbm.phase1.model import Phase1CBMTopKMil
+from cbm.phase1.data import ConceptDataset, collate_fn
+from cbm.phase2.model import ConceptEmbeddingAdapter, Stage2CrossAttentionGeoHead
+from cbm.phase2.data import Stage2Dataset, collate_fn_stage2
+from cbm.phase2.geocells import fit_semantic_geocells, assign_geocells, compute_offsets
+from cbm.phase2.metrics import haversine_km, threshold_accuracies_km, cell_accuracy, xyz_to_latlng
+from cbm.viz.maps import visualize_predictions_map, dump_predictions, visualize_geocell_centers
+from cbm.viz.attention import visualize_predictions_summary
 
 
 class JointDataset(ConceptDataset):
@@ -103,7 +98,7 @@ def _compute_text_embeddings_for_concepts(
 
 
 def build_concept_vectors(
-    phase1_model: CBM_QueryTopK,
+    phase1_model: Phase1CBMTopKMil,
     concept_names: list[str],
     device: torch.device,
     text_model_name: str = "geolocal/StreetCLIP",
@@ -219,7 +214,7 @@ def compute_concept_weights(dataset, num_concepts, device):
 
 
 def train_epoch(
-    phase1_model: CBM_QueryTopK,
+    phase1_model: Phase1CBMTopKMil,
     stage2_model: Stage2CrossAttentionGeoHead,
     concept_adapter: ConceptEmbeddingAdapter,
     loader: DataLoader,
@@ -276,7 +271,7 @@ def train_epoch(
         concept_emb = concept_adapter(c_logits)
         
         # Forward through Stage2
-        cell_logits, offset_pred = stage2_model(concept_emb, patches, pooled_emb)
+        cell_logits, offset_pred, gate = stage2_model(concept_emb, patches, pooled_emb)
         
         # Geo losses
         cell_loss = cell_criterion(cell_logits, cell_labels)
@@ -328,7 +323,7 @@ def train_epoch(
 
 @torch.no_grad()
 def eval_epoch(
-    phase1_model: CBM_QueryTopK,
+    phase1_model: Phase1CBMTopKMil,
     stage2_model: Stage2CrossAttentionGeoHead,
     concept_adapter: ConceptEmbeddingAdapter,
     loader: DataLoader,
@@ -386,7 +381,7 @@ def eval_epoch(
         concept_emb = concept_adapter(c_logits)
         
         # Forward through Stage2
-        cell_logits, offset_pred = stage2_model(concept_emb, patches, pooled_emb)
+        cell_logits, offset_pred, gate = stage2_model(concept_emb, patches, pooled_emb)
         
         cell_loss = cell_criterion(cell_logits, cell_labels)
         offset_loss = offset_criterion(offset_pred, offset_targets)
@@ -553,7 +548,9 @@ def main():
     num_concepts = len(concept_names)
     print(f"Loaded {num_concepts} concepts")
     
-    # Load datasets (use ConceptDataset for both - it has everything we need)
+    # Load datasets (use ConceptDataset for both - it has everything we need).
+    # For joint training we also need pooled embeddings, so we load them via the dataset
+    # to avoid separate duplicate tensor loads.
     print("Loading datasets...")
     train_ds = ConceptDataset(
         args.train_csv,
@@ -562,6 +559,7 @@ def main():
         s2_vocab_path,
         split="train",
         allow_unsafe_index_fallback=False,
+        load_pooled_embeddings=True,
     )
     val_ds = ConceptDataset(
         args.val_csv,
@@ -570,6 +568,7 @@ def main():
         s2_vocab_path,
         split="val",
         allow_unsafe_index_fallback=False,
+        load_pooled_embeddings=True,
     )
     
     test_ds = None
@@ -581,15 +580,8 @@ def main():
             s2_vocab_path,
             split="test",
             allow_unsafe_index_fallback=False,
+            load_pooled_embeddings=True,
         )
-    
-    # Load pooled embeddings separately (needed for Stage2)
-    print("Loading pooled embeddings...")
-    train_pooled = torch.load(Path(args.cached_dir) / "train_pooled_embeddings.pt")
-    val_pooled = torch.load(Path(args.cached_dir) / "val_pooled_embeddings.pt")
-    test_pooled = None
-    if args.test_csv:
-        test_pooled = torch.load(Path(args.cached_dir) / "test_pooled_embeddings.pt")
     
     # Detect dimensions
     patch_dim = train_ds.patch_tokens.shape[2]
@@ -597,7 +589,9 @@ def main():
         print(f"Warning: --patch-dim={args.patch_dim} != detected={patch_dim}, using detected")
         args.patch_dim = patch_dim
     
-    detected_pooled_dim = train_pooled.shape[1]
+    if train_ds.pooled_embeddings is None:
+        raise RuntimeError("Expected train_ds.pooled_embeddings to be loaded (got None).")
+    detected_pooled_dim = train_ds.pooled_embeddings.shape[1]
     print(f"Detected patch_dim: {patch_dim}, pooled_dim: {detected_pooled_dim}")
     
     # Fit geocells
@@ -670,7 +664,7 @@ def main():
     # Initialize models
     mix_local_kernel_size = args.mix_local_kernel_size if args.mix_local_kernel_size > 0 else None
     
-    phase1_model = CBM_QueryTopK(
+    phase1_model = Phase1CBMTopKMil(
         num_concepts=num_concepts,
         patch_dim=patch_dim,
         concept_dim=args.concept_dim,
@@ -791,7 +785,7 @@ def main():
         train_ds, 
         batch_size=args.batch_size, 
         shuffle=True, 
-        collate_fn=make_collate_fn(train_pooled),
+        collate_fn=make_collate_fn(train_ds.pooled_embeddings),
         num_workers=num_workers, 
         pin_memory=False
     )
@@ -799,17 +793,19 @@ def main():
         val_ds, 
         batch_size=args.batch_size, 
         shuffle=False, 
-        collate_fn=make_collate_fn(val_pooled),
+        collate_fn=make_collate_fn(val_ds.pooled_embeddings),
         num_workers=num_workers, 
         pin_memory=False
     )
     test_loader = None
     if test_ds:
+        if test_ds.pooled_embeddings is None:
+            raise RuntimeError("Expected test_ds.pooled_embeddings to be loaded (got None).")
         test_loader = DataLoader(
             test_ds, 
             batch_size=args.batch_size, 
             shuffle=False, 
-            collate_fn=make_collate_fn(test_pooled),
+            collate_fn=make_collate_fn(test_ds.pooled_embeddings),
             num_workers=num_workers, 
             pin_memory=False
         )

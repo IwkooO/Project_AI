@@ -74,7 +74,6 @@ echo "  - concept_dim is learned from scratch (no CLIP projection weight, no tex
 echo "  - hard top-K + LogSumExp pooling"
 echo "============================================================"
 python scripts/training/train_cbm.py \
-  --model query_topk \
   --train-csv "$TRAIN_CSV" \
   --val-csv "$VAL_CSV" \
   --cached-dir "$CACHED_DIR" \

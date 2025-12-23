@@ -57,8 +57,16 @@ This repository contains tools for collecting, processing, and analyzing GeoGues
 
 5. **Use dataset:**
    ```python
-   from src.dataset import PanoramaCBMDataset
-   dataset = PanoramaCBMDataset()
+   # Phase 1 concept dataset (cached patch tokens)
+   from cbm.phase1.data import ConceptDataset
+
+   dataset = ConceptDataset(
+       csv_path="path/to/train.csv",
+       cached_dir="path/to/cached_dir",
+       concept_vocab_path="path/to/concept_vocab.json",
+       s2_vocab_path="path/to/s2_cells.json",
+       split="train",
+   )
    ```
 
 ## Documentation

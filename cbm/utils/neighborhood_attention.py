@@ -100,7 +100,6 @@ def get_local_attention_bias(
     is_neighbor = _neighbor_bool_mask_cpu(int(num_patches), int(kernel_size))
     p = int(num_patches)
 
-    # Allowed pairs get 0; blocked pairs get a very negative bias.
     if dtype.is_floating_point:
         neg = torch.finfo(dtype).min
     else:

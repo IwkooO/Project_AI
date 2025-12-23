@@ -2,7 +2,7 @@
 """
 Train Concept Bottleneck Model - Phase 1 (Concept Prediction Only).
 
-Patch-only training using query-sparse attention model.
+Patch-only training using a hard Top-K MIL pooling model (canonical Phase-1 CBM).
 """
 
 import argparse
@@ -16,14 +16,9 @@ import numpy as np
 import sys
 from datetime import datetime
 
-# Add project root to path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-
-from src.cbm.models.query_sparse import CBM_QuerySparse
-from src.cbm.models.query_topk_256 import CBM_QueryTopK
-from src.cbm.data.concept_dataset import ConceptDataset, collate_fn
-from src.cbm.visualize.attention import visualize_predictions_summary
+from cbm.phase1.model import Phase1CBMTopKMil
+from cbm.phase1.data import ConceptDataset, collate_fn
+from cbm.viz.attention import visualize_predictions_summary
 
 try:
     import wandb
@@ -54,8 +49,11 @@ def _compute_text_embeddings_for_concepts(
     batch_size: int = 64,
 ) -> tuple[torch.Tensor, torch.Tensor, int]:
     """
-    Compute CLIP-style text embeddings for each concept using a single prompt template.
+    Compute StreetCLIP text embeddings for each concept using a single prompt template.
 
+    Args:
+        model_name: HuggingFace model ID (default: "geolocal/StreetCLIP")
+    
     Returns:
         (text_embeds, visual_proj_weight, projection_dim)
           - text_embeds: [K, T] on CPU, L2-normalized
@@ -84,7 +82,7 @@ def _compute_text_embeddings_for_concepts(
     feats_all = torch.cat(feats_batches, dim=0)  # [K, T]
     text_embeds = feats_all.contiguous()
 
-    # Visual projection weight maps vision hidden size -> projection_dim (shared CLIP space).
+    # Visual projection weight maps vision hidden size -> projection_dim (shared StreetCLIP space).
     if not hasattr(clip, "visual_projection") or not hasattr(clip.visual_projection, "weight"):
         raise AttributeError(
             f"Expected CLIPModel to have visual_projection.weight, but it was not found for {model_name}"
@@ -303,13 +301,7 @@ def eval_epoch(model, loader, device, criterion):
 
 def main():
     parser = argparse.ArgumentParser(description="Train CBM Phase 1 (Concept Prediction)")
-    parser.add_argument(
-        "--model",
-        type=str,
-        default="query_sparse",
-        choices=["query_sparse", "query_topk"],
-        help="Which concept model to train. query_sparse uses StreetCLIP visual_projection init; query_topk learns concept space from scratch.",
-    )
+    # Canonical Phase-1 model only (legacy model variants removed).
     parser.add_argument("--train-csv", required=True, help="Training CSV path")
     parser.add_argument("--val-csv", required=True, help="Validation CSV path")
     parser.add_argument("--cached-dir", default=None, help="Directory with cached patch tokens (required if --trainable-backbone=False)")
@@ -332,7 +324,7 @@ def main():
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--dropout", type=float, default=DEFAULT_DROPOUT)
     parser.add_argument("--weight-decay", type=float, default=DEFAULT_WEIGHT_DECAY)
-    parser.add_argument("--concept-dim", type=int, default=CONCEPT_DIM_DEFAULT, help="Must match CLIP projection_dim when using text init.")
+    parser.add_argument("--concept-dim", type=int, default=CONCEPT_DIM_DEFAULT, help="Must match StreetCLIP projection_dim when using text init.")
     parser.add_argument("--attn-tau", type=float, default=0.25, help="Temperature for LogSumExp aggregation")
     parser.add_argument("--anneal-attn-tau", action="store_true", help="Anneal attn_tau over epochs")
     parser.add_argument("--attn-tau-start", type=float, default=0.5, help="Start attn_tau for annealing")
@@ -351,9 +343,16 @@ def main():
     parser.add_argument("--stk-k-mask", type=int, default=1, help="STKIM: number of top patches to mask (per concept)")
     parser.add_argument("--stk-mask-fill", type=str, default="min", choices=["min", "zero"], help="STKIM: fill value for masked patches ('min' or 'zero')")
     parser.add_argument(
+        "--proj-type",
+        type=str,
+        default="simple",
+        choices=["simple", "two_stage", "bottleneck"],
+        help="Patch projection architecture: 'simple' (direct compression), 'two_stage' (full-res then compress), 'bottleneck' (compress-expand-compress)",
+    )
+    parser.add_argument(
         "--init-concepts-from-text",
         action="store_true",
-        help="Baseline: initialize concept vectors from CLIP text embeddings and initialize trainable vision projection from CLIP visual_projection.",
+        help="Initialize concept query weights from StreetCLIP text embeddings. concept_dim must match the text embedding dimension (projection_dim).",
     )
     parser.add_argument(
         "--text-model-name",
@@ -449,98 +448,71 @@ def main():
     patch_dim = train_ds.patch_tokens.shape[2]
     print(f"Detected patch dimension: {patch_dim}")
 
-    # Baseline (query_sparse only): if --init-concepts-from-text is enabled, we deterministically:
-    # - set concept_dim to CLIP projection_dim (must match),
-    # - initialize query/local_weight from CLIP text embeddings,
-    # - initialize a trainable vision projection from CLIP visual_projection.
-    init_concept_vecs = None
-    vision_proj_init_weight = None
-    if args.model == "query_sparse" and args.init_concepts_from_text and args.resume_checkpoint is None:
-        concepts_in_order = [train_ds.idx_to_concept[i] for i in range(train_ds.num_concepts)]
-
-        if "{}" not in args.concept_prompt_template:
-            raise ValueError("--concept-prompt-template must include '{}' placeholder for the concept name.")
-
-        print(f"Computing CLIP text embeddings for {len(concepts_in_order)} concepts...")
-        text_embeds, visual_proj_weight, projection_dim = _compute_text_embeddings_for_concepts(
-            concepts_in_order,
-            model_name=args.text_model_name,
-            device=device,
-            prompt_template=args.concept_prompt_template,
-        )
-
-        # Enforce concept_dim == CLIP projection_dim.
-        if args.concept_dim != projection_dim:
-            raise ValueError(
-                f"--concept-dim must equal CLIP projection_dim={projection_dim} for this baseline, got {args.concept_dim}."
-            )
-
-        # Sanity-check vision projection compatibility with cached patch tokens.
-        if int(visual_proj_weight.shape[1]) != int(patch_dim):
-            raise ValueError(
-                "Cached patch_dim does not match CLIP visual_projection input dim: "
-                f"patch_dim={patch_dim}, visual_proj_in={visual_proj_weight.shape[1]}"
-            )
-
-        init_concept_vecs = text_embeds  # [K, projection_dim] on CPU
-        vision_proj_init_weight = visual_proj_weight  # [projection_dim, patch_dim] on CPU
-
-        print(
-            f"Baseline init ready: concept_dim={args.concept_dim}, "
-            f"text_embeds={tuple(text_embeds.shape)}, visual_proj_weight={tuple(visual_proj_weight.shape)}"
-        )
-    
     # Initialize model (patch-only)
     mix_local_kernel_size = int(args.mix_local_kernel_size)
     if mix_local_kernel_size == 0:
         mix_local_kernel_size = None
-    if args.model == "query_sparse":
-        print("Initializing CBM_QuerySparse...")
-        model = CBM_QuerySparse(
-            num_concepts=train_ds.num_concepts,
-            patch_dim=patch_dim,
-            concept_dim=args.concept_dim,
-            dropout=args.dropout,
-            attn_tau=args.attn_tau_start if args.anneal_attn_tau else args.attn_tau,
-            mix_depth=args.mix_depth,
-            mix_heads=args.mix_heads,
-            mix_mlp_ratio=args.mix_mlp_ratio,
-            mix_local_kernel_size=mix_local_kernel_size,
-            use_local_scores=False,
-            vision_proj_init_weight=vision_proj_init_weight,
-            mil_topk=args.mil_topk,
-            stk_mask_prob=args.stk_mask_prob,
-            stk_k_mask=args.stk_k_mask,
-            stk_mask_fill=args.stk_mask_fill,
-        )
-    else:
-        if args.init_concepts_from_text:
-            print("WARNING: --init-concepts-from-text is ignored for --model query_topk (scratch concept space).")
-        print("Initializing CBM_QueryTopK (scratch concept space)...")
-        model = CBM_QueryTopK(
-            num_concepts=train_ds.num_concepts,
-            patch_dim=patch_dim,
-            concept_dim=args.concept_dim,
-            dropout=args.dropout,
-            mil_topk=args.mil_topk,
-            mil_tau=args.attn_tau_start if args.anneal_attn_tau else args.attn_tau,
-            mix_depth=args.mix_depth,
-            mix_heads=args.mix_heads,
-            mix_mlp_ratio=args.mix_mlp_ratio,
-            mix_local_kernel_size=mix_local_kernel_size,
-        )
+    print("Initializing Phase1CBMTopKMil (canonical Phase-1 model)...")
+    model = Phase1CBMTopKMil(
+        num_concepts=train_ds.num_concepts,
+        patch_dim=patch_dim,
+        concept_dim=args.concept_dim,
+        dropout=args.dropout,
+        mil_topk=args.mil_topk,
+        mil_tau=args.attn_tau_start if args.anneal_attn_tau else args.attn_tau,
+        mix_depth=args.mix_depth,
+        mix_heads=args.mix_heads,
+        mix_mlp_ratio=args.mix_mlp_ratio,
+        mix_local_kernel_size=mix_local_kernel_size,
+        stk_mask_prob=args.stk_mask_prob,
+        stk_k_mask=args.stk_k_mask,
+        stk_mask_fill=args.stk_mask_fill,
+        proj_type=args.proj_type,
+    )
     model = model.to(device)
-    print_param_counts(model)
-
-    if init_concept_vecs is not None:
-        # Copy init into both concept vectors:
-        # - query (context branch)
-        # - local_weight (local branch)
+    
+    # Initialize concept queries from text embeddings if requested
+    if args.init_concepts_from_text:
+        print("Initializing concept queries from StreetCLIP text embeddings...")
+        # Get concept names in sorted order by index
+        concept_names = [train_ds.idx_to_concept[i] for i in sorted(train_ds.idx_to_concept.keys())]
+        if len(concept_names) != train_ds.num_concepts:
+            raise ValueError(f"Concept name count mismatch: {len(concept_names)} != {train_ds.num_concepts}")
+        
+        # Compute text embeddings
+        text_embeds, visual_proj_weight, projection_dim = _compute_text_embeddings_for_concepts(
+            concept_names,
+            model_name=args.text_model_name,
+            device=device,
+            prompt_template=args.concept_prompt_template,
+        )
+        
+        # Check if concept_dim matches projection_dim
+        if args.concept_dim != projection_dim:
+            print(f"Warning: concept_dim={args.concept_dim} != projection_dim={projection_dim}")
+            print(f"Projecting text embeddings from {projection_dim} to {args.concept_dim}...")
+            # Create a simple linear projection
+            projection_layer = nn.Linear(projection_dim, args.concept_dim, bias=False).to(device)
+            # Initialize with small weights to preserve semantic structure
+            nn.init.xavier_uniform_(projection_layer.weight, gain=0.1)
+            with torch.no_grad():
+                text_embeds = projection_layer(text_embeds.to(device))
+            text_embeds = text_embeds.cpu()
+        else:
+            print(f"Using text embeddings directly (concept_dim={args.concept_dim} == projection_dim={projection_dim})")
+        
+        # Initialize concept query weights with text embeddings
+        if text_embeds.shape != (train_ds.num_concepts, args.concept_dim):
+            raise ValueError(
+                f"Text embedding shape mismatch: {text_embeds.shape} != ({train_ds.num_concepts}, {args.concept_dim})"
+            )
+        
         with torch.no_grad():
-            init_dev = init_concept_vecs.to(device=device, dtype=model.concept_head.query.dtype)
-            model.concept_head.query.copy_(init_dev)
-            model.concept_head.local_weight.copy_(init_dev)
-        print("Initialized concept vectors (query + local_weight) from StreetCLIP text embeddings.")
+            model.concept_head.query.data.copy_(text_embeds.to(device))
+        
+        print(f"Initialized {train_ds.num_concepts} concept queries from text embeddings.")
+    
+    print_param_counts(model)
     
     # Resume from checkpoint if provided
     start_epoch = 0
