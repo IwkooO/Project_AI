@@ -82,6 +82,7 @@ class Stage2CrossAttentionGeoHead(nn.Module):
         num_layers: int = 2,
         dropout: float = 0.1,
         mode: str = "both",
+        pooled_dim: int | None = None,
     ):
         """
         Args:
@@ -93,6 +94,7 @@ class Stage2CrossAttentionGeoHead(nn.Module):
             num_layers: Number of cross-attention layers
             dropout: Dropout rate
             mode: 'both' (concept + image), 'concept_only', 'image_only'
+            pooled_dim: Dimension of pooled embeddings (CLS token). If None, will use patch_dim.
         """
         super().__init__()
         
@@ -103,44 +105,44 @@ class Stage2CrossAttentionGeoHead(nn.Module):
         self.num_cells = num_cells
         self.hidden_dim = hidden_dim
         
+        # Use pooled_dim if provided, otherwise fall back to patch_dim
+        if pooled_dim is None:
+            pooled_dim = patch_dim
+        
         # Projections to hidden_dim
         if mode in ["both", "concept_only"]:
             self.concept_proj = nn.Linear(concept_dim, hidden_dim)
         
         if mode in ["both", "image_only"]:
-            self.patch_proj = nn.Linear(patch_dim, hidden_dim)
+            self.pooled_proj = nn.Linear(pooled_dim, hidden_dim)
         
-        # Cross-attention layers
+        # Fusion layers
         if mode == "both":
-            # Cross-attention: concept queries attend to patch keys/values
-            # Use MultiheadAttention for cross-attention
-            self.cross_attn_layers = nn.ModuleList([
-                nn.MultiheadAttention(
-                    embed_dim=hidden_dim,
-                    num_heads=num_heads,
-                    dropout=dropout,
-                    batch_first=True,
-                )
-                for _ in range(num_layers)
-            ])
-            self.cross_attn_norms = nn.ModuleList([
-                nn.LayerNorm(hidden_dim)
-                for _ in range(num_layers)
-            ])
-            self.cross_attn_ffns = nn.ModuleList([
-                nn.Sequential(
-                    nn.Linear(hidden_dim, hidden_dim * 4),
-                    nn.GELU(),
-                    nn.Dropout(dropout),
-                    nn.Linear(hidden_dim * 4, hidden_dim),
-                    nn.Dropout(dropout),
-                )
-                for _ in range(num_layers)
-            ])
-            self.cross_attn_ffn_norms = nn.ModuleList([
-                nn.LayerNorm(hidden_dim)
-                for _ in range(num_layers)
-            ])
+            # Gated residual fusion:
+            #   h = LN(h_img + sigmoid(g([h_img; h_concept])) * h_concept)
+            #
+            # This makes concepts "can't-hurt" by allowing the model to ignore them
+            # when they are noisy, while still enabling additive improvements.
+            self.image_adapter = nn.Sequential(
+                nn.LayerNorm(hidden_dim),
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.GELU(),
+                nn.Dropout(dropout),
+            )
+            self.concept_adapter = nn.Sequential(
+                nn.LayerNorm(hidden_dim),
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.GELU(),
+                nn.Dropout(dropout),
+            )
+            self.gate_hidden = nn.Sequential(
+                nn.Linear(hidden_dim * 2, hidden_dim),
+                nn.GELU(),
+                nn.Dropout(dropout),
+            )
+            self.gate_out = nn.Linear(hidden_dim, hidden_dim)
+            nn.init.constant_(self.gate_out.bias, -2.0)  # start mostly-closed (sigmoid ~ 0.12)
+            self.fuse_norm = nn.LayerNorm(hidden_dim)
         elif mode == "concept_only":
             # Just use concept embeddings directly
             self.concept_mlp = nn.Sequential(
@@ -150,12 +152,15 @@ class Stage2CrossAttentionGeoHead(nn.Module):
                 nn.Linear(hidden_dim * 2, hidden_dim),
             )
         elif mode == "image_only":
-            # Just use patch tokens (mean pooled)
-            self.patch_mlp = nn.Sequential(
+            # Use CLS token (pooled embeddings) directly
+            self.pooled_mlp = nn.Sequential(
+                nn.LayerNorm(hidden_dim),
                 nn.Linear(hidden_dim, hidden_dim * 2),
                 nn.GELU(),
                 nn.Dropout(dropout),
                 nn.Linear(hidden_dim * 2, hidden_dim),
+                nn.LayerNorm(hidden_dim),
+                nn.Dropout(dropout),
             )
         
         # Output heads
@@ -181,11 +186,13 @@ class Stage2CrossAttentionGeoHead(nn.Module):
         self,
         concept_emb: torch.Tensor,  # [B, concept_dim]
         patch_tokens: torch.Tensor | None = None,  # [B, P, patch_dim]
+        pooled_emb: torch.Tensor | None = None,  # [B, pooled_dim] CLS token
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Args:
             concept_emb: [B, concept_dim] concept embeddings
-            patch_tokens: [B, P, patch_dim] patch tokens (optional)
+            patch_tokens: [B, P, patch_dim] patch tokens (optional, used for Phase1 only)
+            pooled_emb: [B, pooled_dim] pooled embeddings (CLS token, used for 'both' and 'image_only' modes)
         
         Returns:
             (cell_logits, offset_pred)
@@ -193,48 +200,33 @@ class Stage2CrossAttentionGeoHead(nn.Module):
               - offset_pred: [B, 3] (x, y, z in 3D Cartesian)
         """
         if self.mode == "both":
-            if patch_tokens is None:
-                raise ValueError("patch_tokens required for mode='both'")
+            if pooled_emb is None:
+                raise ValueError("pooled_emb required for mode='both'")
             
             # Project to hidden_dim
             concept_h = self.concept_proj(concept_emb)  # [B, hidden_dim]
-            patch_h = self.patch_proj(patch_tokens)  # [B, P, hidden_dim]
-            
-            # Cross-attention: concept queries attend to patch keys/values
-            # Concept as query: [B, 1, hidden_dim]
-            query = concept_h.unsqueeze(1)  # [B, 1, hidden_dim]
-            
-            # Patches as key/value: [B, P, hidden_dim]
-            key_value = patch_h  # [B, P, hidden_dim]
-            
-            # Apply cross-attention layers
-            hidden = query  # [B, 1, hidden_dim]
-            for i, (attn, norm, ffn, ffn_norm) in enumerate(zip(
-                self.cross_attn_layers,
-                self.cross_attn_norms,
-                self.cross_attn_ffns,
-                self.cross_attn_ffn_norms,
-            )):
-                # Cross-attention: query attends to key_value
-                attn_out, _ = attn(hidden, key_value, key_value)  # [B, 1, hidden_dim]
-                hidden = norm(hidden + attn_out)  # Residual + norm
-                
-                # FFN
-                ffn_out = ffn(hidden)
-                hidden = ffn_norm(hidden + ffn_out)  # Residual + norm
-            
-            hidden = hidden.squeeze(1)  # [B, hidden_dim]
+            img_h = self.pooled_proj(pooled_emb)  # [B, hidden_dim]
+
+            # Adapt each branch
+            img_h = self.image_adapter(img_h)  # [B, hidden_dim]
+            concept_h = self.concept_adapter(concept_h)  # [B, hidden_dim]
+
+            # Gate the concept residual
+            gate_in = torch.cat([img_h, concept_h], dim=1)  # [B, 2*hidden_dim]
+            gate = torch.sigmoid(self.gate_out(self.gate_hidden(gate_in)))  # [B, hidden_dim]
+
+            hidden = self.fuse_norm(img_h + gate * concept_h)  # [B, hidden_dim]
         
         elif self.mode == "concept_only":
             concept_h = self.concept_proj(concept_emb)  # [B, hidden_dim]
             hidden = self.concept_mlp(concept_h)  # [B, hidden_dim]
         
         elif self.mode == "image_only":
-            if patch_tokens is None:
-                raise ValueError("patch_tokens required for mode='image_only'")
-            patch_h = self.patch_proj(patch_tokens)  # [B, P, hidden_dim]
-            patch_mean = patch_h.mean(dim=1)  # [B, hidden_dim]
-            hidden = self.patch_mlp(patch_mean)  # [B, hidden_dim]
+            if pooled_emb is None:
+                raise ValueError("pooled_emb required for mode='image_only'")
+            # Use CLS token directly
+            pooled_h = self.pooled_proj(pooled_emb)  # [B, hidden_dim]
+            hidden = self.pooled_mlp(pooled_h)  # [B, hidden_dim]
         
         # Outputs
         cell_logits = self.cell_head(hidden)  # [B, num_cells]

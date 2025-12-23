@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
-#SBATCH --job-name=stage2_geo
+#SBATCH --job-name=joint_train
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --time=24:00:00
-#SBATCH --output=jobs/outputs/stage2_geo_%j.out
+#SBATCH --time=12:00:00
+#SBATCH --output=jobs/outputs/joint_train_%j.out
 
 # Note: this env has activate.d scripts that reference optional env vars.
 # Using `set -u` (nounset) can crash `source activate` on unset vars (e.g. GEOTIFF_CSV).
@@ -38,40 +38,37 @@ CACHED_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_ba
 # Concept vocab/priors
 CONCEPT_DATA="data/concept_data_v2"
 
-# Phase1 checkpoint (must be from query_topk_256 training)
-# Update this path to point to your Phase1 checkpoint
-PHASE1_CHECKPOINT="/home/igodzwon/Project_AI/checkpoints/cbm_query_topk_256_neighborhood_k5_v2_higheracc/phase1/best_phase1.pt"
-
-# Output directory for Stage 2 run
-OUTPUT_DIR="checkpoints/STAGE2_BOTH_GATE"
+# Output directory for joint training
+OUTPUT_DIR="checkpoints/JOINT_TRAINING"
 
 # Stage2 mode: 'both', 'concept_only', or 'image_only'
-# Set to empty string "" to auto-detect based on patch tokens availability
 STAGE2_MODE="both"
 
 mkdir -p jobs/outputs
 mkdir -p "$OUTPUT_DIR"
 
 echo "============================================================"
-echo "Stage 2 Geolocation Training"
+echo "Joint Training: Phase 1 (Concept) + Phase 2 (Geolocation)"
 echo "============================================================"
-echo "Phase1 checkpoint: $PHASE1_CHECKPOINT"
 echo "Cached embeddings: $CACHED_DIR"
 echo "Output directory: $OUTPUT_DIR"
+echo "Mode: $STAGE2_MODE"
 echo "============================================================"
-
-# Verify Phase1 checkpoint exists
-if [[ ! -f "$PHASE1_CHECKPOINT" ]]; then
-  echo "ERROR: Phase1 checkpoint not found: $PHASE1_CHECKPOINT"
-  echo "Please train Phase1 first using train_cbm.py with --model query_topk"
-  exit 1
-fi
 
 # Verify cached embeddings exist
 if [[ ! -f "$CACHED_DIR/train_pooled_embeddings.pt" || ! -f "$CACHED_DIR/train_metadata.json" ]]; then
   echo "ERROR: Missing cached embeddings in $CACHED_DIR"
   echo "Run precompute_streetclip_embeddings.py first."
   exit 1
+fi
+
+# Verify patch tokens exist if mode requires them
+if [[ "$STAGE2_MODE" == "both" || "$STAGE2_MODE" == "image_only" ]]; then
+  if [[ ! -f "$CACHED_DIR/train_patch_tokens.pt" ]]; then
+    echo "ERROR: Mode '$STAGE2_MODE' requires patch tokens, but they are not found."
+    echo "Please set STAGE2_MODE='concept_only' or ensure patch tokens are cached."
+    exit 1
+  fi
 fi
 
 # Verify test CSV exists (optional but recommended)
@@ -81,33 +78,25 @@ if [[ ! -f "$TEST_CSV" ]]; then
   TEST_CSV=""
 fi
 
-# Auto-detect mode if not explicitly set
-if [[ -z "$STAGE2_MODE" ]]; then
-  # Check if patch tokens exist (required for mode='both' or 'image_only')
-  if [[ ! -f "$CACHED_DIR/train_patch_tokens.pt" ]]; then
-    echo "WARNING: Patch tokens not found. Stage2 mode will be set to 'concept_only'"
-    STAGE2_MODE="concept_only"
-  else
-    STAGE2_MODE="concept_only"
-  fi
-fi
-
-# Verify mode is valid and compatible with available data
-if [[ "$STAGE2_MODE" == "both" || "$STAGE2_MODE" == "image_only" ]]; then
-  if [[ ! -f "$CACHED_DIR/train_patch_tokens.pt" ]]; then
-    echo "ERROR: Mode '$STAGE2_MODE' requires patch tokens, but they are not found."
-    echo "Please set STAGE2_MODE='concept_only' or ensure patch tokens are cached."
-    exit 1
-  fi
-fi
+# Optional: Load pre-trained checkpoints
+# Uncomment and set paths to resume from checkpoints:
+PHASE1_CHECKPOINT="/home/igodzwon/Project_AI/checkpoints/cbm_query_topk_256_neighborhood_k5_v2_higheracc/phase1/best_phase1.pt"
+PHASE2_CHECKPOINT="/home/igodzwon/Project_AI/checkpoints/STAGE2_BOTH_GATE/phase2/best_phase2.pt"
+# Or resume from a previous joint training run:
+# RESUME_JOINT="checkpoints/JOINT_TRAINING"
 
 echo "============================================================"
-echo "Training Stage 2 Geolocation Model"
+echo "Joint Training Configuration"
+echo "  - Phase 1: Concept prediction (trainable)"
+echo "  - Phase 2: Geolocation (trainable)"
 echo "  - Mode: $STAGE2_MODE"
 echo "  - Num cells: 1000"
 echo "  - Hidden dim: 512"
 echo "  - Cross-attention layers: 2"
-echo "  - Offset loss weight: 50.0 (to balance with cell loss)"
+echo "  - Concept loss weight: 1.0"
+echo "  - Cell loss weight: 1.0"
+echo "  - Offset loss weight: 6371.0"
+echo "  - Phase 1 LR: 7e-5 (separate from Phase 2 LR: 1e-4)"
 if [[ -n "$TEST_CSV" ]]; then
   echo "  - Test evaluation: Enabled"
 else
@@ -115,49 +104,57 @@ else
 fi
 echo "============================================================"
 
-python scripts/training/train_stage2.py \
+python scripts/training/train_joint.py \
   --train-csv "$TRAIN_CSV" \
   --val-csv "$VAL_CSV" \
   ${TEST_CSV:+--test-csv "$TEST_CSV"} \
   --cached-dir "$CACHED_DIR" \
-  --phase1-checkpoint "$PHASE1_CHECKPOINT" \
   --concept-data-dir "$CONCEPT_DATA" \
   --output-dir "$OUTPUT_DIR" \
+  ${PHASE1_CHECKPOINT:+--phase1-checkpoint "$PHASE1_CHECKPOINT"} \
+  ${PHASE2_CHECKPOINT:+--phase2-checkpoint "$PHASE2_CHECKPOINT"} \
+  ${RESUME_JOINT:+--resume-joint-checkpoint "$RESUME_JOINT"} \
   --num-cells 1000 \
   --hidden-dim 512 \
   --num-heads 8 \
   --num-layers 2 \
   --dropout 0.1 \
+  --phase1-dropout 0.3 \
   --mode "$STAGE2_MODE" \
   --batch-size 64 \
+  --num-workers 2 \
   --epochs 100 \
   --lr 1e-4 \
+  --phase1-lr 7e-5 \
   --weight-decay 0.01 \
+  --concept-loss-weight 1.0 \
   --cell-loss-weight 1.0 \
   --offset-loss-weight 6371.0 \
   --concept-dim 256 \
   --patch-dim 1024 \
-  --phase1-dropout 0.3 \
-  --phase1-mil-topk 8 \
-  --phase1-mil-tau 0.3 \
-  --phase1-mix-depth 1 \
-  --phase1-mix-heads 4 \
-  --phase1-mix-mlp-ratio 2.0 \
-  --phase1-mix-local-kernel-size 5 \
+  --mil-topk 8 \
+  --mil-tau 0.3 \
+  --mix-depth 1 \
+  --mix-heads 4 \
+  --mix-mlp-ratio 2.0 \
+  --mix-local-kernel-size 5 \
   --text-model-name "geolocal/StreetCLIP" \
   --concept-prompt-template "a street view photo containing {}" \
   --wandb \
-  --wandb-project "cbm_stage2" \
-  --wandb-run-name "stage2_geo_$(date +%Y%m%d_%H%M%S)" \
+  --wandb-project "cbm_joint" \
+  --wandb-run-name "joint_$(date +%Y%m%d_%H%M%S)" \
   --early-stop-patience 10
 
 echo "============================================================"
-echo "Stage 2 training complete!"
-echo "Outputs: $OUTPUT_DIR/phase2/"
-echo "  - Checkpoints: $OUTPUT_DIR/phase2/best_phase2.pt"
-echo "  - Visualizations: $OUTPUT_DIR/phase2/visualizations/"
+echo "Joint training complete!"
+echo "Outputs:"
+echo "  - Phase 1: $OUTPUT_DIR/phase1/"
+echo "    - Checkpoints: $OUTPUT_DIR/phase1/best_phase1.pt"
+echo "  - Phase 2: $OUTPUT_DIR/phase2/"
+echo "    - Checkpoints: $OUTPUT_DIR/phase2/best_phase2.pt"
+echo "    - Visualizations: $OUTPUT_DIR/phase2/visualizations/"
 if [[ -n "$TEST_CSV" ]]; then
-  echo "  - Test results: $OUTPUT_DIR/phase2/test_results.json"
-  echo "  - Test visualizations: $OUTPUT_DIR/phase2/visualizations/test_set/"
+  echo "    - Test results: $OUTPUT_DIR/phase2/test_results.json"
 fi
 echo "============================================================"
+

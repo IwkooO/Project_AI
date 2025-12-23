@@ -211,7 +211,7 @@ def train_epoch(
         concept_emb = concept_adapter(phase1_logits)  # [B, concept_dim]
         
         # Forward through Stage2
-        cell_logits, offset_pred = model(concept_emb, patch_tokens)  # [B, num_cells], [B, 3]
+        cell_logits, offset_pred = model(concept_emb, patch_tokens, pooled_emb)  # [B, num_cells], [B, 3]
         
         # Losses
         cell_loss = cell_criterion(cell_logits, cell_labels)
@@ -296,7 +296,7 @@ def eval_epoch(
             continue
         
         concept_emb = concept_adapter(phase1_logits)
-        cell_logits, offset_pred = model(concept_emb, patch_tokens)
+        cell_logits, offset_pred = model(concept_emb, patch_tokens, pooled_emb)
         
         # Losses
         cell_loss = cell_criterion(cell_logits, cell_labels)
@@ -461,7 +461,7 @@ def main():
     if test_ds:
         print(f"Test: {len(test_ds)}")
     
-    # Detect patch dimension from dataset
+    # Detect patch dimension from dataset (for Phase1)
     if train_ds.patch_tokens is not None:
         detected_patch_dim = train_ds.patch_tokens.shape[2]
         if args.patch_dim != detected_patch_dim:
@@ -471,6 +471,10 @@ def main():
         print("Warning: No patch tokens in dataset, Stage2 mode must be 'concept_only'")
         if args.mode != "concept_only":
             raise ValueError(f"Stage2 mode must be 'concept_only' when patch tokens are unavailable")
+    
+    # Detect pooled dimension from dataset (for Stage2)
+    detected_pooled_dim = train_ds.pooled_embeddings.shape[1]
+    print(f"Detected pooled_dim: {detected_pooled_dim}")
     
     # Fit geocells on train split only
     print("\nFitting semantic geocells on train split...")
@@ -584,6 +588,7 @@ def main():
         num_layers=args.num_layers,
         dropout=args.dropout,
         mode=args.mode,
+        pooled_dim=detected_pooled_dim,
     ).to(device)
     
     print(f"Stage2 model parameters: {sum(p.numel() for p in stage2_model.parameters())/1e6:.2f}M")
