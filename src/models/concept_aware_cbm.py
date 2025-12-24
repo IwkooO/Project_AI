@@ -1283,6 +1283,14 @@ class Stage2CrossAttentionGeoHead(nn.Module):
                 - fused_emb: Final embedding used for prediction [batch, 512]
                 - ablation_mode: Current ablation mode (for logging)
         """
+        # AMP-safe: ensure inputs match the Stage2 head parameter dtype
+        # (encoder/Stage1 may run under autocast and produce bfloat16).
+        param_dtype = next(self.parameters()).dtype
+        if concept_emb.dtype != param_dtype:
+            concept_emb = concept_emb.to(dtype=param_dtype)
+        if image_features.dtype != param_dtype:
+            image_features = image_features.to(dtype=param_dtype)
+
         batch_size = concept_emb.size(0)
         gate = None
         
