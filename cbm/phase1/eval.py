@@ -58,7 +58,9 @@ def evaluate(
     correct_top5 = 0
     total_samples = 0
     
-    for patches, c_labels, coords, cell_labels, offsets in tqdm(dataloader, desc="Evaluating"):
+    # Dataset/collate yields:
+    # (patches, concept_label, coords, cell_label, country_label, cache_idx)
+    for patches, c_labels, coords, cell_labels, country_labels, offsets in tqdm(dataloader, desc="Evaluating"):
         patches = patches.to(device)
         c_labels = c_labels.to(device)
         
@@ -177,7 +179,9 @@ def main():
     
     # Load checkpoint
     print(f"Loading checkpoint from {args.checkpoint}...")
-    checkpoint = torch.load(args.checkpoint, map_location=device)
+    # PyTorch 2.6+ defaults torch.load(weights_only=True), which can fail for our checkpoints
+    # (e.g., when they contain numpy scalars in metadata). We trust our own checkpoints here.
+    checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=False)
     model.load_state_dict(checkpoint['model_state_dict'])
     print(f"Loaded checkpoint from epoch {checkpoint.get('epoch', 'unknown')}")
     if 'val_acc1' in checkpoint:

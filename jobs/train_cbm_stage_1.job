@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=12:00:00
-#SBATCH --output=jobs/outputs/CBM_QUERY_256_COMPRESSED%j.out
+#SBATCH --output=jobs/outputs/cbm_stage_1_two_stage_%j.out
 
 set -eo pipefail
 
@@ -41,7 +41,7 @@ CACHED_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_ba
 CONCEPT_DATA="data/concept_data_v2"
 
 # Output directory
-OUTPUT_DIR="checkpoints/CBM_QUERY_256_COMPRESSED"
+OUTPUT_DIR="checkpoints/cbm_stage_1_two_stage"
 CONCEPT_MAPPING="data/concept_refinement_mapped.csv"
 
 mkdir -p "$OUTPUT_DIR"
@@ -76,7 +76,7 @@ echo "Step 3: Train Phase 1 concept head (QueryTopK256 + Neighborhood Attention)
 echo "  - concept_dim=256 (learned projection + concept queries from scratch)"
 echo "  - mix_local_kernel_size=5 (Chebyshev KxK neighborhood)"
 echo "============================================================"
-python scripts/training/train_cbm.py \
+python -m cbm.phase1.train \
   --train-csv "$TRAIN_CSV" \
   --val-csv "$VAL_CSV" \
   --cached-dir "$CACHED_DIR" \
@@ -93,7 +93,8 @@ python scripts/training/train_cbm.py \
   --mix-depth 1 --mix-heads 4 --mix-mlp-ratio 2.0 \
   --mix-local-kernel-size 5 \
   --dropout 0.3 --weight-decay 0.05 \
-  --selection-metric acc1
+  --selection-metric acc1 \
+  --proj-type two_stage
 
 echo "============================================================"
 echo "Training complete! (QueryTopK256 + Neighborhood Attention)"
@@ -127,7 +128,7 @@ echo "============================================================"
 
 mkdir -p "$EVAL_OUTPUT_DIR"
 
-python scripts/evaluation/evaluate_concept_head.py \
+python -m cbm.phase1.eval \
   --checkpoint "$BEST_CHECKPOINT" \
   --test-csv "$TEST_CSV" \
   --cached-dir "$CACHED_DIR" \
