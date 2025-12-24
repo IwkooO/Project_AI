@@ -102,6 +102,7 @@ def main():
     # Model config (should match training)
     parser.add_argument("--concept-dim", type=int, default=256, help="Concept dimension")
     parser.add_argument("--dropout", type=float, default=0.3, help="Dropout")
+    parser.add_argument("--mil-topk", type=int, default=8, help="Hard top-K selection for MIL-style aggregation")
     parser.add_argument("--mil-tau", type=float, default=0.25, help="Temperature for LogSumExp aggregation")
     parser.add_argument("--mix-depth", type=int, default=1, help="Patch mixer depth")
     parser.add_argument("--mix-heads", type=int, default=4, help="Patch mixer heads")
@@ -169,6 +170,7 @@ def main():
         patch_dim=patch_dim,
         concept_dim=args.concept_dim,
         dropout=args.dropout,
+        mil_topk=args.mil_topk,
         mil_tau=args.mil_tau,
         mix_depth=args.mix_depth,
         mix_heads=args.mix_heads,

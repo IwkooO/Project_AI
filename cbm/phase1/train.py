@@ -479,7 +479,7 @@ def main():
         if len(concept_names) != train_ds.num_concepts:
             raise ValueError(f"Concept name count mismatch: {len(concept_names)} != {train_ds.num_concepts}")
         
-        # Compute text embeddings
+        # Compute text embeddings (+ StreetCLIP visual projection weight for space alignment).
         text_embeds, visual_proj_weight, projection_dim = _compute_text_embeddings_for_concepts(
             concept_names,
             model_name=args.text_model_name,
@@ -488,6 +488,7 @@ def main():
         )
         
         # Check if concept_dim matches projection_dim
+        projection_layer = None
         if args.concept_dim != projection_dim:
             print(f"Warning: concept_dim={args.concept_dim} != projection_dim={projection_dim}")
             print(f"Projecting text embeddings from {projection_dim} to {args.concept_dim}...")
@@ -501,6 +502,41 @@ def main():
         else:
             print(f"Using text embeddings directly (concept_dim={args.concept_dim} == projection_dim={projection_dim})")
         
+        # Align spaces: initialize patch projection from StreetCLIP visual_projection.weight.
+        # This makes patches and text-initialized queries start in the same CLIP projection space.
+        try:
+            if projection_layer is None:
+                patch_proj_init_weight = visual_proj_weight.to(device=device)  # [concept_dim, patch_dim]
+            else:
+                # Compose the same text projection with the CLIP visual projection:
+                #   patches -> (visual_proj) -> projection_dim -> (projection_layer) -> concept_dim
+                patch_proj_init_weight = projection_layer.weight @ visual_proj_weight.to(device=device)
+
+            # Find a Linear inside the concept head patch projection whose weight matches.
+            target_linear = None
+            linear_shapes = []
+            for m in model.concept_head.patch_proj.modules():
+                if isinstance(m, nn.Linear):
+                    linear_shapes.append(tuple(m.weight.shape))
+                    if tuple(m.weight.shape) == tuple(patch_proj_init_weight.shape):
+                        target_linear = m  # if multiple match, last one wins (final projection)
+
+            if target_linear is None:
+                print(
+                    "WARNING: Could not initialize patch_proj from StreetCLIP visual projection "
+                    f"(wanted weight shape={tuple(patch_proj_init_weight.shape)}). "
+                    f"Found Linear weights: {linear_shapes}"
+                )
+            else:
+                with torch.no_grad():
+                    target_linear.weight.copy_(patch_proj_init_weight.to(dtype=target_linear.weight.dtype))
+                print(
+                    "Initialized concept_head.patch_proj Linear weights from StreetCLIP visual_projection.weight "
+                    f"(shape={tuple(target_linear.weight.shape)})"
+                )
+        except Exception as e:
+            print(f"WARNING: Failed to init patch projection from StreetCLIP visual projection: {e}")
+
         # Initialize concept query weights with text embeddings
         if text_embeds.shape != (train_ds.num_concepts, args.concept_dim):
             raise ValueError(

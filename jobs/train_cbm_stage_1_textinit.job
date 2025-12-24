@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=12:00:00
-#SBATCH --output=jobs/outputs/cbm_stage_1_textinit_%j.out
+#SBATCH --output=jobs/outputs/cbm_stage_1_textinit_visinit_proj_full_attn_%j.out
 
 # Use venv (not conda) for this run.
 set -eo pipefail
@@ -52,7 +52,7 @@ CACHED_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_ba
 CONCEPT_DATA="data/concept_data_v2"
 
 # Output directory
-OUTPUT_DIR="checkpoints/cbm_stage_1_textinit"
+OUTPUT_DIR="checkpoints/cbm_stage_1_textinit_visinit_proj_full_attn"
 CONCEPT_MAPPING="data/concept_refinement_mapped.csv"
 
 mkdir -p "$OUTPUT_DIR"
@@ -104,11 +104,11 @@ python -m cbm.phase1.train \
   --attn-tau 0.3 \
   --mil-topk 8 \
   --mix-depth 1 --mix-heads 4 --mix-mlp-ratio 2.0 \
-  --mix-local-kernel-size 5 \
+  --mix-local-kernel-size 0 \
   --dropout 0.3 --weight-decay 0.05 \
   --selection-metric acc1 \
   --stk-mask-prob 0.0 \
-  --stk-k-mask 4
+  --stk-k-mask 2
 
 echo "============================================================"
 echo "Training complete! (Query Sparse + Neighborhood Attention)"

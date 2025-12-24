@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
-#SBATCH --job-name=cbm_qtopk128_na
+#SBATCH --job-name=cbm_textinit_interp
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=12:00:00
-#SBATCH --output=jobs/outputs/cbm_stage_1_simple_local_stk0.4_%j.out
+#SBATCH --output=jobs/outputs/cbm_stage_1_textinit_interpretable_%j.out
 
 set -eo pipefail
 
@@ -16,11 +16,7 @@ module load Anaconda3/2025.06-1
 cd "$HOME/Project_AI/"
 mkdir -p jobs/outputs
 
-echo "============================================================"
-echo "Activating environment"
-echo "============================================================"
-
-# Activate environment
+# Activate env
 export GEOTIFF_CSV="${GEOTIFF_CSV:-}"
 set +u
 source activate streetview
@@ -29,10 +25,24 @@ set -u
 wandb_api_key="9073a011764cb23fce5384443a3996ca9c5d9198"
 export WANDB_API_KEY="$wandb_api_key"
 
+# ---------------------------
+# Interpretability sweep knobs
+# ---------------------------
+# If attention collapses to sky/floor, the most common culprit is "too soft + too many patches":
+#   high tau + high top-k makes it easy to spread mass onto correlated background.
+TAU="${TAU:-0.25}"              # try 0.25 / 0.30 / 0.35
+TOPK="${TOPK:-6}"               # try 6 / 8 / 10
+STK_MASK_PROB="${STK_MASK_PROB:-0.35}"   # try 0.15 / 0.25 / 0.35
+STK_K_MASK="${STK_K_MASK:-1}"             # usually 1; 2 is stronger
+MIX_LOCAL_KERNEL="${MIX_LOCAL_KERNEL:-5}" # keep 0 unless you explicitly want local coherence (3/5)
+
+RUN_TAG="tau${TAU}_k${TOPK}_stk${STK_MASK_PROB}_lk${MIX_LOCAL_KERNEL}"
+
 # Paths
 SPLITS_DIR="data/6921d7831744c5356b098bf7_balanced/splits"
 TRAIN_CSV="${SPLITS_DIR}/dataset_train.csv"
 VAL_CSV="${SPLITS_DIR}/dataset_val.csv"
+TEST_CSV="${SPLITS_DIR}/dataset_test.csv"
 
 # Cached embeddings (must already exist)
 CACHED_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip_v2"
@@ -41,11 +51,10 @@ CACHED_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_ba
 CONCEPT_DATA="data/concept_data_v2"
 
 # Output directory
-OUTPUT_DIR="checkpoints/cbm_stage_1_simple_local_stk0.4"
+OUTPUT_DIR="checkpoints/cbm_stage_1_textinit_visinit_interpretable_${RUN_TAG}"
 CONCEPT_MAPPING="data/concept_refinement_mapped.csv"
 
-mkdir -p "$OUTPUT_DIR"
-mkdir -p "$CONCEPT_DATA"
+mkdir -p "$OUTPUT_DIR" "$CONCEPT_DATA"
 
 echo "============================================================"
 echo "Step 0: Mapping meta_name -> generalized concepts"
@@ -72,10 +81,13 @@ if [[ ! -f "$CACHED_DIR/train_pooled_embeddings.pt" || ! -f "$CACHED_DIR/train_m
 fi
 
 echo "============================================================"
-echo "Step 3: Train Phase 1 concept head (QueryTopK256 + Neighborhood Attention)"
-echo "  - concept_dim=256 (learned projection + concept queries from scratch)"
-echo "  - mix_local_kernel_size=5 (Chebyshev KxK neighborhood)"
+echo "Step 3: Train Phase 1 (TopK-MIL) with interpretability knobs"
+echo "  - STKIM enabled: reduces single-patch shortcutting"
+echo "  - tau/topk tuned to avoid background shortcuts"
+echo "  - mix-local-kernel-size matched at eval"
+echo "  - RUN_TAG=${RUN_TAG}"
 echo "============================================================"
+
 python -m cbm.phase1.train \
   --train-csv "$TRAIN_CSV" \
   --val-csv "$VAL_CSV" \
@@ -87,26 +99,26 @@ python -m cbm.phase1.train \
   --lr 7e-5 \
   --warmup-epochs 5 \
   --wandb \
-  --concept-dim 256 \
-  --attn-tau 0.25 \
-  --mil-topk 6 \
+  --init-concepts-from-text \
+  --concept-dim 768 \
+  --concept-prompt-template "a street view photo containing {}" \
+  --text-model-name "geolocal/StreetCLIP" \
+  --attn-tau "$TAU" \
+  --mil-topk "$TOPK" \
   --mix-depth 1 --mix-heads 4 --mix-mlp-ratio 2.0 \
-  --mix-local-kernel-size 5 \
+  --mix-local-kernel-size "$MIX_LOCAL_KERNEL" \
   --dropout 0.3 --weight-decay 0.05 \
   --selection-metric acc1 \
-  --stk-mask-prob 0.4 \
-  --stk-k-mask 1 \
-  --proj-type simple
-
+  --stk-mask-prob "$STK_MASK_PROB" \
+  --stk-k-mask "$STK_K_MASK" \
+  --stk-mask-fill min
 
 echo "============================================================"
-echo "Training complete! (QueryTopK256 + Neighborhood Attention)"
+echo "Training complete!"
 echo "Outputs: $OUTPUT_DIR"
 echo "============================================================"
 
-# Check if best checkpoint exists before evaluation
 BEST_CHECKPOINT="${OUTPUT_DIR}/phase1/best_phase1.pt"
-TEST_CSV="${SPLITS_DIR}/dataset_test.csv"
 EVAL_OUTPUT_DIR="${OUTPUT_DIR}/test_evaluation"
 
 if [[ ! -f "$BEST_CHECKPOINT" ]]; then
@@ -122,13 +134,8 @@ if [[ ! -f "$TEST_CSV" ]]; then
 fi
 
 echo "============================================================"
-echo "Step 4: Evaluating on Test Set with Visualizations"
+echo "Step 4: Evaluating on Test Set with Visualizations (MATCH config)"
 echo "============================================================"
-echo "Checkpoint: $BEST_CHECKPOINT"
-echo "Test CSV: $TEST_CSV"
-echo "Output: $EVAL_OUTPUT_DIR"
-echo "============================================================"
-
 mkdir -p "$EVAL_OUTPUT_DIR"
 
 python -m cbm.phase1.eval \
@@ -137,13 +144,14 @@ python -m cbm.phase1.eval \
   --cached-dir "$CACHED_DIR" \
   --concept-data-dir "$CONCEPT_DATA" \
   --output-dir "$EVAL_OUTPUT_DIR" \
-  --concept-dim 256 \
+  --concept-dim 768 \
   --dropout 0.3 \
-  --mil-tau 0.3 \
+  --mil-topk "$TOPK" \
+  --mil-tau "$TAU" \
   --mix-depth 1 \
   --mix-heads 4 \
   --mix-mlp-ratio 2.0 \
-  --mix-local-kernel-size 5 \
+  --mix-local-kernel-size "$MIX_LOCAL_KERNEL" \
   --batch-size 64 \
   --num-workers 4 \
   --generate-visualizations \
@@ -153,7 +161,6 @@ python -m cbm.phase1.eval \
 echo "============================================================"
 echo "Test evaluation complete!"
 echo "Results saved to: $EVAL_OUTPUT_DIR"
-echo "Metrics: $EVAL_OUTPUT_DIR/metrics.json"
-echo "Visualizations: $EVAL_OUTPUT_DIR/visualizations/"
 echo "============================================================"
+
 
