@@ -32,119 +32,145 @@ echo "============================================="
 echo "Stage 2 Ablation Study Launcher"
 echo "============================================="
 
-VANILLA_MODE=0
-if [ "${1:-}" == "--vanilla" ]; then
-    VANILLA_MODE=1
+VANILLA_ONLY=0
+FINETUNED_ONLY=0
+if [ "${1:-}" == "--vanilla" ] || [ "${1:-}" == "--vanilla-only" ]; then
+    VANILLA_ONLY=1
+    shift
+elif [ "${1:-}" == "--finetuned-only" ]; then
+    FINETUNED_ONLY=1
     shift
 fi
 
 MODE="${1:-all}"
 
-if [ "${VANILLA_MODE}" -eq 1 ]; then
+submit_vanilla() {
     echo "Vanilla mode enabled:"
     echo "  - Stage 1: vanilla StreetCLIP (no Stage 0 fine-tuning)"
     echo "  - Stage 2: uses Stage 1 vanilla checkpoint for ablations"
     echo ""
 
     echo "Submitting Stage 1 vanilla job..."
-    STAGE1_JID=$(sbatch --parsable jobs/stage1/train_stage1_vanilla_streetclip.job)
-    echo "Stage 1 job id: ${STAGE1_JID}"
+    STAGE1_VANILLA_JID=$(sbatch --parsable jobs/stage1/train_stage1_vanilla_streetclip.job)
+    echo "Stage 1 vanilla job id: ${STAGE1_VANILLA_JID}"
     echo ""
 
     if [ "${MODE}" == "" ] || [ "${MODE}" == "all" ]; then
-        echo "Submitting ALL ablation experiments (dependent on Stage 1)..."
+        echo "Submitting ALL ablation experiments (vanilla lineage, dependent on Stage 1 vanilla)..."
         echo ""
 
-        echo "[1/3] Submitting concept_only experiment (vanilla Stage 1)..."
-        sbatch --dependency=afterok:${STAGE1_JID} jobs/stage2/vanilla_stage1/train_stage2_ablation_concept_only_vanilla_stage1.job
+        echo "[VANILLA 1/3] Submitting concept_only experiment..."
+        sbatch --dependency=afterok:${STAGE1_VANILLA_JID} jobs/stage2/vanilla_stage1/train_stage2_ablation_concept_only_vanilla_stage1.job
 
-        echo "[2/3] Submitting image_only experiment (vanilla Stage 1)..."
-        sbatch --dependency=afterok:${STAGE1_JID} jobs/stage2/vanilla_stage1/train_stage2_ablation_image_only_vanilla_stage1.job
+        echo "[VANILLA 2/3] Submitting image_only experiment..."
+        sbatch --dependency=afterok:${STAGE1_VANILLA_JID} jobs/stage2/vanilla_stage1/train_stage2_ablation_image_only_vanilla_stage1.job
 
-        echo "[3/3] Submitting both experiment (vanilla Stage 1)..."
-        sbatch --dependency=afterok:${STAGE1_JID} jobs/stage2/vanilla_stage1/train_stage2_ablation_both_vanilla_stage1.job
+        echo "[VANILLA 3/3] Submitting both experiment..."
+        sbatch --dependency=afterok:${STAGE1_VANILLA_JID} jobs/stage2/vanilla_stage1/train_stage2_ablation_both_vanilla_stage1.job
 
     elif [ "${MODE}" == "concept" ] || [ "${MODE}" == "concept_only" ]; then
         echo "Submitting concept_only experiment (vanilla Stage 1)..."
-        sbatch --dependency=afterok:${STAGE1_JID} jobs/stage2/vanilla_stage1/train_stage2_ablation_concept_only_vanilla_stage1.job
+        sbatch --dependency=afterok:${STAGE1_VANILLA_JID} jobs/stage2/vanilla_stage1/train_stage2_ablation_concept_only_vanilla_stage1.job
 
     elif [ "${MODE}" == "image" ] || [ "${MODE}" == "image_only" ]; then
         echo "Submitting image_only experiment (vanilla Stage 1)..."
-        sbatch --dependency=afterok:${STAGE1_JID} jobs/stage2/vanilla_stage1/train_stage2_ablation_image_only_vanilla_stage1.job
+        sbatch --dependency=afterok:${STAGE1_VANILLA_JID} jobs/stage2/vanilla_stage1/train_stage2_ablation_image_only_vanilla_stage1.job
 
     elif [ "${MODE}" == "both" ]; then
         echo "Submitting both experiment (vanilla Stage 1)..."
-        sbatch --dependency=afterok:${STAGE1_JID} jobs/stage2/vanilla_stage1/train_stage2_ablation_both_vanilla_stage1.job
+        sbatch --dependency=afterok:${STAGE1_VANILLA_JID} jobs/stage2/vanilla_stage1/train_stage2_ablation_both_vanilla_stage1.job
 
     else
         echo "Unknown option: ${MODE}"
-        echo "Usage: $0 [--vanilla] [all|concept|image|both]"
+        echo "Usage: $0 [--vanilla-only|--finetuned-only] [all|concept|image|both]"
         exit 1
     fi
+}
 
+submit_finetuned() {
+    # Finetuned: submit Stage0 -> Stage1 -> Stage2 ablations (all dependent)
+    echo "Submitting Stage 0 finetuning job..."
+    STAGE0_JID=$(sbatch --parsable jobs/stage0/train_stage0_prototype.job)
+    echo "Stage 0 job id: ${STAGE0_JID}"
+    echo ""
+
+    echo "Submitting Stage 1 finetuned job (depends on Stage 0)..."
+    STAGE1_FT_JID=$(sbatch --parsable --dependency=afterok:${STAGE0_JID} jobs/stage1/train_stage1_prototype.job)
+    echo "Stage 1 finetuned job id: ${STAGE1_FT_JID}"
+    echo ""
+
+    if [ "${MODE}" == "" ] || [ "${MODE}" == "all" ]; then
+        echo "Submitting ALL ablation experiments (finetuned lineage, dependent on Stage 1 finetuned)..."
+        echo ""
+
+        echo "[FINETUNED 1/3] Submitting concept_only experiment..."
+        sbatch --dependency=afterok:${STAGE1_FT_JID} jobs/stage2/ablations/train_stage2_ablation_concept_only.job
+
+        echo "[FINETUNED 2/3] Submitting image_only experiment..."
+        sbatch --dependency=afterok:${STAGE1_FT_JID} jobs/stage2/ablations/train_stage2_ablation_image_only.job
+
+        echo "[FINETUNED 3/3] Submitting both experiment..."
+        sbatch --dependency=afterok:${STAGE1_FT_JID} jobs/stage2/ablations/train_stage2_ablation_both.job
+
+    elif [ "${MODE}" == "concept" ] || [ "${MODE}" == "concept_only" ]; then
+        echo "Submitting concept_only experiment..."
+        sbatch --dependency=afterok:${STAGE1_FT_JID} jobs/stage2/ablations/train_stage2_ablation_concept_only.job
+
+    elif [ "${MODE}" == "image" ] || [ "${MODE}" == "image_only" ]; then
+        echo "Submitting image_only experiment..."
+        sbatch --dependency=afterok:${STAGE1_FT_JID} jobs/stage2/ablations/train_stage2_ablation_image_only.job
+
+    elif [ "${MODE}" == "both" ]; then
+        echo "Submitting both experiment..."
+        sbatch --dependency=afterok:${STAGE1_FT_JID} jobs/stage2/ablations/train_stage2_ablation_both.job
+
+    else
+        echo "Unknown option: ${MODE}"
+        echo "Usage: $0 [--vanilla-only|--finetuned-only] [all|concept|image|both]"
+        exit 1
+    fi
+}
+
+if [ "${VANILLA_ONLY}" -eq 1 ] && [ "${FINETUNED_ONLY}" -eq 1 ]; then
+    echo "Invalid flags: choose only one of --vanilla-only or --finetuned-only"
+    exit 1
+fi
+
+if [ "${VANILLA_ONLY}" -eq 1 ]; then
+    submit_vanilla
     echo ""
     echo "============================================="
-    echo "Jobs submitted! Check status with: squeue -u \$USER"
+    echo "Vanilla jobs submitted! Check status with: squeue -u \$USER"
     echo "Vanilla Stage 1 checkpoint path will be written to:"
     echo "  - jobs/outputs/stage1_vanilla_ckpt_path.txt"
-    echo "Results will be saved to:"
-    echo "  - results/stage1-prototype/vanilla_streetclip_no_stage0/"
-    echo "  - results/stage2_cross_attention_concept_only/vanilla_stage1/"
-    echo "  - results/stage2_cross_attention_image_only/vanilla_stage1/"
-    echo "  - results/stage2_cross_attention_both/vanilla_stage1/"
     echo "============================================="
     exit 0
 fi
 
-# Non-vanilla: submit Stage0 -> Stage1 -> Stage2 ablations (all dependent)
-echo "Submitting Stage 0 finetuning job..."
-STAGE0_JID=$(sbatch --parsable jobs/stage0/train_stage0_prototype.job)
-echo "Stage 0 job id: ${STAGE0_JID}"
-echo ""
-
-echo "Submitting Stage 1 finetuned job (depends on Stage 0)..."
-STAGE1_JID=$(sbatch --parsable --dependency=afterok:${STAGE0_JID} jobs/stage1/train_stage1_prototype.job)
-echo "Stage 1 job id: ${STAGE1_JID}"
-echo ""
-
-if [ "${MODE}" == "" ] || [ "${MODE}" == "all" ]; then
-    echo "Submitting ALL ablation experiments..."
+if [ "${FINETUNED_ONLY}" -eq 1 ]; then
+    submit_finetuned
     echo ""
-
-    echo "[1/3] Submitting concept_only experiment..."
-    sbatch --dependency=afterok:${STAGE1_JID} jobs/stage2/ablations/train_stage2_ablation_concept_only.job
-
-    echo "[2/3] Submitting image_only experiment..."
-    sbatch --dependency=afterok:${STAGE1_JID} jobs/stage2/ablations/train_stage2_ablation_image_only.job
-
-    echo "[3/3] Submitting both experiment..."
-    sbatch --dependency=afterok:${STAGE1_JID} jobs/stage2/ablations/train_stage2_ablation_both.job
-
-elif [ "${MODE}" == "concept" ] || [ "${MODE}" == "concept_only" ]; then
-    echo "Submitting concept_only experiment..."
-    sbatch --dependency=afterok:${STAGE1_JID} jobs/stage2/ablations/train_stage2_ablation_concept_only.job
-
-elif [ "${MODE}" == "image" ] || [ "${MODE}" == "image_only" ]; then
-    echo "Submitting image_only experiment..."
-    sbatch --dependency=afterok:${STAGE1_JID} jobs/stage2/ablations/train_stage2_ablation_image_only.job
-
-elif [ "${MODE}" == "both" ]; then
-    echo "Submitting both experiment..."
-    sbatch --dependency=afterok:${STAGE1_JID} jobs/stage2/ablations/train_stage2_ablation_both.job
-
-else
-    echo "Unknown option: ${MODE}"
-    echo "Usage: $0 [--vanilla] [all|concept|image|both]"
-    exit 1
+    echo "============================================="
+    echo "Finetuned jobs submitted! Check status with: squeue -u \$USER"
+    echo "Finetuned Stage 1 checkpoint path will be written to:"
+    echo "  - jobs/outputs/stage1_ckpt_path.txt"
+    echo "============================================="
+    exit 0
 fi
 
+echo "Submitting BOTH lineages (finetuned + vanilla)..."
+echo ""
+submit_finetuned
+echo ""
+submit_vanilla
 echo ""
 echo "============================================="
 echo "Jobs submitted! Check status with: squeue -u \$USER"
-echo "Results will be saved to:"
-echo "  - results/stage2_cross_attention_concept_only/"
-echo "  - results/stage2_cross_attention_image_only/"
-echo "  - results/stage2_cross_attention_both/"
+echo "Checkpoint path files:"
+echo "  - jobs/outputs/stage0_ckpt_path.txt"
+echo "  - jobs/outputs/stage1_ckpt_path.txt"
+echo "  - jobs/outputs/stage1_vanilla_ckpt_path.txt"
 echo "============================================="
+exit 0
 
 

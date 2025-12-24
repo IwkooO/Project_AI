@@ -106,6 +106,17 @@ class Stage0PretrainingModel(nn.Module):
         
         # Location encoder (GeoCLIP)
         self.location_encoder = LocationEncoder()
+
+        # GPS adapter: project GeoCLIP 512d location features up to StreetCLIP space (768d)
+        # so that image↔GPS alignment can happen without compressing the image features.
+        self.gps_adapter = nn.Sequential(
+            nn.Linear(concept_emb_dim, streetclip_dim),
+            nn.LayerNorm(streetclip_dim),
+            nn.GELU(),
+            nn.Dropout(0.1),
+            nn.Linear(streetclip_dim, streetclip_dim),
+            nn.LayerNorm(streetclip_dim),
+        )
         
         # Text prototypes (frozen base, used for contrastive targets)
         self.register_buffer("T_meta", T_meta)  # [num_metas, 768]
@@ -138,6 +149,11 @@ class Stage0PretrainingModel(nn.Module):
                     nn.init.zeros_(layer.bias)
         nn.init.xavier_uniform_(self.prototype_projection.weight)
         nn.init.xavier_uniform_(self.patch_projection.weight)
+        for layer in self.gps_adapter:
+            if isinstance(layer, nn.Linear):
+                nn.init.xavier_uniform_(layer.weight)
+                if layer.bias is not None:
+                    nn.init.zeros_(layer.bias)
     
     @property
     def T_meta_projected(self) -> torch.Tensor:
@@ -166,6 +182,7 @@ class Stage0PretrainingModel(nn.Module):
         """
         # Image features + patch tokens (encoder may be partially unfrozen)
         img_features, patch_tokens = self.image_encoder.get_features_and_patches(images)  # [B, 768], [B, 576, 1024]
+        img_features_norm = F.normalize(img_features, p=2, dim=1)
         
         # Concept embedding (bottleneck output)
         concept_emb = self.concept_bottleneck(img_features)  # [batch, 512]
@@ -173,6 +190,8 @@ class Stage0PretrainingModel(nn.Module):
         
         # GPS embedding
         gps_emb = self.location_encoder(coords)  # [batch, 512]
+        gps_emb_768 = self.gps_adapter(gps_emb)  # [batch, 768]
+        gps_emb_768_norm = F.normalize(gps_emb_768, p=2, dim=1)
 
         # Patch embedding (pooled) for patch-level objectives
         patch_emb = self.patch_projection(patch_tokens)  # [B, 576, 512]
@@ -181,9 +200,13 @@ class Stage0PretrainingModel(nn.Module):
         
         return {
             "img_features": img_features,
+            "img_features_norm": img_features_norm,
+            "patch_tokens": patch_tokens,
             "concept_emb": concept_emb,
             "concept_emb_norm": concept_emb_norm,
             "gps_emb": gps_emb,
+            "gps_emb_768": gps_emb_768,
+            "gps_emb_768_norm": gps_emb_768_norm,
             "patch_emb_norm": patch_emb_norm,
         }
     
@@ -198,6 +221,8 @@ class Stage0PretrainingModel(nn.Module):
         params.extend(self.prototype_projection.parameters())
         # Patch projection
         params.extend(self.patch_projection.parameters())
+        # GPS adapter
+        params.extend(self.gps_adapter.parameters())
         # Location encoder
         params.extend(self.location_encoder.parameters())
         return params
@@ -289,6 +314,7 @@ def validate(
     total_loss_hierarchy = 0
     total_loss_patch_gps = 0
     total_loss_anchor = 0
+    total_loss_patch_anchor = 0
     total_count = 0
     
     for batch in dataloader:
@@ -302,10 +328,13 @@ def validate(
         concept_emb_norm = outputs["concept_emb_norm"]
         patch_emb_norm = outputs["patch_emb_norm"]
         gps_emb = outputs["gps_emb"]
+        img_features_norm = outputs["img_features_norm"]
+        gps_emb_768_norm = outputs["gps_emb_768_norm"]
         img_features = outputs["img_features"]
+        patch_tokens = outputs["patch_tokens"]
         
         # Compute losses
-        loss_gps = clip_contrastive_loss(concept_emb_norm, gps_emb, args.temperature)
+        loss_gps = clip_contrastive_loss(img_features_norm, gps_emb_768_norm, args.temperature)
         loss_child = concept_prototype_contrastive_loss(
             concept_emb_norm, model.T_meta_projected, concept_idx, args.temperature
         )
@@ -319,10 +348,15 @@ def validate(
         loss_patch_gps = clip_contrastive_loss(patch_emb_norm, gps_emb, args.temperature)
 
         loss_anchor = torch.tensor(0.0, device=device)
+        loss_patch_anchor = torch.tensor(0.0, device=device)
         if anchor_encoder is not None and args.lambda_anchor > 0:
             with torch.no_grad():
                 vanilla_features = anchor_encoder(images)
             loss_anchor = F.mse_loss(img_features.float(), vanilla_features.float())
+            if args.lambda_patch_anchor > 0:
+                with torch.no_grad():
+                    vanilla_patches = anchor_encoder.get_patch_tokens(images)  # [B, 576, 1024]
+                loss_patch_anchor = F.mse_loss(patch_tokens.float(), vanilla_patches.float())
         
         loss = (
             args.lambda_gps * loss_gps +
@@ -330,7 +364,8 @@ def validate(
             args.lambda_parent * loss_parent +
             args.lambda_hierarchy * loss_hierarchy +
             args.lambda_patch_gps * loss_patch_gps +
-            args.lambda_anchor * loss_anchor
+            args.lambda_anchor * loss_anchor +
+            args.lambda_patch_anchor * loss_patch_anchor
         )
         
         batch_size = len(images)
@@ -341,6 +376,7 @@ def validate(
         total_loss_hierarchy += loss_hierarchy.item() * batch_size
         total_loss_patch_gps += loss_patch_gps.item() * batch_size
         total_loss_anchor += loss_anchor.item() * batch_size
+        total_loss_patch_anchor += loss_patch_anchor.item() * batch_size
         total_count += batch_size
     
     return {
@@ -351,6 +387,7 @@ def validate(
         "loss_hierarchy": total_loss_hierarchy / total_count,
         "loss_patch_gps": total_loss_patch_gps / total_count,
         "loss_anchor": total_loss_anchor / total_count,
+        "loss_patch_anchor": total_loss_patch_anchor / total_count,
     }
 
 
@@ -544,9 +581,19 @@ def train(args):
     # ========================================================================
     # SETUP OPTIMIZER AND SCHEDULER
     # ========================================================================
+    # Optimizer with param groups: use a smaller LR for encoder params to reduce forgetting.
+    encoder_params = list(image_encoder.get_trainable_params())
+    non_encoder_params = []
+    encoder_param_ids = {id(p) for p in encoder_params}
+    for p in trainable_params:
+        if id(p) not in encoder_param_ids:
+            non_encoder_params.append(p)
+
     optimizer = torch.optim.AdamW(
-        trainable_params,
-        lr=args.lr,
+        [
+            {"params": encoder_params, "lr": args.encoder_lr},
+            {"params": non_encoder_params, "lr": args.lr},
+        ],
         weight_decay=args.weight_decay,
     )
     
@@ -609,10 +656,13 @@ def train(args):
                 concept_emb_norm = outputs["concept_emb_norm"]
                 patch_emb_norm = outputs["patch_emb_norm"]
                 gps_emb = outputs["gps_emb"]
+                img_features_norm = outputs["img_features_norm"]
+                gps_emb_768_norm = outputs["gps_emb_768_norm"]
                 img_features = outputs["img_features"]
+                patch_tokens = outputs["patch_tokens"]
                 
                 # 1. Image-GPS contrastive
-                loss_gps = clip_contrastive_loss(concept_emb_norm, gps_emb, args.temperature)
+                loss_gps = clip_contrastive_loss(img_features_norm, gps_emb_768_norm, args.temperature)
                 
                 # 2. Image-Child Concept contrastive
                 loss_child = concept_prototype_contrastive_loss(
@@ -632,10 +682,15 @@ def train(args):
                 loss_patch_gps = clip_contrastive_loss(patch_emb_norm, gps_emb, args.temperature)
 
                 loss_anchor = torch.tensor(0.0, device=device)
+                loss_patch_anchor = torch.tensor(0.0, device=device)
                 if anchor_encoder is not None and args.lambda_anchor > 0:
                     with torch.no_grad():
                         vanilla_features = anchor_encoder(images)
                     loss_anchor = F.mse_loss(img_features.float(), vanilla_features.float())
+                    if args.lambda_patch_anchor > 0:
+                        with torch.no_grad():
+                            vanilla_patches = anchor_encoder.get_patch_tokens(images)  # [B, 576, 1024]
+                        loss_patch_anchor = F.mse_loss(patch_tokens.float(), vanilla_patches.float())
                 
                 # Total loss
                 loss = (
@@ -644,7 +699,8 @@ def train(args):
                     args.lambda_parent * loss_parent +
                     args.lambda_hierarchy * loss_hierarchy +
                     args.lambda_patch_gps * loss_patch_gps +
-                    args.lambda_anchor * loss_anchor
+                    args.lambda_anchor * loss_anchor +
+                    args.lambda_patch_anchor * loss_patch_anchor
                 )
                 
                 loss = loss / args.gradient_accumulation_steps
@@ -787,6 +843,12 @@ if __name__ == "__main__":
     parser.add_argument("--stage0_epochs", type=int, default=20)
     parser.add_argument("--batch_size", type=int, default=128)
     parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument(
+        "--encoder_lr",
+        type=float,
+        default=3e-5,
+        help="Learning rate for trainable StreetCLIP encoder params (use smaller than --lr to reduce forgetting).",
+    )
     parser.add_argument("--weight_decay", type=float, default=0.01)
     parser.add_argument("--gradient_accumulation_steps", type=int, default=1)
     parser.add_argument("--max_grad_norm", type=float, default=1.0)
@@ -799,6 +861,7 @@ if __name__ == "__main__":
     parser.add_argument("--lambda_hierarchy", type=float, default=0.3, help="Weight for Child-Parent consistency loss")
     parser.add_argument("--lambda_patch_gps", type=float, default=0.2, help="Weight for Patch-GPS contrastive loss (Stage2-aligned)")
     parser.add_argument("--lambda_anchor", type=float, default=0.01, help="Weight for anchor loss to keep encoder close to vanilla features")
+    parser.add_argument("--lambda_patch_anchor", type=float, default=0.01, help="Weight for patch-token anchor loss to keep patch tokens close to vanilla")
     parser.add_argument("--temperature", type=float, default=0.07, help="Contrastive loss temperature")
     
     # Misc

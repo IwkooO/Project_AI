@@ -71,6 +71,9 @@ python scripts/training/train_stage2_cross_attention.py \
     --lambda_cell $LAMBDA_CELL \
     --lambda_offset $LAMBDA_OFFSET \
     --ablation_mode $ABLATION_MODE \
+    --cell_weighting inverse_freq \
+    --finetune_stage1_bottleneck \
+    --stage1_lr 1e-5 \
     --num_workers 8 \
     --amp \
     --use_wandb 

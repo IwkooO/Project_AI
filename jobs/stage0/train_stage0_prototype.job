@@ -22,6 +22,7 @@ export PATH="$CONDA_PREFIX/bin:$PATH"
 STAGE0_EPOCHS=20
 BATCH_SIZE=128
 LR=1e-4
+ENCODER_LR=3e-5
 UNFREEZE_LAYERS=2
 
 # Loss weights
@@ -31,6 +32,7 @@ LAMBDA_PARENT=0.5
 LAMBDA_HIERARCHY=0.3
 LAMBDA_PATCH_GPS=0.2
 LAMBDA_ANCHOR=0.01
+LAMBDA_PATCH_ANCHOR=0.01
 TEMPERATURE=0.07
 
 DATA_ROOT=/scratch-shared/pnair/Project_AI/data
@@ -46,6 +48,7 @@ python scripts/training/train_stage0_prototype.py \
     --stage0_epochs ${STAGE0_EPOCHS} \
     --batch_size ${BATCH_SIZE} \
     --lr ${LR} \
+    --encoder_lr ${ENCODER_LR} \
     --weight_decay 0.01 \
     --unfreeze_layers ${UNFREEZE_LAYERS} \
     --finetune_text_encoder \
@@ -55,6 +58,7 @@ python scripts/training/train_stage0_prototype.py \
     --lambda_hierarchy ${LAMBDA_HIERARCHY} \
     --lambda_patch_gps ${LAMBDA_PATCH_GPS} \
     --lambda_anchor ${LAMBDA_ANCHOR} \
+    --lambda_patch_anchor ${LAMBDA_PATCH_ANCHOR} \
     --temperature ${TEMPERATURE} \
     --gradient_accumulation_steps 1 \
     --max_grad_norm 1.0 \
