@@ -1,0 +1,1 @@
+/scratch-shared/pnair/Project_AI/results/stage1-prototype/geolocal_StreetCLIP/2025-12-24_19-10-45/checkpoints/best_model_stage1.pt

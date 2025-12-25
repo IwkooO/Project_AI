@@ -6,3 +6,8 @@ results/
 *.env
 .cursor/
 wandb/
+cache/
+*_cache/
+hf_home/
+torch_home/
+matplotlib_cache/

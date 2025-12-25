@@ -830,7 +830,7 @@ def validate(
     if stage1_model is not None:
         stage1_model.eval()
     
-    criterion_cell = nn.CrossEntropyLoss(weight=getattr(args, "cell_class_weights", None))
+    criterion_cell = nn.CrossEntropyLoss()
     
     total_loss = 0.0
     total_cell_acc = 0.0
@@ -943,7 +943,7 @@ def train_epoch(
     if stage1_model is not None:
         stage1_model.eval()  # Keep Stage 1 frozen
     
-    criterion_cell = nn.CrossEntropyLoss(weight=getattr(args, "cell_class_weights", None))
+    criterion_cell = nn.CrossEntropyLoss()
     
     total_loss = 0.0
     n_batches = 0
@@ -956,42 +956,17 @@ def train_epoch(
         coordinates = coordinates.to(device)
         cell_labels = cell_labels.to(device)
         
-        # Get concept embeddings + patch tokens efficiently.
-        # Encoder is frozen; Stage1 bottleneck may be optionally finetuned.
-        if getattr(args, "finetune_stage1_bottleneck", False):
-            # Compute img_features + patch_tokens without grad (encoder frozen), but allow grad through bottleneck.
-            if args.ablation_mode == "concept_only":
-                if args.amp and images.is_cuda:
-                    with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-                        img_features = image_encoder(images)
-                else:
-                    img_features = image_encoder(images)
-                img_features_f32 = img_features.float() if img_features.dtype != torch.float32 else img_features
-                concept_embs = stage1_model.concept_bottleneck(img_features_f32)
-                patch_tokens = torch.empty((images.size(0), 0, args.patch_dim), device=images.device, dtype=images.dtype)
-            else:
-                # both / image_only need patch tokens (one forward)
-                if args.amp and images.is_cuda:
-                    with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
-                        img_features, patch_tokens = image_encoder.get_features_and_patches(images)
-                else:
-                    img_features, patch_tokens = image_encoder.get_features_and_patches(images)
-                if args.ablation_mode == "image_only":
-                    concept_embs = torch.zeros((images.size(0), args.concept_dim), device=images.device, dtype=img_features.dtype)
-                else:
-                    img_features_f32 = img_features.float() if img_features.dtype != torch.float32 else img_features
-                    concept_embs = stage1_model.concept_bottleneck(img_features_f32)
-        else:
-            with torch.no_grad():
-                concept_embs, patch_tokens = compute_concept_emb_and_patches(
-                    images=images,
-                    image_encoder=image_encoder,
-                    stage1_model=stage1_model,
-                    ablation_mode=args.ablation_mode,
-                    patch_dim=args.patch_dim,
-                    concept_dim=args.concept_dim,
-                    use_amp=args.amp,
-                )
+        # Get concept embeddings + patch tokens efficiently (encoder + Stage1 are frozen)
+        with torch.no_grad():
+            concept_embs, patch_tokens = compute_concept_emb_and_patches(
+                images=images,
+                image_encoder=image_encoder,
+                stage1_model=stage1_model,
+                ablation_mode=args.ablation_mode,
+                patch_dim=args.patch_dim,
+                concept_dim=args.concept_dim,
+                use_amp=args.amp,
+            )
         
         # Forward pass through trainable head
         optimizer.zero_grad()
@@ -1098,27 +1073,6 @@ def main():
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--amp", action="store_true", default=False,
                         help="Use autocast (bfloat16) for frozen encoder/Stage1 forward to speed up.")
-
-    parser.add_argument(
-        "--cell_weighting",
-        type=str,
-        default="inverse_freq",
-        choices=["none", "inverse_freq"],
-        help="How to weight geocell classes in CrossEntropyLoss.",
-    )
-
-    parser.add_argument(
-        "--finetune_stage1_bottleneck",
-        action="store_true",
-        default=False,
-        help="If set, finetune Stage1 concept bottleneck during Stage2 with a small LR (encoder stays frozen).",
-    )
-    parser.add_argument(
-        "--stage1_lr",
-        type=float,
-        default=1e-5,
-        help="Learning rate for Stage1 bottleneck params if --finetune_stage1_bottleneck is set.",
-    )
     
     # Loss weights
     parser.add_argument("--lambda_cell", type=float, default=1.0)
@@ -1501,20 +1455,6 @@ def main():
     )
     
     logger.info(f"Train: {len(train_dataset)}, Val: {len(val_dataset)}, Test: {len(test_dataset)}")
-
-    # Build inverse-frequency weights for geocell classes (train split only) if requested.
-    args.cell_class_weights = None
-    if args.cell_weighting == "inverse_freq":
-        train_counts = torch.bincount(train_dataset.cell_labels, minlength=num_cells).float()
-        train_counts = train_counts.clamp(min=1.0)
-        inv = 1.0 / train_counts
-        # Normalize weights so mean ~= 1.0 for stable CE magnitudes
-        inv = inv * (inv.numel() / inv.sum())
-        args.cell_class_weights = inv.to(device)
-        logger.info(
-            f"Using inverse-frequency cell weights (min={args.cell_class_weights.min().item():.4f}, "
-            f"max={args.cell_class_weights.max().item():.4f})"
-        )
     
     # Create dataloaders
     dataloader_extra_kwargs = {}
@@ -1569,19 +1509,8 @@ def main():
     )
     model.to(device)
     
-    # Optionally unfreeze Stage1 bottleneck for Stage2 finetuning
-    stage1_params = []
-    if stage1_model is not None and args.finetune_stage1_bottleneck:
-        for p in stage1_model.concept_bottleneck.parameters():
-            p.requires_grad = True
-        stage1_params = list(stage1_model.concept_bottleneck.parameters())
-        logger.info(f"Finetuning Stage1 concept_bottleneck in Stage2 (params={sum(p.numel() for p in stage1_params):,})")
-
-    # Optimizer (Stage 2 head + optional Stage1 bottleneck)
-    param_groups = [{"params": model.parameters(), "lr": args.lr}]
-    if stage1_params:
-        param_groups.append({"params": stage1_params, "lr": args.stage1_lr})
-    optimizer = torch.optim.AdamW(param_groups, weight_decay=args.weight_decay)
+    # Optimizer (only Stage 2 head parameters)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
     
     logger.info("Starting Stage 2 Cross-Attention Training...")

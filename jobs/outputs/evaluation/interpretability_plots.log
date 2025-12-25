@@ -1,0 +1,67 @@
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+=============================================
+Interpretability Plots Generation
+=============================================
+Batch mode: Auto-detecting latest Stage 2 checkpoints
+Results root: results
+Using splits: /scratch-shared/pnair/Project_AI/results/stage1-prototype/vanilla_streetclip_no_stage0/2025-12-21_10-48-19/splits.json
+Split: test
+=============================================
+INFO:__main__:Using device: cuda
+INFO:__main__:Loading world basemap...
+WARNING:__main__:Could not load Natural Earth dataset: The geopandas.dataset has been deprecated and was removed in GeoPandas 1.0. You can get the original 'naturalearth_lowres' data from https://www.naturalearthdata.com/downloads/110m-cultural-vectors/.
+INFO:__main__:Creating minimal world basemap...
+INFO:__main__:Loading splits from /scratch-shared/pnair/Project_AI/results/stage1-prototype/vanilla_streetclip_no_stage0/2025-12-21_10-48-19/splits.json
+INFO:__main__:Test split: 4304 samples
+INFO:__main__:Loading dataset from data/dataset-43k-mapped.csv
+Building dataset:   0%|          | 0/30436 [00:00<?, ?it/s]Building dataset:   0%|          | 41/30436 [00:00<01:14, 409.01it/s]Building dataset:   0%|          | 100/30436 [00:00<01:07, 451.37it/s]Building dataset:   1%|          | 187/30436 [00:00<00:52, 579.73it/s]Building dataset:   2%|▏         | 492/30436 [00:00<00:22, 1356.60it/s]Building dataset:   2%|▏         | 711/30436 [00:00<00:19, 1542.34it/s]Building dataset:   3%|▎         | 1016/30436 [00:00<00:15, 1945.75it/s]Building dataset:   4%|▍         | 1299/30436 [00:00<00:13, 2178.75it/s]Building dataset:   5%|▌         | 1638/30436 [00:00<00:11, 2442.72it/s]Building dataset:   7%|▋         | 1996/30436 [00:01<00:10, 2717.68it/s]Building dataset:   7%|▋         | 2270/30436 [00:01<00:10, 2567.07it/s]Building dataset:   8%|▊         | 2529/30436 [00:01<00:11, 2488.80it/s]Building dataset:   9%|▉         | 2780/30436 [00:01<00:11, 2430.66it/s]Building dataset:  10%|█         | 3152/30436 [00:01<00:09, 2790.28it/s]Building dataset:  11%|█▏        | 3435/30436 [00:01<00:10, 2662.87it/s]Building dataset:  12%|█▏        | 3705/30436 [00:01<00:10, 2443.65it/s]Building dataset:  13%|█▎        | 4050/30436 [00:01<00:09, 2692.97it/s]Building dataset:  15%|█▍        | 4475/30436 [00:01<00:08, 3040.16it/s]Building dataset:  17%|█▋        | 5069/30436 [00:02<00:06, 3733.01it/s]Building dataset:  18%|█▊        | 5447/30436 [00:02<00:06, 3593.99it/s]Building dataset:  19%|█▉        | 5810/30436 [00:02<00:07, 3293.35it/s]Building dataset:  22%|██▏       | 6616/30436 [00:02<00:05, 4551.33it/s]Building dataset:  24%|██▍       | 7312/30436 [00:02<00:04, 5211.41it/s]Building dataset:  26%|██▌       | 7854/30436 [00:02<00:04, 4672.89it/s]Building dataset:  28%|██▊       | 8663/30436 [00:02<00:03, 5570.68it/s]Building dataset:  30%|███       | 9250/30436 [00:02<00:05, 3990.52it/s]Building dataset:  32%|███▏      | 9731/30436 [00:03<00:05, 3941.77it/s]Building dataset:  33%|███▎      | 10182/30436 [00:03<00:05, 3788.07it/s]Building dataset:  35%|███▍      | 10599/30436 [00:03<00:05, 3383.69it/s]Building dataset:  36%|███▌      | 10968/30436 [00:03<00:06, 3165.65it/s]Building dataset:  37%|███▋      | 11305/30436 [00:03<00:06, 3071.10it/s]Building dataset:  39%|███▉      | 11820/30436 [00:03<00:05, 3561.37it/s]Building dataset:  40%|████      | 12199/30436 [00:03<00:06, 2711.90it/s]Building dataset:  42%|████▏     | 12875/30436 [00:04<00:04, 3517.55it/s]Building dataset:  44%|████▎     | 13284/30436 [00:04<00:05, 3336.74it/s]Building dataset:  45%|████▍     | 13658/30436 [00:04<00:04, 3361.15it/s]Building dataset:  48%|████▊     | 14672/30436 [00:04<00:03, 4803.53it/s]Building dataset:  50%|█████     | 15271/30436 [00:04<00:03, 5019.66it/s]Building dataset:  52%|█████▏    | 15957/30436 [00:04<00:02, 5283.14it/s]Building dataset:  54%|█████▍    | 16585/30436 [00:04<00:02, 5539.87it/s]Building dataset:  58%|█████▊    | 17617/30436 [00:04<00:01, 6513.07it/s]Building dataset:  60%|██████    | 18387/30436 [00:05<00:01, 6832.53it/s]Building dataset:  63%|██████▎   | 19080/30436 [00:05<00:01, 6665.69it/s]Building dataset:  67%|██████▋   | 20286/30436 [00:05<00:01, 8063.92it/s]Building dataset:  69%|██████▉   | 21103/30436 [00:05<00:01, 7550.73it/s]Building dataset:  72%|███████▏  | 21952/30436 [00:05<00:01, 7641.30it/s]Building dataset:  75%|███████▍  | 22725/30436 [00:05<00:01, 7106.36it/s]Building dataset:  78%|███████▊  | 23723/30436 [00:05<00:00, 7711.73it/s]Building dataset:  81%|████████▏ | 24784/30436 [00:05<00:00, 8496.19it/s]Building dataset:  84%|████████▍ | 25650/30436 [00:05<00:00, 7525.93it/s]Building dataset:  87%|████████▋ | 26472/30436 [00:06<00:00, 7530.70it/s]Building dataset:  90%|█████████ | 27521/30436 [00:06<00:00, 8150.28it/s]Building dataset:  93%|█████████▎| 28354/30436 [00:06<00:00, 7508.09it/s]Building dataset:  96%|█████████▌| 29291/30436 [00:06<00:00, 7992.37it/s]Building dataset:  99%|█████████▉| 30111/30436 [00:06<00:00, 7658.60it/s]Building dataset: 100%|██████████| 30436/30436 [00:06<00:00, 4648.81it/s]
+INFO:__main__:Dataset: 4304 samples
+INFO:__main__:Batch mode: Auto-detecting latest Stage 2 checkpoints...
+INFO:__main__:Found latest Stage 2 checkpoint: results/stage2_cross_attention_both/2025-12-23_20-08-07/checkpoints/best_model_stage2_xattn.pt (variant=finetuned, mode=both)
+INFO:__main__:Found latest Stage 2 checkpoint: results/stage2_cross_attention_both/vanilla_stage1/2025-12-24_12-23-31/checkpoints/best_model_stage2_xattn.pt (variant=vanilla, mode=both)
+INFO:__main__:Found latest Stage 2 checkpoint: results/stage2_cross_attention_concept_only/2025-12-23_20-08-06/checkpoints/best_model_stage2_xattn.pt (variant=finetuned, mode=concept_only)
+INFO:__main__:Found latest Stage 2 checkpoint: results/stage2_cross_attention_concept_only/vanilla_stage1/2025-12-24_12-23-31/checkpoints/best_model_stage2_xattn.pt (variant=vanilla, mode=concept_only)
+INFO:__main__:Found latest Stage 2 checkpoint: results/stage2_cross_attention_image_only/2025-12-23_20-08-06/checkpoints/best_model_stage2_xattn.pt (variant=finetuned, mode=image_only)
+INFO:__main__:Found latest Stage 2 checkpoint: results/stage2_cross_attention_image_only/vanilla_stage1/2025-12-24_12-23-30/checkpoints/best_model_stage2_xattn.pt (variant=vanilla, mode=image_only)
+INFO:__main__:Found 6 checkpoint(s) to process
+INFO:__main__:
+============================================================
+INFO:__main__:Processing: results/stage2_cross_attention_both/2025-12-23_20-08-07/checkpoints/best_model_stage2_xattn.pt
+INFO:__main__:Tag: finetuned_both
+INFO:__main__:============================================================
+INFO:__main__:Loading Stage 2 checkpoint from results/stage2_cross_attention_both/2025-12-23_20-08-07/checkpoints/best_model_stage2_xattn.pt
+INFO:__main__:Stage1 indicates vanilla lineage (no Stage0 checkpoint); using base encoder weights
+INFO:scripts.training.train_stage2_cross_attention:Loading Stage 1 checkpoint from /scratch-shared/pnair/Project_AI/results/stage1-prototype/geolocal_StreetCLIP/2025-12-15_10-09-20/checkpoints/best_model_stage1.pt
+INFO:scripts.training.train_stage2_cross_attention:Loaded Stage 1 model with 2105 concepts, 236 parents
+Traceback (most recent call last):
+  File "/gpfs/scratch1/shared/pnair/Project_AI/scripts/analysis/interpretability_plots.py", line 890, in <module>
+    main()
+  File "/gpfs/scratch1/shared/pnair/Project_AI/scripts/analysis/interpretability_plots.py", line 767, in main
+    model, image_encoder, stage1_model, cell_centers, concept_info, ckpt = load_stage2_checkpoint(
+                                                                           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/gpfs/scratch1/shared/pnair/Project_AI/scripts/analysis/interpretability_plots.py", line 181, in load_stage2_checkpoint
+    model.load_state_dict(ckpt["model_state_dict"])
+  File "/home/pnair/.conda/envs/streetview_pnair/lib/python3.11/site-packages/torch/nn/modules/module.py", line 2581, in load_state_dict
+    raise RuntimeError(
+RuntimeError: Error(s) in loading state_dict for Stage2CrossAttentionGeoHead:
+	Missing key(s) in state_dict: "patch_proj.0.weight", "patch_proj.0.bias", "patch_proj.1.weight", "patch_proj.1.bias", "cross_attn.in_proj_weight", "cross_attn.in_proj_bias", "cross_attn.out_proj.weight", "cross_attn.out_proj.bias", "attn_norm.weight", "attn_norm.bias", "ffn.0.weight", "ffn.0.bias", "ffn.3.weight", "ffn.3.bias", "ffn_norm.weight", "ffn_norm.bias". 
+	Unexpected key(s) in state_dict: "image_proj.0.weight", "image_proj.0.bias", "image_proj.1.weight", "image_proj.1.bias". 
+
+=============================================
+Interpretability plots generation complete!
+Check output directory: results/interpretability/
+=============================================
