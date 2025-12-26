@@ -43,6 +43,9 @@
 \DeclareTranslation{dutch}{tutor}{Tutor}
 \DeclareTranslation{english}{tutor}{Tutor}
 
+\DeclareTranslation{dutch}{mentor}{Mentor}
+\DeclareTranslation{english}{mentor}{Mentor}
+
 \DeclareTranslation{dutch}{of}{van}
 \DeclareTranslation{english}{of}{of}
 
@@ -72,9 +75,6 @@
 
 \newcommand*{\assignment}[1]{\gdef\@assignment{#1}}
 \newcommand*{\@assignment}{$\backslash assignment\{\}$ is unset}
-
-\newcommand*{\assignmenttype}[1]{\gdef\@assignmenttype{#1}}
-\newcommand*{\@assignmenttype}{$\backslash assignmenttype\{\}$ is unset}
 
 \newcommand*{\tutor}[1]{\gdef\@tutor{#1}}
 \newcommand*{\@tutor}{}
@@ -191,7 +191,7 @@
 \renewcommand{\headrulewidth}{0pt}
 \lhead{\includegraphics[width=5cm]{\GetTranslation{uva_logo}}}
 \chead{\raisebox{-\baselineskip}{\andreaslineslim}}
-\rhead{\footnotesize \textsc {\@assignmenttype\\ \@assignment}}
+\rhead{\footnotesize \textsc {\@assignment}}
 \lfoot
 {
 \footnotesize
@@ -240,49 +240,18 @@
 	\textsc{\Large \@assignment}\\[0.4cm]
 	{ \huge \bfseries \@title}\\[0.3cm]
 	\andreasline \\[0.2cm]
-	{\large \@date  \\[0.4cm]}
-
-	\begin{minipage}{0.4\textwidth}
-		\begin{flushleft}
-			\emph{\ifnum\value{authorcount}>1\relax
-                    \GetTranslation{students}%
-                  \else
-                    \GetTranslation{student}%
-                  \fi:}\\
-			\foreach \index in {1, ..., \value{authorcount}} {%
-                {\getprefix{author\index}\\ {\small \getprefix{uva\index}\\[0.2cm]}}
-            }
-		\end{flushleft}
-	\end{minipage}
-~
-	\begin{minipage}{0.4\textwidth}
-		\begin{flushright}
-			\ifdefempty{\@tutor}{}{
-    			\emph{\GetTranslation{tutor}:} \\
-    			\@tutor \\[0.2cm]
-			}
-			\ifdefempty{\@mentor}{}{
-    			\emph{\GetTranslation{mentor}:} \\
-    			\@mentor \\[0.2cm]
-			}
-			\ifdefempty{\@group}{}{
-    			\emph{\GetTranslation{group}:} \\
-    			\@group \\[0.2cm]
-    		}
-			\ifdefempty{\@docent}{}{
-    			\emph{\GetTranslation{lecturer}:} \\
-    			\@docent \\[0.2cm]
-    		}
-			\ifdefempty{\@course}{}{
-    			\emph{\GetTranslation{course}:} \\
-    			\@course \\[0.2cm]
-    		}
-			\ifdefempty{\@courseid}{}{
-    			\emph{\GetTranslation{course_id}:} \\
-    			\@courseid \\[0.2cm]
-			}
-		\end{flushright}
-	\end{minipage}\\[1cm]
+	
+	% Author name (centered, horizontally aligned)
+	\foreach \index in {1, ..., \value{authorcount}} {%
+        {\large \getprefix{author\index}\\[0.1cm]}
+        {\small \getprefix{uva\index}\\[0.2cm]}
+    }
+	
+	% Mentor
+	\ifdefempty{\@mentor}{}{
+		\emph{\GetTranslation{mentor}:} \\
+		\@mentor \\[0.4cm]
+	}
  \end{center}
 }
 

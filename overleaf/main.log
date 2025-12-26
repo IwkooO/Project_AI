@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2024.11.30)  26 DEC 2025 16:14
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2024.11.30)  26 DEC 2025 16:54
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -879,25 +879,25 @@ Package csquotes Info: Redefining alias 'default' -> 'english'.
  (./main.aux)
 \openout1 = `main.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 45.
-LaTeX Font Info:    ... okay on input line 45.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 45.
-LaTeX Font Info:    ... okay on input line 45.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 45.
-LaTeX Font Info:    ... okay on input line 45.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 45.
-LaTeX Font Info:    ... okay on input line 45.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 45.
-LaTeX Font Info:    ... okay on input line 45.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 45.
-LaTeX Font Info:    ... okay on input line 45.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 45.
-LaTeX Font Info:    ... okay on input line 45.
-LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 45.
-LaTeX Font Info:    ... okay on input line 45.
-LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 45.
-LaTeX Font Info:    ... okay on input line 45.
-Package hyperref Info: Link coloring OFF on input line 45.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 41.
+LaTeX Font Info:    ... okay on input line 41.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 41.
+LaTeX Font Info:    ... okay on input line 41.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 41.
+LaTeX Font Info:    ... okay on input line 41.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 41.
+LaTeX Font Info:    ... okay on input line 41.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 41.
+LaTeX Font Info:    ... okay on input line 41.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 41.
+LaTeX Font Info:    ... okay on input line 41.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 41.
+LaTeX Font Info:    ... okay on input line 41.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 41.
+LaTeX Font Info:    ... okay on input line 41.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 41.
+LaTeX Font Info:    ... okay on input line 41.
+Package hyperref Info: Link coloring OFF on input line 41.
  (/usr/share/texlive/texmf-dist/tex/latex/hyperref/nameref.sty
 Package: nameref 2021-04-02 v2.47 Cross-referencing by name of section
  (/usr/share/texlive/texmf-dist/tex/latex/refcount/refcount.sty
@@ -907,9 +907,9 @@ Package: gettitlestring 2019/12/15 v1.6 Cleanup title references (HO)
 )
 \c@section@level=\count475
 )
-LaTeX Info: Redefining \ref on input line 45.
-LaTeX Info: Redefining \pageref on input line 45.
-LaTeX Info: Redefining \nameref on input line 45.
+LaTeX Info: Redefining \ref on input line 41.
+LaTeX Info: Redefining \pageref on input line 41.
+LaTeX Info: Redefining \nameref on input line 41.
  (./main.out) (./main.out)
 \@outlinefile=\write6
 \openout6 = `main.out'.
@@ -935,12 +935,12 @@ File: epstopdf-sys.cfg 2010/07/13 v1.3 Configuration of (r)epstopdf for TeX Live
 ))
 Package lastpage Info: Please have a look at the pageslts package at
 (lastpage)             https://www.ctan.org/pkg/pageslts
-(lastpage)             ! on input line 45.
-Package ragged2e Info: ABD: executing \RaggedRight on input line 45.
+(lastpage)             ! on input line 41.
+Package ragged2e Info: ABD: executing \RaggedRight on input line 41.
  (/usr/share/texlive/texmf-dist/tex/latex/translations/translations-basic-dictionary-english.trsl
 File: translations-basic-dictionary-english.trsl (english translation file `translations-basic-dictionary')
 )
-Package translations Info: loading dictionary `translations-basic-dictionary' for `english'. on input line 45.
+Package translations Info: loading dictionary `translations-basic-dictionary' for `english'. on input line 41.
 
 *geometry* driver: auto-detecting
 *geometry* detected driver: pdftex
@@ -991,21 +991,22 @@ Package biblatex Info: Automatic encoding selection.
 Package biblatex Info: Trying to load bibliographic data...
 Package biblatex Info: ... file 'main.bbl' found.
  (./main.bbl)
-Package biblatex Info: Reference section=0 on input line 45.
-Package biblatex Info: Reference segment=0 on input line 45.
+Package biblatex Info: Reference section=0 on input line 41.
+Package biblatex Info: Reference segment=0 on input line 41.
 <logo/logoUvA_en.pdf, id=71, 258.9675pt x 28.01506pt>
 File: logo/logoUvA_en.pdf Graphic file (type pdf)
 <use logo/logoUvA_en.pdf>
-Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 46.
+Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 42.
 (pdftex.def)             Requested size: 199.16928pt x 21.54686pt.
-LaTeX Font Info:    Trying to load font information for U+msa on input line 46.
+ (./main.toc
+LaTeX Font Info:    Trying to load font information for U+msa on input line 8.
  (/usr/share/texlive/texmf-dist/tex/latex/amsfonts/umsa.fd
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 )
-LaTeX Font Info:    Trying to load font information for U+msb on input line 46.
+LaTeX Font Info:    Trying to load font information for U+msb on input line 8.
  (/usr/share/texlive/texmf-dist/tex/latex/amsfonts/umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
-) (./main.toc)
+))
 \tf@toc=\write7
 \openout7 = `main.toc'.
 
@@ -1017,294 +1018,230 @@ runsystem(texcount -1 -sum=1,1,1,0,0,1,1. -merge -q -nobib main.tex > main-words
 
 pdfTeX warning: pdflatex (file ./logo/logoUvA_en.pdf): PDF inclusion: multiple pdfs with page group included in a single page
 >]
-Overfull \hbox (0.37625pt too wide) in paragraph at lines 88--89
+Overfull \hbox (0.37625pt too wide) in paragraph at lines 84--85
 \OT1/cmr/m/n/10 and Philbin []2016[]) demon-strated that train-ing CNNs to clas-sify im-ages into ap-prox-i-mately 26,000 
  []
 
 File: logo/logoUvA_en.pdf Graphic file (type pdf)
 <use logo/logoUvA_en.pdf>
-Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 89.
+Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 85.
 (pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
-
-Package fancyhdr Warning: \headheight is too small (27.3908pt): 
-(fancyhdr)                Make it at least 27.5pt, for example:
-(fancyhdr)                \setlength{\headheight}{27.5pt}.
-(fancyhdr)                You might also make \topmargin smaller to compensate:
-(fancyhdr)                \addtolength{\topmargin}{-0.1092pt}.
-
 [2]
-Overfull \hbox (0.13339pt too wide) in paragraph at lines 90--91
+Overfull \hbox (0.13339pt too wide) in paragraph at lines 86--87
  []\OT1/cmr/bx/n/10 Concept Bot-tle-neck Mod-els.[] \OT1/cmr/m/n/10 The con-cept bot-tle-neck frame-work ([]Koh et al. []2020[]) ad-dresses 
  []
 
 
-Overfull \hbox (6.09956pt too wide) in paragraph at lines 92--93
+Overfull \hbox (6.09956pt too wide) in paragraph at lines 88--89
  []\OT1/cmr/bx/n/10 Vision-Language Mod-els for Ge-olo-ca-tion.[] \OT1/cmr/m/n/10 CLIP ([]Rad-ford et al. []2021[]) learns aligned vision- 
  []
 
 
-Overfull \hbox (0.3206pt too wide) in paragraph at lines 92--93
+Overfull \hbox (0.3206pt too wide) in paragraph at lines 88--89
 \OT1/cmr/m/n/10 language rep-re-sen-ta-tions through con-trastive learn-ing on 400 mil-lion image-text pairs. This foun- 
  []
 
 
-Overfull \hbox (2.73727pt too wide) in paragraph at lines 101--102
+Overfull \hbox (2.73727pt too wide) in paragraph at lines 97--98
 \OT1/cmr/m/n/10 Our ap-proach fol-lows a cur-ricu-lum learn-ing strat-egy ([]Ben-gio et al. []2009[]) that pro-gres-sively builds 
  []
 
 File: logo/logoUvA_en.pdf Graphic file (type pdf)
 <use logo/logoUvA_en.pdf>
-Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 115.
+Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 113.
 (pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
-
-Package fancyhdr Warning: \headheight is too small (27.3908pt): 
-(fancyhdr)                Make it at least 27.5pt, for example:
-(fancyhdr)                \setlength{\headheight}{27.5pt}.
-(fancyhdr)                You might also make \topmargin smaller to compensate:
-(fancyhdr)                \addtolength{\topmargin}{-0.1092pt}.
-
 [3]
 <geocells_map/geocells_map_finetuned_both.png, id=957, 1628.0022pt x 860.013pt>
 File: geocells_map/geocells_map_finetuned_both.png Graphic file (type png)
 <use geocells_map/geocells_map_finetuned_both.png>
-Package pdftex.def Info: geocells_map/geocells_map_finetuned_both.png  used on input line 122.
+Package pdftex.def Info: geocells_map/geocells_map_finetuned_both.png  used on input line 118.
 (pdftex.def)             Requested size: 204.85802pt x 108.20998pt.
 
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 122--123
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 118--119
 [][]  
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 123--123
+Underfull \hbox (badness 10000) in paragraph at lines 119--119
 [] 
  []
 
 <geocells_map/cell_distribution_finetuned_both.png, id=959, 1004.553pt x 570.6921pt>
 File: geocells_map/cell_distribution_finetuned_both.png Graphic file (type png)
 <use geocells_map/cell_distribution_finetuned_both.png>
-Package pdftex.def Info: geocells_map/cell_distribution_finetuned_both.png  used on input line 128.
+Package pdftex.def Info: geocells_map/cell_distribution_finetuned_both.png  used on input line 124.
 (pdftex.def)             Requested size: 204.85802pt x 116.37436pt.
 
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 128--129
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 124--125
 [][]  
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 129--129
+Underfull \hbox (badness 10000) in paragraph at lines 125--125
 [] 
  []
 
 
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 132--132
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 128--128
 [][]  
  []
 
 File: logo/logoUvA_en.pdf Graphic file (type pdf)
 <use logo/logoUvA_en.pdf>
-Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 156.
+Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 159.
 (pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
-
-Package fancyhdr Warning: \headheight is too small (27.3908pt): 
-(fancyhdr)                Make it at least 27.5pt, for example:
-(fancyhdr)                \setlength{\headheight}{27.5pt}.
-(fancyhdr)                You might also make \topmargin smaller to compensate:
-(fancyhdr)                \addtolength{\topmargin}{-0.1092pt}.
-
 [4 <./geocells_map/geocells_map_finetuned_both.png> <./geocells_map/cell_distribution_finetuned_both.png>]
-Overfull \hbox (19.4414pt too wide) in paragraph at lines 171--173
+Overfull \hbox (19.4414pt too wide) in paragraph at lines 167--169
 \OT1/cmr/m/n/10 where $\OML/cmm/m/it/10 T[]$ \OT1/cmr/m/n/10 con-tains frozen text em-bed-dings and $^^A$ is a learn-able resid-ual ini-tial-ized from $\OMS/cmsy/m/n/10 N\OT1/cmr/m/n/10 (0\OML/cmm/m/it/10 ; \OT1/cmr/m/n/10 0\OML/cmm/m/it/10 :\OT1/cmr/m/n/10 01)$. 
  []
 
 File: logo/logoUvA_en.pdf Graphic file (type pdf)
 <use logo/logoUvA_en.pdf>
-Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 202.
+Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 203.
 (pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
-
-Package fancyhdr Warning: \headheight is too small (27.3908pt): 
-(fancyhdr)                Make it at least 27.5pt, for example:
-(fancyhdr)                \setlength{\headheight}{27.5pt}.
-(fancyhdr)                You might also make \topmargin smaller to compensate:
-(fancyhdr)                \addtolength{\topmargin}{-0.1092pt}.
-
 [5]
-Overfull \hbox (0.4317pt too wide) in paragraph at lines 241--242
+Overfull \hbox (0.4317pt too wide) in paragraph at lines 237--238
 \OT1/cmr/m/n/10 We eval-u-ate our ap-proach on both in-distribution test data and an out-of-distribution Ge-oGuessr 
  []
 
 File: logo/logoUvA_en.pdf Graphic file (type pdf)
 <use logo/logoUvA_en.pdf>
-Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 246.
+Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 247.
 (pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
-
-Package fancyhdr Warning: \headheight is too small (27.3908pt): 
-(fancyhdr)                Make it at least 27.5pt, for example:
-(fancyhdr)                \setlength{\headheight}{27.5pt}.
-(fancyhdr)                You might also make \topmargin smaller to compensate:
-(fancyhdr)                \addtolength{\topmargin}{-0.1092pt}.
-
 [6]
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 259--259
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 255--255
 [][]  
  []
 
-<analysis/stage1_accuracies.png, id=1913, 1002.3849pt x 793.5246pt>
+<analysis/stage1_accuracies.png, id=1911, 1002.3849pt x 793.5246pt>
 File: analysis/stage1_accuracies.png Graphic file (type png)
 <use analysis/stage1_accuracies.png>
-Package pdftex.def Info: analysis/stage1_accuracies.png  used on input line 277.
+Package pdftex.def Info: analysis/stage1_accuracies.png  used on input line 273.
 (pdftex.def)             Requested size: 384.1096pt x 304.07309pt.
 
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 278--278
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 274--274
 [][]  
  []
 
 
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 288--288
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 284--284
 [][]  
  []
 
 
-Overfull \hbox (40.18675pt too wide) in paragraph at lines 290--305
+Overfull \hbox (40.18675pt too wide) in paragraph at lines 286--301
  [][] 
  []
 
 File: logo/logoUvA_en.pdf Graphic file (type pdf)
 <use logo/logoUvA_en.pdf>
-Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 310.
+Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 311.
 (pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
-
-Package fancyhdr Warning: \headheight is too small (27.3908pt): 
-(fancyhdr)                Make it at least 27.5pt, for example:
-(fancyhdr)                \setlength{\headheight}{27.5pt}.
-(fancyhdr)                You might also make \topmargin smaller to compensate:
-(fancyhdr)                \addtolength{\topmargin}{-0.1092pt}.
-
 [7]
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 321--321
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 317--317
 [][]  
  []
 
 
-Overfull \hbox (40.18675pt too wide) in paragraph at lines 323--338
+Overfull \hbox (40.18675pt too wide) in paragraph at lines 319--334
  [][] 
  []
 
-<analysis/stage2_test_split_results.png, id=2224, 1002.3849pt x 793.5246pt>
+<analysis/stage2_test_split_results.png, id=2222, 1002.3849pt x 793.5246pt>
 File: analysis/stage2_test_split_results.png Graphic file (type png)
 <use analysis/stage2_test_split_results.png>
-Package pdftex.def Info: analysis/stage2_test_split_results.png  used on input line 349.
+Package pdftex.def Info: analysis/stage2_test_split_results.png  used on input line 345.
 (pdftex.def)             Requested size: 204.85802pt x 162.16504pt.
 
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 349--350
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 345--346
 [][]  
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 350--350
+Underfull \hbox (badness 10000) in paragraph at lines 346--346
 [] 
  []
 
-<analysis/stage2_hf_results.png, id=2225, 1002.3849pt x 793.5246pt>
+<analysis/stage2_hf_results.png, id=2223, 1002.3849pt x 793.5246pt>
 File: analysis/stage2_hf_results.png Graphic file (type png)
 <use analysis/stage2_hf_results.png>
-Package pdftex.def Info: analysis/stage2_hf_results.png  used on input line 355.
+Package pdftex.def Info: analysis/stage2_hf_results.png  used on input line 351.
 (pdftex.def)             Requested size: 204.85802pt x 162.16504pt.
 
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 355--356
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 351--352
 [][]  
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 356--356
+Underfull \hbox (badness 10000) in paragraph at lines 352--352
 [] 
  []
 
 
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 359--359
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 355--355
 [][]  
  []
 
-<analysis/stage2_finetuned_radar.png, id=2227, 1435.0413pt x 454.5783pt>
+<analysis/stage2_finetuned_radar.png, id=2225, 1435.0413pt x 454.5783pt>
 File: analysis/stage2_finetuned_radar.png Graphic file (type png)
 <use analysis/stage2_finetuned_radar.png>
-Package pdftex.def Info: analysis/stage2_finetuned_radar.png  used on input line 370.
+Package pdftex.def Info: analysis/stage2_finetuned_radar.png  used on input line 366.
 (pdftex.def)             Requested size: 204.85802pt x 64.88905pt.
 
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 370--371
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 366--367
 [][]  
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 371--371
+Underfull \hbox (badness 10000) in paragraph at lines 367--367
 [] 
  []
 
-<analysis/stage2_finetuned_lollipop.png, id=2228, 805.8105pt x 568.7649pt>
+<analysis/stage2_finetuned_lollipop.png, id=2226, 805.8105pt x 568.7649pt>
 File: analysis/stage2_finetuned_lollipop.png Graphic file (type png)
 <use analysis/stage2_finetuned_lollipop.png>
-Package pdftex.def Info: analysis/stage2_finetuned_lollipop.png  used on input line 376.
+Package pdftex.def Info: analysis/stage2_finetuned_lollipop.png  used on input line 372.
 (pdftex.def)             Requested size: 204.85802pt x 144.59485pt.
 
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 376--377
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 372--373
 [][]  
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 377--377
+Underfull \hbox (badness 10000) in paragraph at lines 373--373
 [] 
  []
 
 
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 380--380
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 376--376
 [][]  
  []
 
 File: logo/logoUvA_en.pdf Graphic file (type pdf)
 <use logo/logoUvA_en.pdf>
-Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 385.
+Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 390.
 (pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
-
-Package fancyhdr Warning: \headheight is too small (27.3908pt): 
-(fancyhdr)                Make it at least 27.5pt, for example:
-(fancyhdr)                \setlength{\headheight}{27.5pt}.
-(fancyhdr)                You might also make \topmargin smaller to compensate:
-(fancyhdr)                \addtolength{\topmargin}{-0.1092pt}.
-
 [8 <./analysis/stage1_accuracies.png>]
 File: logo/logoUvA_en.pdf Graphic file (type pdf)
 <use logo/logoUvA_en.pdf>
-Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 398.
+Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 395.
 (pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
-
-
-Package fancyhdr Warning: \headheight is too small (27.3908pt): 
-(fancyhdr)                Make it at least 27.5pt, for example:
-(fancyhdr)                \setlength{\headheight}{27.5pt}.
-(fancyhdr)                You might also make \topmargin smaller to compensate:
-(fancyhdr)                \addtolength{\topmargin}{-0.1092pt}.
-
-[9 <./analysis/stage2_test_split_results.png> <./analysis/stage2_hf_results.png>]
-Overfull \hbox (8.15395pt too wide) in paragraph at lines 401--402
+ [9 <./analysis/stage2_test_split_results.png> <./analysis/stage2_hf_results.png>]
+Overfull \hbox (8.15395pt too wide) in paragraph at lines 397--398
 \OT1/cmr/m/n/10 cab-u-lary was de-rived from the train-ing data and may miss im-por-tant ge-o-graphic in-di-ca-tors present 
  []
 
 File: logo/logoUvA_en.pdf Graphic file (type pdf)
 <use logo/logoUvA_en.pdf>
-Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 420.
+Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 416.
 (pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
-
-Package fancyhdr Warning: \headheight is too small (27.3908pt): 
-(fancyhdr)                Make it at least 27.5pt, for example:
-(fancyhdr)                \setlength{\headheight}{27.5pt}.
-(fancyhdr)                You might also make \topmargin smaller to compensate:
-(fancyhdr)                \addtolength{\topmargin}{-0.1092pt}.
-
 [10 <./analysis/stage2_finetuned_radar.png> <./analysis/stage2_finetuned_lollipop.png>]
-Overfull \hbox (97.49756pt too wide) in paragraph at lines 421--421
+Overfull \hbox (97.49756pt too wide) in paragraph at lines 417--417
 \OT1/cmr/m/n/10 View Im-age Clas-si-fi-ca-tion". In: \OT1/cmr/m/it/10 Hug-ging Face Model Hub\OT1/cmr/m/n/10 . Avail-able at: https://huggingface.co/geolocal/StreetCLIP.  
  []
 
 
-Overfull \hbox (0.50116pt too wide) in paragraph at lines 421--421
+Overfull \hbox (0.50116pt too wide) in paragraph at lines 417--417
 [][]\OT1/cmr/m/n/10 M^^?uller-Budack, Eric et al. (2018). \  Ge-olo-ca-tion Es-ti-ma-tion of Pho-tos Us-ing a Hi-er-ar-chi-cal Model 
  []
 
@@ -1312,15 +1249,8 @@ Overfull \hbox (0.50116pt too wide) in paragraph at lines 421--421
 AED: lastpage setting LastPage
 File: logo/logoUvA_en.pdf Graphic file (type pdf)
 <use logo/logoUvA_en.pdf>
-Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 422.
+Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 418.
 (pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
-
-Package fancyhdr Warning: \headheight is too small (27.3908pt): 
-(fancyhdr)                Make it at least 27.5pt, for example:
-(fancyhdr)                \setlength{\headheight}{27.5pt}.
-(fancyhdr)                You might also make \topmargin smaller to compensate:
-(fancyhdr)                \addtolength{\topmargin}{-0.1092pt}.
-
 [11] (./main.aux)
 Package rerunfilecheck Info: File `main.out' has not changed.
 (rerunfilecheck)             Checksum: A085D900CE6B84FE583D02638D6898D0;2738.
@@ -1329,18 +1259,18 @@ Package logreq Info: Writing requests to 'main.run.xml'.
 
  ) 
 Here is how much of TeX's memory you used:
- 34008 strings out of 480247
- 656722 string characters out of 5896150
- 1475149 words of memory out of 5000000
- 51333 multiletter control sequences out of 15000+600000
+ 34007 strings out of 480247
+ 656727 string characters out of 5896150
+ 1474730 words of memory out of 5000000
+ 51332 multiletter control sequences out of 15000+600000
  479019 words of font info for 64 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
  103i,16n,105p,1235b,1840s stack positions out of 5000i,500n,10000p,200000b,80000s
- </home/pradyutnair/.texlive2021/texmf-var/fonts/pk/ljfour/jknappen/ec/tcrm1000.600pk></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmcsc10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmti9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
-Output written on main.pdf (11 pages, 5957652 bytes).
+ </home/pradyutnair/.texlive2021/texmf-var/fonts/pk/ljfour/jknappen/ec/tcrm1000.600pk></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmcsc10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmti9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
+Output written on main.pdf (11 pages, 5936212 bytes).
 PDF statistics:
- 3560 PDF objects out of 3580 (max. 8388607)
- 1888 compressed objects within 19 object streams
+ 3550 PDF objects out of 3580 (max. 8388607)
+ 1882 compressed objects within 19 object streams
  81 named destinations out of 1000 (max. 500000)
  9679 words of extra memory for PDF output out of 10000 (max. 10000000)
 

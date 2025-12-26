@@ -1,7 +1,7 @@
 \babel@toc {english}{}\relax 
 \contentsline {section}{\numberline {1}Introduction}{2}{section.1}%
-\contentsline {section}{\numberline {2}Related Work}{3}{section.2}%
-\contentsline {paragraph}{Image Geolocation.}{3}{section*.2}%
+\contentsline {section}{\numberline {2}Related Work}{2}{section.2}%
+\contentsline {paragraph}{Image Geolocation.}{2}{section*.2}%
 \contentsline {paragraph}{Concept Bottleneck Models.}{3}{section*.3}%
 \contentsline {paragraph}{Vision-Language Models for Geolocation.}{3}{section*.4}%
 \contentsline {section}{\numberline {3}Methodology}{3}{section.3}%
@@ -12,12 +12,12 @@
 \contentsline {paragraph}{Text-Anchored Prototypes.}{5}{section*.6}%
 \contentsline {paragraph}{Hierarchical Classification.}{5}{section*.7}%
 \contentsline {paragraph}{Loss Functions.}{5}{section*.8}%
-\contentsline {subsection}{\numberline {3.5}Stage 2: Cross-Attention Geolocation}{6}{subsection.3.5}%
+\contentsline {subsection}{\numberline {3.5}Stage 2: Cross-Attention Geolocation}{5}{subsection.3.5}%
 \contentsline {paragraph}{Architecture.}{6}{section*.9}%
 \contentsline {paragraph}{Prediction Heads.}{6}{section*.10}%
 \contentsline {paragraph}{Ablation Modes.}{6}{section*.11}%
 \contentsline {section}{\numberline {4}Experiments}{6}{section.4}%
-\contentsline {subsection}{\numberline {4.1}Evaluation Metrics}{7}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.1}Evaluation Metrics}{6}{subsection.4.1}%
 \contentsline {subsection}{\numberline {4.2}Stage 1: Concept Classification Results}{7}{subsection.4.2}%
 \contentsline {subsection}{\numberline {4.3}Stage 2: Geolocation Results}{7}{subsection.4.3}%
 \contentsline {subsection}{\numberline {4.4}Out-of-Distribution Evaluation}{8}{subsection.4.4}%
