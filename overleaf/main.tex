@@ -1,0 +1,471 @@
+%-------------------------------------------------------------------------------
+% LATEX TEMPLATE ARTIKEL
+%-------------------------------------------------------------------------------
+% Dit template is voor gebruik door studenten van de de bacheloropleiding 
+% Informatica van de Universiteit van Amsterdam.
+% Voor informatie over schrijfvaardigheden, zie 
+%                               https://practicumav.nl/schrijven/index.html
+%
+%-------------------------------------------------------------------------------
+%	PACKAGES EN DOCUMENT CONFIGURATIE
+%-------------------------------------------------------------------------------
+
+\documentclass{uva-inf-article}
+\usepackage[english]{babel}
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{booktabs}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+\usepackage[style=authoryear-comp]{biblatex}
+\addbibresource{references.bib}
+
+%-------------------------------------------------------------------------------
+%	GEGEVENS VOOR IN DE TITEL, HEADER EN FOOTER
+%-------------------------------------------------------------------------------
+
+% Geef je artikel een logische titel die de inhoud dekt.
+\title{Concept-Aware Geolocation with Hierarchical Concept Bottleneck Models}
+
+% Vul de naam van de opdracht in zoals gegeven door de docent en het type 
+% opdracht, bijvoorbeeld 'technisch rapport' of 'essay'.
+\assignment{Project AI}
+\assignmenttype{Technical Report}
+
+% Vul de volledige namen van alle auteurs in en de corresponderende UvAnetID's.
+\authors{P. Nair}
+\uvanetids{UvAnetID}
+
+% Vul de naam van je tutor, begeleider (mentor), of docent / vakcoördinator in.
+% Vermeld in ieder geval de naam van diegene die het artikel nakijkt!
+\tutor{Mentor Name}
+\mentor{}
+\docent{}
+
+% Vul hier de naam van je tutorgroep, werkgroep, of practicumgroep in.
+\group{AI Research Group}
+
+% Vul de naam van de cursus in en de cursuscode, te vinden op o.a. DataNose.
+\course{Artificial Intelligence}
+\courseid{X_400xxx}
+
+% Dit is de datum die op het document komt te staan. Standaard is dat vandaag.
+\date{\today}
+
+%-------------------------------------------------------------------------------
+%	VOORPAGINA
+%-------------------------------------------------------------------------------
+
+\begin{document}
+\maketitle
+
+%-------------------------------------------------------------------------------
+%	INHOUDSOPGAVE EN ABSTRACT
+%-------------------------------------------------------------------------------
+
+\tableofcontents
+\begin{abstract}
+This report presents a Concept-Aware Global Image-GPS Alignment system that learns to geolocate street view images by understanding semantic concepts and their relationship to geographic locations. The system employs a three-stage training pipeline: Stage 0 for domain contrastive pretraining, Stage 1 for text-prototype concept learning, and Stage 2 for cross-attention geolocation. We introduce a hierarchical concept bottleneck architecture with text-anchored prototype learning and cross-attention interpretability, achieving competitive performance on both test set and out-of-distribution GeoGuessr dataset evaluation.
+\end{abstract}
+
+%-------------------------------------------------------------------------------
+%	INHOUD
+%-------------------------------------------------------------------------------
+% Hanteer bij benadering IMRAD: Introduction, Method, Results, Discussion.
+
+\section{Introduction}
+\label{sec:introduction}
+
+Geolocating street view images is a challenging problem due to the inherent visual ambiguity in similar-looking locations across different geographic regions. Existing approaches \parencite{weyand2016planet} primarily rely on raw visual features, which lack interpretability and semantic reasoning capabilities. This limitation hinders applications where understanding \textit{why} a location prediction is made is crucial, such as in autonomous navigation, urban planning, and disaster response scenarios.
+
+Recent advances in vision-language models, particularly CLIP \parencite{radford2021learning}, have demonstrated the power of aligning visual and textual representations through contrastive learning. These models learn to understand semantic concepts and their relationships to visual patterns. Concept Bottleneck Models (CBMs) \parencite{mahajan2021concept} further enhance interpretability by forcing predictions to operate through a concept bottleneck, making the decision process traceable to human-understandable concepts.
+
+\subsection{Motivation}
+
+The need for interpretable geolocation systems stems from several key requirements. First, in safety-critical applications like autonomous vehicles, understanding the semantic reasoning behind location predictions is essential for trust and accountability. Second, concept-aware reasoning enables systems to generalize better to novel locations by recognizing similar semantic patterns rather than relying solely on memorized visual features. Finally, interpretability facilitates debugging and improvement of geolocation models by allowing domain experts to understand and rectify failure cases.
+
+\subsection{Approach Overview}
+
+We propose a three-stage curriculum learning pipeline that progressively builds a concept-aware geolocation system:
+
+\begin{enumerate}
+    \item \textbf{Stage 0: Domain Contrastive Pretraining} - Partially unfreezes the top layers of a StreetCLIP vision encoder to align it with GPS and concept domains through multiple contrastive losses.
+    
+    \item \textbf{Stage 1: Text-Prototype Concept Learning} - Learns concept representations using text-anchored classification with hierarchical supervision. Concept prototypes are initialized from text embeddings and fine-tuned through learnable residuals.
+    
+    \item \textbf{Stage 2: Cross-Attention Geolocation} - Interpretable geolocation prediction using cross-attention between concept embeddings and image patch tokens. The attention mechanism provides spatial interpretability, showing which image regions support concept-based predictions.
+\end{enumerate}
+
+\subsection{Key Contributions}
+
+Our work makes the following key contributions:
+
+\begin{itemize}
+    \item \textbf{Hierarchical Concept Bottleneck Model}: We introduce a two-level concept hierarchy (fine-grained meta concepts and coarse parent concepts) with multiple consistency losses enforcing hierarchical relationships.
+    
+    \item \textbf{Text-Anchored Prototype Learning}: Concept prototypes are initialized from CLIP text embeddings, ensuring semantic grounding, while learnable residuals allow adaptation to visual patterns specific to street view imagery.
+    
+    \item \textbf{Cross-Attention Interpretability}: We employ cross-attention where concept embeddings query image patch tokens, providing patch-level explanations for geolocation predictions.
+    
+    \item \textbf{Strict CBM Architecture}: All downstream predictions operate through the 512-dimensional concept bottleneck, preventing shortcut learning via raw image features and ensuring full interpretability.
+    
+    \item \textbf{Semantic Geocells}: We introduce per-country K-means clustering in 3D Cartesian space for semantic geocell generation, adapting the number of cells to regional data density.
+\end{itemize}
+
+The remainder of this report is organized as follows. Section~\ref{sec:methodology} describes our methodology, including the dataset structure and the three training stages in detail. Section~\ref{sec:experiments} presents experimental results and analysis. Section~\ref{sec:discussion} discusses findings and limitations. Section~\ref{sec:conclusion} concludes with future directions.
+
+\section{Methodology}
+\label{sec:methodology}
+
+\subsection{Dataset}
+
+We utilize the PanoramaCBMDataset, a comprehensive dataset designed for concept-aware geolocation learning. Each sample in the dataset contains:
+
+\begin{itemize}
+    \item \textbf{Image}: A street view panorama image
+    \item \textbf{Meta Concept}: Fine-grained semantic concept (e.g., ``Urban Street'', ``Suburban Road'', ``Rural Landscape'') extracted from the \texttt{meta\_name} field
+    \item \textbf{Parent Concept}: Coarse semantic category (e.g., ``Urban'', ``Rural'', ``Natural'') extracted from the \texttt{parent\_concept} field
+    \item \textbf{Country}: Country name for the image location
+    \item \textbf{Coordinates}: Latitude and longitude in degrees
+    \item \textbf{Note}: Text description of the concept (HTML format)
+\end{itemize}
+
+\subsubsection{Hierarchical Concept Structure}
+
+The dataset employs a two-level concept hierarchy to capture semantic relationships:
+
+\begin{itemize}
+    \item \textbf{Meta Concepts (Fine-Grained)}: Approximately 100 fine-grained concepts such as ``Urban Street'', ``Suburban Road'', ``Rural Landscape'', and ``Coastal Area''. These are extracted from the \texttt{meta\_name} column.
+    
+    \item \textbf{Parent Concepts (Coarse)}: Approximately 10-20 coarse categories such as ``Urban'', ``Rural'', ``Natural'', and ``Coastal''. These are extracted from the \texttt{parent\_concept} column.
+\end{itemize}
+
+Each meta concept belongs to exactly one parent concept, establishing a clear hierarchical mapping $\text{meta\_name} \rightarrow \text{parent\_concept}$. This hierarchy is utilized for:
+\begin{itemize}
+    \item Hierarchical supervision losses (consistency, parent-guided)
+    \item Intra-parent prototype consistency (soft weight sharing)
+    \item Multi-scale concept predictions (both fine and coarse)
+\end{itemize}
+
+\subsubsection{Dataset Splits}
+
+The dataset is split into training, validation, and test sets with a 70/15/15 ratio. The splits are stratified by meta concept to ensure all concepts are seen during training. Consistent splits are used across all three training stages to ensure fair comparison. For Stage 0 pretraining, the training set is further split 90/10 into pretrain\_train and pretrain\_val subsets.
+
+\subsubsection{Semantic Geocell Generation}
+
+To enable efficient geolocation prediction, we employ semantic geocells generated via per-country K-means clustering in 3D Cartesian space. The generation process is as follows:
+
+\begin{enumerate}
+    \item Convert latitude/longitude coordinates to 3D Cartesian coordinates on the unit sphere:
+    \[
+    (x, y, z) = (\cos(\text{lat})\cos(\text{lng}), \cos(\text{lat})\sin(\text{lng}), \sin(\text{lat}))
+    \]
+    
+    \item For each country with more than \texttt{min\_samples\_per\_cell} samples (default: 500):
+    \begin{itemize}
+        \item Compute $k = \lceil\text{samples} / \text{min\_samples\_per\_cell}\rceil$
+        \item Apply K-means clustering with $k$ clusters
+        \item Store cluster centers normalized to the unit sphere
+    \end{itemize}
+    
+    \item For countries with fewer samples:
+    \begin{itemize}
+        \item Create a single cell using the mean of all sample coordinates
+    \end{itemize}
+\end{enumerate}
+
+This adaptive clustering approach ensures that dense regions (typically urban areas) receive more granular geocells while sparse regions maintain broad cells. The geocell centers are visualized on a world map, with samples colored by cell ID and cell centers marked for reference.
+
+\subsection{Stage 0: Domain Contrastive Pretraining}
+\label{sec:stage0}
+
+The first stage of our pipeline aims to align the StreetCLIP vision encoder with GPS and concept domains. This stage partially unfreezes the top $N$ layers of the vision encoder to allow domain-specific adaptation while preserving general visual representations.
+
+\subsubsection{Model Architecture}
+
+The Stage 0 model comprises the following components:
+
+\begin{itemize}
+    \item \textbf{StreetCLIP Vision Encoder}: A pre-trained vision transformer with 768-dimensional global features ($x_{\text{img}} \in \mathbb{R}^{B \times 768}$) and 1024-dimensional patch tokens ($\text{patch\_tokens} \in \mathbb{R}^{B \times 576 \times 1024}$). The top $N$ layers are trainable while lower layers remain frozen.
+    
+    \item \textbf{GPS Adapter}: A linear projection from 512 to 768 dimensions to align GPS features with the image feature space.
+    
+    \item \textbf{Concept Bottleneck}: A neural network projecting 768-dimensional image features to 512-dimensional concept embeddings ($\text{concept\_emb} \in \mathbb{R}^{B \times 512}$).
+    
+    \item \textbf{Text Prototypes}: Frozen text-encoded prototypes for meta ($T_{\text{meta}} \in \mathbb{R}^{k_m \times 768}$) and parent ($T_{\text{parent}} \in \mathbb{R}^{k_p \times 768}$) concepts, initialized using CLIP's text encoder with multiple concept templates.
+\end{itemize}
+
+\subsubsection{Loss Functions}
+
+Stage 0 employs six complementary loss functions:
+
+\paragraph{Image-GPS Contrastive Loss}
+We align image features with GPS embeddings using InfoNCE loss:
+\[
+\mathcal{L}_{\text{GPS}} = -\frac{1}{B}\sum_{i=1}^{B}\log\frac{\exp(\text{sim}(x_{\text{img}, i}, g_i)/\tau)}{\sum_{j=1}^{B}\exp(\text{sim}(x_{\text{img}}, i}, g_j)/\tau)}
+\]
+where $g_i$ is the GPS embedding of sample $i$ and $\tau = 0.07$ is the temperature.
+
+\paragraph{Image-Concept Contrastive Losses}
+We align concept embeddings with both meta and parent concept prototypes:
+\begin{align*}
+\mathcal{L}_{\text{child}} &= \text{InfoNCE}(\text{concept\_emb}, T_{\text{meta}}, c_{\text{meta}}, \tau) \\
+\mathcal{L}_{\text{parent}} &= \text{InfoNCE}(\text{concept\_emb}, T_{\text{parent}}, c_{\text{parent}}, \tau)
+\end{align*}
+where $c_{\text{meta}}$ and $c_{\text{parent}}$ are the concept label indices.
+
+\paragraph{Hierarchy Consistency Loss}
+We enforce that concept embeddings from the same parent concept are closer in embedding space:
+\[
+\mathcal{L}_{\text{hierarchy}} = -\frac{1}{B}\sum_{i=1}^{B}\log\frac{\sum_{j \in \mathcal{P}(c_{\text{parent}}, i)}\exp(\text{sim}(z_i, z_j)/\tau)}{\sum_{j=1}^{B}\exp(\text{sim}(z_i, z_j)/\tau)}
+\]
+where $\mathcal{P}(p)$ is the set of samples with parent concept $p$.
+
+\paragraph{Patch-GPS Contrastive Loss}
+To prepare for Stage 2, we align patch-level embeddings with GPS:
+\[
+\mathcal{L}_{\text{patch-GPS}} = \text{InfoNCE}(\text{mean}(\text{patch\_emb}), g, \tau)
+\]
+where patch tokens are projected and pooled to match the GPS embedding dimension.
+
+\paragraph{Anchor Loss (Optional)}
+An optional loss prevents catastrophic forgetting by keeping the encoder close to the vanilla StreetCLIP:
+\[
+\mathcal{L}_{\text{anchor}} = \frac{1}{B}\sum_{i=1}^{B}\|x_{\text{img}, i} - x^{\text{vanilla}}_{\text{img}, i}|_2^2
+\]
+
+The total loss is a weighted sum:
+\[
+\mathcal{L} = \lambda_{\text{GPS}}\mathcal{L}_{\text{GPS}} + \lambda_{\text{child}}\mathcal{L}_{\text{child}} + \lambda_{\text{parent}}\mathcal{L}_{\text{parent}} + \lambda_{\text{hierarchy}}\mathcal{L}_{\text{hierarchy}} + \lambda_{\text{patch-GPS}}\mathcal{L}_{\text{patch-GPS}} + \lambda_{\text{anchor}}\mathcal{L}_{\text{anchor}}
+\]
+
+Default loss weights: $\lambda_{\text{GPS}} = 1.0$, $\lambda_{\text{child}} = 1.0$, $\lambda_{\text{parent}} = 0.5$, $\lambda_{\text{hierarchy}} = 0.3$, $\lambda_{\text{patch-GPS}} = 0.2$, $\lambda_{\text{anchor}} = 0.01$.
+
+\subsubsection{Training Details}
+
+We train Stage 0 with batch size 128 for 20 epochs using two learning rates: encoder layers use $3 \times 10^{-5}$ while non-encoder components use $1 \times 10^{-4}$. The top 2 vision transformer layers are unfrozen (parameter \texttt{unfreeze\_layers} = 2). Early stopping is applied on the pretrain\_val split to prevent overfitting.
+
+\subsection{Stage 1: Text-Prototype Concept Learning}
+\label{sec:stage1}
+
+Stage 1 focuses on learning concept representations with hierarchical supervision using text-anchored classification. The image encoder is frozen to preserve domain alignment learned in Stage 0.
+
+\subsubsection{Model Architecture}
+
+The Stage 1 model extends Stage 0 with:
+
+\begin{itemize}
+    \item \textbf{Frozen Image Encoder}: StreetCLIP encoder from Stage 0 produces fixed $x_{\text{img}} \in \mathbb{R}^{B \times 768}$.
+    
+    \item \textbf{Concept Bottleneck}: An MLP or Transformer network projecting to 512-dimensional concept embeddings.
+    
+    \item \textbf{Learnable Prototype Residuals}: Residual vectors $\Delta_{\text{meta}} \in \mathbb{R}^{k_m \times 768}$ and $\Delta_{\text{parent}} \in \mathbb{R}^{k_p \times 768}$ initialized from $\mathcal{N}(0, 0.01)$.
+    
+    \item \textbf{Prototype Projection}: Projects combined prototypes to concept embedding dimension:
+    \begin{align*}
+    T_{\text{meta}} &= \text{normalize}(\text{proj}(T^{\text{base}}_{\text{meta}} + \Delta_{\text{meta}})) \in \mathbb{R}^{k_m \times 512} \\
+    T_{\text{parent}} &= \text{normalize}(\text{proj}(T^{\text{base}}_{\text{parent}} + \Delta_{\text{parent}})) \in \mathbb{R}^{k_p \times 512}
+    \end{align*}
+    
+    \item \textbf{Per-Concept Bias and Scale}: Learnable bias terms $b_{\text{meta}} \in \mathbb{R}^{k_m}$, $b_{\text{parent}} \in \mathbb{R}^{k_p}$ and logit scales $s_{\text{meta}}$, $s_{\text{parent}}$ (initialized to 14.0, clamped to 20.0).
+\end{itemize}
+
+\subsubsection{Text-Anchored Classification}
+
+Concept predictions are computed via cosine similarity to prototypes:
+\begin{align*}
+\text{meta\_logits} &= s_{\text{meta}} \cdot (\text{concept\_emb} \cdot T_{\text{meta}}^T) + b_{\text{meta}} \\
+\text{parent\_logits} &= s_{\text{parent}} \cdot (\text{concept\_emb} \cdot T_{\text{parent}}^T) + b_{\text{parent}} \\
+\text{meta\_probs} &= \text{softmax}(\text{meta\_logits}), \quad \text{parent\_probs} = \text{softmax}(\text{parent\_logits})
+\end{align*}
+
+This text-anchored approach ensures semantic grounding while allowing adaptation through learnable residuals.
+
+\subsubsection{Loss Functions}
+
+Stage 1 employs nine complementary losses:
+
+\paragraph{Meta and Parent Classification Losses}
+Focal loss addresses class imbalance:
+\[
+\mathcal{L}_{\text{meta}} = \text{FocalLoss}(\text{meta\_logits}, c_{\text{meta}}, \gamma=2.0, \alpha_{\text{class}}, \text{label\_smoothing}=0.2)
+\]
+\[
+\mathcal{L}_{\text{parent}} = \text{FocalLoss}(\text{parent\_logits}, c_{\text{parent}}, \gamma=2.0, \alpha_{\text{parent}}, \text{label\_smoothing}=0.2)
+\]
+
+\paragraph{Hierarchical Consistency Loss}
+KL divergence between expected parent distribution from meta predictions and actual parent predictions:
+\[
+\mathcal{L}_{\text{consistency}} = \frac{1}{B}\sum_{i=1}^{B} \text{KL}(\text{meta\_probs}_i \cdot M_{\text{hier}} || \text{parent\_probs}_i)
+\]
+where $M_{\text{hier}} \in \mathbb{R}^{k_m \times k_p}$ maps meta concepts to parent concepts.
+
+\paragraph{Parent-Guided Meta Loss}
+Soft constraint encouraging meta predictions consistent with parent:
+\[
+\mathcal{L}_{\text{meta-guided}} = -\frac{1}{B}\sum_{i=1}^{B}\log \sum_{j \in \text{children}(c_{\text{parent}}, i)} \text{meta\_probs}_i[j]
+\]
+
+\paragraph{Inter-Parent Contrastive Loss}
+Push apart concept embeddings from different parent categories:
+\[
+\mathcal{L}_{\text{parent-contrastive}} = \text{InfoNCE}(\text{concept\_emb}, c_{\text{parent}}, \tau=0.1)
+\]
+
+\paragraph{Prototype Contrastive Loss}
+Align concept embeddings with their target prototypes:
+\[
+\mathcal{L}_{\text{contrastive}} = \text{InfoNCE}(\text{concept\_emb}, T_{\text{meta}}, c_{\text{meta}}, \tau=0.07)
+\]
+
+\paragraph{Prototype Regularization}
+L2 penalty on learnable residuals:
+\[
+\mathcal{L}_{\text{reg}} = \lambda_{\text{reg}} (|\Delta_{\text{meta}}|_2^2 + |\Delta_{\text{parent}}|_2^2)
+\]
+
+\paragraph{Intra-Parent Consistency}
+Encourage meta prototypes within same parent to be similar:
+\[
+\mathcal{L}_{\text{intra-parent}} = \sum_{p=1}^{k_p}\sum_{i,j \in \text{children}(p)} |T_{\text{meta}, i} - T_{\text{meta}, j}|_2^2
+\]
+
+\paragraph{Semantic Soft Cross-Entropy}
+Anti-overfitting loss allowing predictions to be ``close'' to semantically similar concepts:
+\[
+\mathcal{L}_{\text{semantic}} = -\frac{1}{B}\sum_{i=1}^{B}\log \sum_{j \neq c_{\text{meta}}, i} S_{ij} \cdot \text{meta\_probs}_i[j]
+\]
+where $S = T^{\text{base}}_{\text{meta}} \cdot (T^{\text{base}}_{\text{meta}})^T$ is the prototype similarity matrix.
+
+The total loss:
+\[
+\mathcal{L} = \lambda_{\text{meta}}\mathcal{L}_{\text{meta}} + \lambda_{\text{parent}}\mathcal{L}_{\text{parent}} + \lambda_{\text{consistency}}\mathcal{L}_{\text{consistency}} + \lambda_{\text{parent-contrastive}}\mathcal{L}_{\text{parent-contrastive}} + \lambda_{\text{contrastive}}\mathcal{L}_{\text{contrastive}} + \mathcal{L}_{\text{reg}} + \mathcal{L}_{\text{intra-parent}} + \lambda_{\text{semantic}}\mathcal{L}_{\text{semantic}}
+\]
+
+Default weights: $\lambda_{\text{meta}} = 1.0$, $\lambda_{\text{parent}} = 0.5$, $\lambda_{\text{consistency}} = 0.3$, $\lambda_{\text{parent-contrastive}} = 0.2$, $\lambda_{\text{contrastive}} = 0.5$, $\lambda_{\text{reg}} = 0.001$, $\lambda_{\text{semantic}} = 0.15$.
+
+\subsubsection{Training Details}
+
+Stage 1 is trained with batch size 256 using precomputed image embeddings for efficiency. Learning rate is $3 \times 10^{-4}$ for 50 epochs. The concept bottleneck uses an MLP with 0.4 dropout or a 2-layer Transformer with 8 heads. All losses are computed per-batch with hierarchical supervision enforcing the meta-to-parent relationships.
+
+\subsection{Stage 2: Cross-Attention Geolocation}
+\label{sec:stage2}
+
+Stage 2 performs interpretable geolocation prediction using cross-attention between concept embeddings and image patch tokens. This stage maintains strict CBM architecture where all predictions flow through the frozen concept bottleneck.
+
+\subsubsection{Model Architecture}
+
+The Stage 2 model consists of:
+
+\begin{itemize}
+    \item \textbf{Frozen Concept Embedding}: $\text{concept\_emb} \in \mathbb{R}^{B \times 512}$ from Stage 1.
+    
+    \item \textbf{Frozen Patch Tokens}: $\text{patch\_tokens} \in \mathbb{R}^{B \times 576 \times 1024}$ from the frozen image encoder.
+    
+    \item \textbf{Patch Projection}: Linear projection to match concept dimension: $\text{patch\_proj} \in \mathbb{R}^{B \times 576 \times 512}$.
+    
+    \item \textbf{Multi-Head Cross-Attention}: Concept embedding serves as query ($q = \text{concept\_emb}.unsqueeze(1)$) while projected patches serve as keys and values:
+    \begin{align*}
+    \text{attn\_output}, \text{attn\_weights} &= \text{MultiHeadAttention}(q, \text{patch\_proj}, \text{patch\_proj}) \\
+    \text{fused} &= \text{LayerNorm}(\text{concept\_emb} + \text{attn\_output})
+    \end{align*}
+    The attention weights ($\text{attn\_weights} \in \mathbb{R}^{B \times 1 \times 576}$) provide patch-level interpretability, showing which image regions support the concept-based prediction.
+    
+    \item \textbf{Feed-Forward Network}: FFN with residual and layer norm:
+    \begin{align*}
+    \text{fused}' &= \text{fused} + \text{FFN}(\text{fused}) \\
+    \text{fused}' &= \text{LayerNorm}(\text{fused}')
+    \end{align*}
+    where FFN projects $512 \rightarrow 1024 \rightarrow 512$.
+    
+    \item \textbf{Cell Classification Head}: Linear layer predicting geocell membership: $\text{cell\_logits} \in \mathbb{R}^{B \times N_{\text{cells}}}$.
+    
+    \item \textbf{Offset Regression Head}: Predicts offset from cell center in 3D Cartesian or 2D lat/lng coordinates: $\text{pred\_offsets} \in \mathbb{R}^{B \times 3}$ or $\mathbb{R}^{B \times 2}$.
+\end{itemize}
+
+\subsubsection{Ablation Modes}
+
+We support three ablation modes to analyze component contributions:
+
+\paragraph{Mode \texttt{both} (Default)}
+Full cross-attention with explicit fusion:
+\[
+\text{final\_emb} = \text{concat}([\text{concept\_emb}, \text{fused}'])
+\]
+Optional gating mechanism learns balance: $\text{gate} \cdot \text{concept\_emb} + (1-\text{gate}) \cdot \text{fused}$.
+
+\paragraph{Mode \texttt{concept\_only}}
+Only concept embedding contributes to prediction, skipping cross-attention:
+\[
+\text{final\_emb} = \text{concept\_only\_proj}(\text{concept\_emb})
+\]
+
+\paragraph{Mode \texttt{image\_only}}
+Only image patches contribute, bypassing concept bottleneck:
+\[
+\text{final\_emb} = \text{image\_pool}(\text{mean}(\text{patch\_proj}))
+\]
+
+\subsubsection{Loss Functions}
+
+Stage 2 uses a simple two-component loss:
+
+\paragraph{Cell Classification Loss}
+Cross-entropy loss for geocell prediction:
+\[
+\mathcal{L}_{\text{cell}} = \text{CrossEntropy}(\text{cell\_logits}, \text{cell\_labels})
+\]
+
+\paragraph{Offset Regression Loss}
+Mean squared error to cell center. For 3D Cartesian output:
+\begin{align*}
+\text{cell\_center}_i &= \text{cell\_centers}[\text{cell\_label}_i] \\
+\text{gt\_cart}_i &= \text{latlon\_to\_cartesian}(\text{lat}_i, \text{lng}_i) \\
+\text{target\_offsets}_i &= \text{gt\_cart}_i - \text{cell\_center}_i \\
+\mathcal{L}_{\text{offset}} &= \frac{1}{B}\sum_{i=1}^{B}|\text{pred\_offsets}_i - \text{target\_offsets}_i|_2^2
+\end{align*}
+
+For 2D lat/lng output, offsets are computed directly in coordinate space with proper longitude wrapping.
+
+Total loss:
+\[
+\mathcal{L} = \lambda_{\text{cell}}\mathcal{L}_{\text{cell}} + \lambda_{\text{offset}}\mathcal{L}_{\text{offset}}
+\]
+
+Default weights: $\lambda_{\text{cell}} = 1.0$, $\lambda_{\text{offset}} = 5.0$.
+
+\subsubsection{Semantic Geocells}
+
+Geocells are generated as described in Section~\ref{sec:methodology}. During training:
+\begin{itemize}
+    \item Cell labels are assigned from precomputed K-means clusters
+    \item Offsets are computed from ground truth coordinates to assigned cell center
+    \item Cell centers ($N_{\text{cells}} \times 3$) remain fixed during Stage 2 training
+\end{itemize}
+
+\subsubsection{Training Details}
+
+Stage 2 is trained with batch size 32 for 30 epochs using learning rate $1 \times 10^{-4}$. The cross-attention module uses dropout for regularization. During inference:
+\begin{enumerate}
+    \item Predict geocell from cell classification head
+    \item Predict offset from offset regression head
+    \item Final coordinates = cell center + predicted offset
+    \item Convert to latitude/longitude if using 3D output
+\end{enumerate}
+
+The cross-attention weights can be visualized as a $24 \times 24$ spatial map showing which image regions most influenced the concept-based geolocation prediction.
+
+%-------------------------------------------------------------------------------
+%	REFERENTIES
+%-------------------------------------------------------------------------------
+
+\printbibliography
+
+%-------------------------------------------------------------------------------
+%	BIJLAGEN
+%-------------------------------------------------------------------------------
+
+\appendix
+
+\end{document}

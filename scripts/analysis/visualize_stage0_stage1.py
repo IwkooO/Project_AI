@@ -46,6 +46,7 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from collections import defaultdict, Counter
+from PIL import Image
 
 import torch
 import torch.nn.functional as F
@@ -932,45 +933,67 @@ def main():
     
     val_dataset = SubsetDataset(full_dataset, val_samples)
     
-    # Create dataloader with precomputed embeddings for Stage 1
-    logger.info("Precomputing embeddings for visualization...")
-    from torch.utils.data import DataLoader
-    
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=args.batch_size,
-        shuffle=False,
-        num_workers=args.num_workers,
-        pin_memory=True,
-    )
-    
     # Precompute embeddings
+    logger.info("Precomputing embeddings for visualization...")
     all_embeddings = []
     all_concept_idx = []
     all_parent_idx = []
     all_country_idx = []
     all_coords = []
-    all_metadata = []
     
     stage1_model.image_encoder.eval()
     with torch.no_grad():
-        for batch in tqdm(val_loader, desc="Precomputing"):
-            images, concept_idx, parent_idx, country_idx, coords, metadata = batch
-            images = images.to(device)
+        for idx in tqdm(range(len(val_dataset)), desc="Precomputing"):
+            # Get sample directly from parent dataset using parent_indices
+            parent_idx = val_dataset.parent_indices[idx]
+            sample = val_dataset.parent_dataset.samples[parent_idx]
+            
+            # Load and process the image
+            image_path = sample['image_path']
+            if not isinstance(image_path, Path):
+                image_path = Path(image_path)
+            image = Image.open(image_path).convert('RGB')
+            
+            # Apply transforms from the full dataset
+            if val_dataset.parent_dataset.transform:
+                image = val_dataset.parent_dataset.transform(image)
+            else:
+                image = image.resize(val_dataset.parent_dataset.image_size, Image.LANCZOS)
+                image = np.array(image).astype(np.float32) / 255.0
+                image = torch.from_numpy(image).permute(2, 0, 1)  # HWC -> CHW
+            
+            # Get indices directly
+            concept_idx = val_dataset.parent_dataset.concept_to_idx[sample['meta_name']]
+            parent_concept = sample.get('parent_concept', 'unknown')
+            parent_idx_tensor = torch.tensor([val_dataset.parent_dataset.parent_to_idx.get(parent_concept, 0)], dtype=torch.long)
+            country_idx_tensor = torch.tensor([val_dataset.parent_dataset.country_to_idx[sample['country']]], dtype=torch.long)
+            
+            # Get coordinates
+            lat = sample['lat']
+            lng = sample['lng']
+            coords_tensor = torch.tensor([lat / 90.0, lng / 180.0], dtype=torch.float32)
+            
+            # Move to device and add batch dimension
+            images = image.unsqueeze(0).to(device)
             
             features = stage1_model.image_encoder(images)
-            all_embeddings.append(features.cpu())
-            all_concept_idx.append(concept_idx)
-            all_parent_idx.append(parent_idx)
-            all_country_idx.append(country_idx)
-            all_coords.append(coords)
-            all_metadata.append(metadata)
+            all_embeddings.append(features.squeeze(0).cpu())
+            all_concept_idx.append(torch.tensor([concept_idx], dtype=torch.long))
+            all_parent_idx.append(parent_idx_tensor)
+            all_country_idx.append(country_idx_tensor)
+            all_coords.append(coords_tensor)
     
     embeddings = torch.cat(all_embeddings, dim=0)
     concept_idx = torch.cat(all_concept_idx, dim=0)
     parent_idx = torch.cat(all_parent_idx, dim=0)
     country_idx = torch.cat(all_country_idx, dim=0)
     coords = torch.cat(all_coords, dim=0)
+    
+    # Build metadata from val_dataset samples (use parent_indices for fast lookup)
+    metadata_list = []
+    for idx in range(len(val_dataset)):
+        parent_idx = val_dataset.parent_indices[idx]
+        metadata_list.append(val_dataset.parent_dataset.samples[parent_idx])
     
     # Create precomputed dataset
     from scripts.training.train_stage1_prototype import PrecomputedEmbeddingsDataset
@@ -980,8 +1003,7 @@ def main():
         parent_indices=parent_idx,
         country_indices=country_idx,
         coordinates=coords,
-        metadata=[m for batch_meta in all_metadata for m in 
-                 (batch_meta if isinstance(batch_meta, list) else [batch_meta])],
+        metadata=metadata_list,
     )
     
     viz_loader = DataLoader(
