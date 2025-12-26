@@ -2,17 +2,20 @@
 
 ## Overview
 
-This document describes the architecture of a **Concept-Aware Global Image-GPS Alignment Model** that learns to geolocate images by understanding semantic concepts (e.g., "urban street", "rural landscape", "coastal area") and their relationship to geographic locations. The model uses a Concept Bottleneck Model (CBM) approach where images are first mapped to a concept space, then concepts are used to predict geographic coordinates.
+This document describes the **3-Stage Training Pipeline** for a Concept-Aware Global Image-GPS Alignment Model that learns to geolocate images by understanding semantic concepts and their relationship to geographic locations. The system uses a hierarchical concept structure with Concept Bottleneck Model (CBM) architecture, progressing through domain pretraining → concept learning → geolocation prediction with cross-attention interpretability.
 
 ## Table of Contents
 
 1. [High-Level Architecture](#high-level-architecture)
-2. [Data Pipeline](#data-pipeline)
-3. [Model Architecture](#model-architecture)
-4. [Training Process](#training-process)
-5. [Loss Functions](#loss-functions)
-6. [Semantic Geocells](#semantic-geocells)
-7. [Dataset Structure](#dataset-structure)
+2. [Three-Stage Training Pipeline](#three-stage-training-pipeline)
+3. [Hierarchical Concept Structure](#hierarchical-concept-structure)
+4. [Dataset Structure](#dataset-structure)
+5. [Stage 0: Domain Contrastive Pretraining](#stage-0-domain-contrastive-pretraining)
+6. [Stage 1: Text-Prototype Concept Learning](#stage-1-text-prototype-concept-learning)
+7. [Stage 2: Cross-Attention Geolocation](#stage-2-cross-attention-geolocation)
+8. [Loss Functions](#loss-functions)
+9. [Semantic Geocells](#semantic-geocells)
+10. [Key Design Decisions](#key-design-decisions)
 
 ---
 
@@ -20,629 +23,823 @@ This document describes the architecture of a **Concept-Aware Global Image-GPS A
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         TRAINING PIPELINE                                │
+│                    THREE-STAGE TRAINING PIPELINE                      │
 └─────────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────┐
-│   Dataset    │  (PanoramaCBMDataset or CBMDataset)
-│  - Images    │  - Each sample: (image, concept_name, country, lat, lng, note)
-│  - Concepts  │
+│   Dataset    │  (PanoramaCBMDataset)
+│  - Images    │  - Each sample: (image, meta_concept, parent_concept, country, lat, lng, note)
+│  - Concepts  │  - Hierarchical: meta_name (fine-grained) → parent_concept (coarse)
 │  - Coords    │
 └──────┬───────┘
        │
-       ├─────────────────────────────────────────────────────┐
-       │                                                       │
-       ▼                                                       ▼
-┌──────────────┐                                    ┌──────────────────┐
-│ Concept      │                                    │ Semantic         │
-│ Extraction   │                                    │ Geocell          │
-│              │                                    │ Generation       │
-│ - Extract    │                                    │                  │
-│   unique     │                                    │ - Per-country    │
-│   concepts   │                                    │   K-Means        │
-│   (meta_name)│                                    │ - Cell centers   │
-│ - Map to     │                                    │   in 3D space    │
-│   notes      │                                    │ - Assign samples │
-│              │                                    │   to cells       │
-└──────┬───────┘                                    └────────┬─────────┘
-       │                                                     │
-       ▼                                                     ▼
-┌──────────────┐                                    ┌──────────────────┐
-│ Concept      │                                    │ Cell Centers     │
-│ Encoding     │                                    │ [N_cells, 3]     │
-│              │                                    │ Sample-to-Cell   │
-│ - Text       │                                    │ Mapping          │
-│   encoder    │                                    │                  │
-│   (StreetCLIP)│                                   └──────────────────┘
-│ - Encode     │
-│   concept    │
-│   notes      │
-│ - E_concept  │
-│   [k, d]     │
-└──────┬───────┘
-       │
-       ▼
+       ├──────────────────────────────────────────────────────────────────┐
+       │                                                               │
+       ▼                                                               ▼
+┌──────────────────┐                                      ┌──────────────────┐
+│   Concepts     │                                      │ Semantic         │
+│   Extraction   │                                      │ Geocell          │
+│                │                                      │ Generation       │
+│ - Extract      │                                      │                  │
+│   unique       │                                      │ - Per-country    │
+│   meta concepts│                                      │   K-Means        │
+│ - Extract      │                                      │ - Cell centers   │
+│   unique parent │                                      │   in 3D space    │
+│   concepts     │                                      │ - Assign samples │
+│ - Build       │                                      │   to cells       │
+│   hierarchy    │                                      │                  │
+└──────────────────┘                                      └──────────────────┘
+
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    ConceptAwareGeoModel                                  │
-│                                                                          │
-│  ┌──────────────┐              ┌──────────────┐                         │
-│  │ Image Path   │              │ Location Path│                         │
-│  │              │              │              │                         │
-│  │ Image [B,3,H,W]             │ GPS [B,2]   │                         │
-│  │      │                       │      │       │                         │
-│  │      ▼                       │      ▼       │                         │
-│  │ StreetCLIP   │              │ LocationEncoder│                        │
-│  │ Encoder      │              │ (GeoCLIP)     │                         │
-│  │      │                       │      │       │                         │
-│  │      ▼                       │      ▼       │                         │
-│  │ x_img [B,d]  │              │ x_loc [B,512] │                         │
-│  │      │                       │      │       │                         │
-│  │      ├───────────────────────┼──────┘       │                         │
-│  │      │                       │               │                         │
-│  │      ▼                       │               │                         │
-│  │ Image        │              │ Location       │                         │
-│  │ Projector    │              │ Adapter        │                         │
-│  │      │                       │      │         │                         │
-│  │      ▼                       │      ▼         │                         │
-│  │ z_img [B,k]  │              │ x_loc [B,d]    │                         │
-│  │      │                       │      │         │                         │
-│  │      │                       │      ▼         │                         │
-│  │      │                       │ Concept Basis  │                         │
-│  │      │                       │ B = E + Δ     │                         │
-│  │      │                       │      │         │                         │
-│  │      │                       │      ▼         │                         │
-│  │      │                       │ z_loc [B,k]   │                         │
-│  │      │                       │               │                         │
-│  │      ├───────────────────────┘               │                         │
-│  │      │                                       │                         │
-│  │      ▼                                       │                         │
-│  │ Fused Features [B, k+d]                      │                         │
-│  │      │                                       │                         │
-│  │      ├──────────┬──────────┬──────────────┐ │                         │
-│  │      │          │          │              │ │                         │
-│  │      ▼          ▼          ▼              ▼ │                         │
-│  │  Cell Head  Offset Head Country Head    │  │                         │
-│  │  [B,N_cells][B,2/3]    [B,C]           │  │                         │
-│  └──────────────┴──────────┴──────────────┴──┘                         │
-│                                                                          │
+│                      STAGE 0: PRETRAINING                          │
+│                                                                      │
+│  ┌──────────────┐              ┌──────────────────┐                │
+│  │ Image Encoder │              │ Text Prototypes  │                │
+│  │ (StreetCLIP) │              │                  │                │
+│  │              │              │ T_meta [k_m,d]  │                │
+│  │              │              │ T_parent [k_p,d] │                │
+│  │ x_img [B,768]│              └────────┬─────────┘                │
+│  │              │                       │                             │
+│  │              │                       ▼                             │
+│  │              │              ┌──────────────────┐                │
+│  │              │              │ Concept          │                │
+│  │              │              │ Bottleneck       │                │
+│  │              │              │ (768→512)        │                │
+│  │              │              └────────┬─────────┘                │
+│  │              │                       │                             │
+│  │              │                       ▼                             │
+│  │              │              concept_emb [B,512]                  │
+│  └──────────────┘                                                    │
+│                                                                      │
+│  ┌──────────────────────────────────────────────────────────┐          │
+│  │ Losses:                                                  │          │
+│  │  1. Image-GPS Contrastive (image features vs GPS)    │          │
+│  │  2. Image-Meta Concept Contrastive                    │          │
+│  │  3. Image-Parent Concept Contrastive                  │          │
+│  │  4. Hierarchy Consistency (intra-batch supervised)    │          │
+│  │  5. Patch-GPS Contrastive (Stage2-aligned)           │          │
+│  │  6. Anchor Loss (optional: keep encoder close)        │          │
+│  └──────────────────────────────────────────────────────────┘          │
+│                                                                      │
+│  Trainable: Top N vision layers, text encoder, bottleneck, GPS adapter │
+│  Frozen: GeoCLIP location encoder                                    │
 └─────────────────────────────────────────────────────────────────────────┘
-       │
-       ▼
+                               │
+                               ▼ (frozen encoder)
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         LOSS COMPUTATION                                 │
-│                                                                          │
-│  - Contrastive Loss (z_img, z_loc)                                      │
-│  - Concept Divergence Loss                                              │
-│  - Concept Classification Loss                                          │
-│  - Country Classification Loss                                          │
-│  - Semantic Reconstruction Loss                                         │
-│  - Cell Classification Loss                                              │
-│  - Offset Regression Loss                                               │
+│                  STAGE 1: CONCEPT LEARNING                          │
+│                                                                      │
+│  ┌──────────────────┐    ┌──────────────────────────────────┐    │
+│  │ Image Encoder   │    │ Text-Anced Prototypes            │    │
+│  │ (frozen)       │    │                                  │    │
+│  │ x_img [B,768] │───▶│ T_meta = T_meta_base + Δ_meta   │    │
+│  │              │    │ T_parent = T_parent_base + Δ_parent│    │
+│  │              │    │                                  │    │
+│  │              │    │ Projected to concept_emb_dim:    │    │
+│  │              │    │   T_meta_proj, T_parent_proj    │    │
+│  └──────────────┘    └──────────────────────────────────┘    │
+│                           │                                     │
+│                           ▼                                     │
+│              ┌──────────────────┐                             │
+│              │ Concept          │                             │
+│              │ Bottleneck       │                             │
+│              │ (MLP or         │                             │
+│              │  Transformer)    │                             │
+│              └────────┬─────────┘                             │
+│                       │                                       │
+│                       ▼                                       │
+│              concept_emb [B,512]                               │
+│                       │                                       │
+│                       ▼                                       │
+│              ┌──────────────────┐                             │
+│              │ Cosine Similarity│                             │
+│              │ to Prototypes    │                             │
+│              │                  │                             │
+│              │ meta_logits = scale * (emb @ T_meta^T) + bias │    │
+│              │ parent_logits = scale * (emb @ T_parent^T) + bias │
+│              └──────────────────┘                             │
+│                                                                      │
+│  ┌──────────────────────────────────────────────────────────┐          │
+│  │ Losses:                                                  │          │
+│  │  1. Meta Classification (Focal Loss)                │          │
+│  │  2. Parent Classification (Focal Loss)              │          │
+│  │  3. Hierarchical Consistency (KL divergence)          │          │
+│  │  4. Parent-Guided Meta Loss (soft constraint)       │          │
+│  │  5. Inter-Parent Contrastive                       │          │
+│  │  6. Prototype Contrastive (concept ↔ prototypes)     │          │
+│  │  7. Prototype Regularization (L2 on residuals)      │          │
+│  │  8. Intra-Parent Consistency (soft weight sharing)   │          │
+│  │  9. Semantic Soft Cross-Entropy (anti-overfitting)  │          │
+│  └──────────────────────────────────────────────────────────┘          │
+│                                                                      │
+│  Trainable: Bottleneck, prototype residuals, biases, logit scales    │
+│  Frozen: Image encoder, text prototypes (base)                         │
+└─────────────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼ (frozen concept_emb)
+┌─────────────────────────────────────────────────────────────────────────┐
+│              STAGE 2: CROSS-ATTENTION GEOLOCATION                   │
+│                                                                      │
+│  ┌──────────────────┐    ┌──────────────────┐    ┌────────────┐  │
+│  │ concept_emb     │    │ Image Encoder   │    │ Geocells   │  │
+│  │ [B,512] (froz)│    │ (frozen)        │    │            │  │
+│  │                 │    │ patch_tokens    │    │ centers[N,3]│  │
+│  │                 │    │ [B,576,1024]   │    └─────┬──────┘  │
+│  │                 │    │                 │          │             │
+│  └────────┬────────┘    └────────┬────────┘          │             │
+│           │                     │                    │             │
+│           ▼                     ▼                    │             │
+│  concept_proj         patch_proj [B,576,512]     │             │
+│  (as query)           (as keys/values)          │             │
+│           │                     │                    │             │
+│           └──────────┬──────────┘                    │             │
+│                      │                               │             │
+│                      ▼                               │             │
+│           ┌──────────────────┐                      │             │
+│           │ Cross-Attention  │                      │             │
+│           │ (multi-head)     │                      │             │
+│           │ query=concept     │                      │             │
+│           │ keys/values=patches│                      │             │
+│           └────────┬─────────┘                      │             │
+│                    │                                │             │
+│                    ▼                                │             │
+│           attn_output [B,512]                      │             │
+│                    │                                │             │
+│                    ▼                                │             │
+│           ┌──────────────────┐                      │             │
+│           │ Residual + Norm  │                      │             │
+│           │ + FFN            │                      │             │
+│           └────────┬─────────┘                      │             │
+│                    │                                │             │
+│                    ▼                                │             │
+│           fused_emb [B,512]                         │             │
+│                    │                                │             │
+│           ┌────────┴────────┐                       │             │
+│           │                 │                       │             │
+│           ▼                 ▼                       │             │
+│    ┌──────────┐     ┌──────────┐               │             │
+│    │ Cell Head │     │ Offset   │               │             │
+│    │           │     │ Head     │               │             │
+│    │ [B,N]    │     │ [B,2/3]  │               │             │
+│    └──────────┘     └──────────┘               │             │
+│                                                      │             │
+│                                                      ▼             │
+│                                             pred_coords [B,2]  │
+│                                                                      │
+│  ┌──────────────────────────────────────────────────────────┐          │
+│  │ Losses:                                                  │          │
+│  │  1. Cell Classification (CrossEntropy)                  │          │
+│  │  2. Offset Regression (MSE to cell center)            │          │
+│  └──────────────────────────────────────────────────────────┘          │
+│                                                                      │
+│  Trainable: Patch projection, cross-attn, FFN, fusion, heads     │
+│  Frozen: Image encoder, Stage 1 concept bottleneck                  │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Data Pipeline
+## Three-Stage Training Pipeline
 
-### Dataset Classes
+The training pipeline consists of three sequential stages, each building on the previous:
 
-#### 1. PanoramaCBMDataset (`src/dataset.py`)
+### Stage 0: Domain Contrastive Pretraining
+**Purpose:** Align image encoder with GPS and concept domains
 
-Loads panorama images from GeoGuessr data structure:
+- **Partially unfreezes** top N layers of StreetCLIP vision encoder
+- **Trains:**
+  - Image ↔ GPS alignment (global features)
+  - Image ↔ Meta (child) concept alignment
+  - Image ↔ Parent concept alignment
+  - Intra-batch hierarchical consistency
+  - Optional anchor loss to keep encoder close to vanilla
+  - Patch-level GPS alignment (Stage2-aligned)
+- **Frozen:** GeoCLIP location encoder, base text prototypes
 
+### Stage 1: Text-Prototype Concept Learning
+**Purpose:** Learn concept representations with hierarchical supervision
+
+- **Fully freezes** StreetCLIP image encoder (from Stage 0)
+- **Trains:**
+  - Concept bottleneck (MLP or Transformer)
+  - Learnable prototype residuals (Δ)
+  - Per-concept bias and logit scale
+  - Multiple auxiliary losses for consistency
+- **Key Innovation:** Text-anchored classification via cosine similarity to prototypes
+- **Frozen:** Image encoder, base text prototypes
+
+### Stage 2: Cross-Attention Geolocation
+**Purpose:** Interpretable geolocation prediction with attention visualization
+
+- **Frozen:** Image encoder, Stage 1 concept bottleneck
+- **Trains:**
+  - Patch projection layer
+  - Cross-attention mechanism (concept queries patches)
+  - Fusion and gating mechanisms
+  - Cell classification head
+  - Offset regression head
+- **Key Innovation:** Cross-attention provides patch-level interpretability
+- **Three Ablation Modes:**
+  - `both`: Concept + image fusion (default)
+  - `concept_only`: Only concept embeddings
+  - `image_only`: Only image patches
+
+---
+
+## Hierarchical Concept Structure
+
+The system uses a two-level concept hierarchy:
+
+### Meta Concepts (Fine-Grained)
+- Examples: "Urban Street", "Suburban Road", "Rural Landscape", "Coastal Area"
+- Number: ~100+ concepts
+- Extracted from `meta_name` column in dataset
+
+### Parent Concepts (Coarse Categories)
+- Examples: "Urban", "Rural", "Natural", "Coastal"
+- Number: ~10-20 concepts
+- Extracted from `parent_concept` column in dataset
+
+### Hierarchical Relationships
+- Each meta concept belongs to exactly one parent concept
+- Mapping: `meta_name → parent_concept`
+- Used for:
+  - Hierarchical supervision losses (consistency, parent-guided)
+  - Intra-parent prototype consistency (soft weight sharing)
+  - Multi-scale concept predictions
+
+### Concept Templates
+
+**Meta Concept Templates** (for text encoding):
 ```
-data/
-└── {geoguessr_id}/
-    ├── panorama/          (or panorama_processed/)
-    │   ├── image_123.jpg
-    │   └── ...
-    └── metas/
-        ├── 123.json
-        └── ...
+"A street view showing {}"
+"A photo of {} in scene"
+"An area characterized by {}"
+"{} visible from road"
+"A location with {}"
 ```
 
-**Sample Structure:**
+**Parent Concept Templates**:
+```
+"A {} area"
+"A scene showing {} features"
+"An environment with {} characteristics"
+"{} landscape"
+"A {} region"
+```
+
+---
+
+## Dataset Structure
+
+### Sample Format
+
+Each sample in the dataset contains:
+
 ```python
 {
-    'pano_id': str,
-    'image_path': Path,
-    'meta_name': str,      # Concept name (e.g., "Urban Street")
-    'country': str,        # Country name
-    'lat': float,          # Latitude
-    'lng': float,          # Longitude
-    'note': str,           # Text description of concept
-    'images': List[str]    # Additional image URLs
+    'pano_id': str,              # Unique identifier
+    'image_path': Path,          # Path to image file
+    'meta_name': str,            # Fine-grained concept (e.g., "Urban Street")
+    'parent_concept': str,       # Coarse concept (e.g., "Urban")
+    'country': str,              # Country name
+    'lat': float,                # Latitude in degrees
+    'lng': float,                # Longitude in degrees
+    'note': str,                 # Text description of concept (HTML)
+    'cell_label': int,           # Semantic geocell ID (added during training)
 }
 ```
 
-**Returns:**
-- `image`: `[3, H, W]` - Preprocessed image tensor
-- `concept_idx`: `int` - Index into concept vocabulary
-- `target_idx`: `int` - Index into country vocabulary
-- `coordinates`: `[2]` - (lat, lng) in degrees
-- `metadata`: `Dict` - Original sample information
+### Label Mappings
 
-#### 2. CBMDataset (`src/iwo_dataset.py`)
+**Meta Concepts:**
+- `concept_to_idx`: Maps `meta_name` → index
+- `idx_to_concept`: Maps index → `meta_name`
+- Alphabetically sorted for determinism
 
-Loads from CSV file with columns:
-- `image_path`: Path to image file
-- `meta_name`: Concept name
-- `country`: Country name
-- `lat`, `lng`: Coordinates
-- `note`: Concept description
-- `pano_id`: Unique identifier
+**Parent Concepts:**
+- `parent_to_idx`: Maps `parent_concept` → index
+- `idx_to_parent`: Maps index → `parent_concept`
 
-**Same return format as PanoramaCBMDataset**
-
-### Data Preprocessing
-
-```
-Image [H, W, 3] (RGB)
-    │
-    ▼
-Resize to (336, 336)  [or from processor]
-    │
-    ▼
-RandomHorizontalFlip (training only)
-    │
-    ▼
-ToTensor (normalize to [0, 1])
-    │
-    ▼
-Normalize (mean, std)
-    │
-    ▼
-Image Tensor [3, 336, 336]
-```
-
-**Normalization (StreetCLIP defaults):**
-- Mean: `[0.48145466, 0.4578275, 0.40821073]`
-- Std: `[0.26862954, 0.26130258, 0.27577711]`
+**Hierarchy:**
+- `meta_to_parent`: Maps `meta_name` → `parent_concept`
+- `meta_to_parent_idx`: Tensor mapping `concept_idx` → `parent_idx`
 
 ### Train/Val/Test Splits
 
-Uses **stratified splitting** by concept (`meta_name`) to ensure:
-- Every concept appears in training set (at least 1 sample)
-- Concept distribution preserved across splits
-- No concept leakage between splits
-
-**Default ratios:** 70% train, 20% val, 10% test
+- **Ratio:** 70% train, 15% val, 15% test
+- **Stratified:** By `meta_name` to ensure all concepts seen in training
+- **Consistency:** Same splits used across all stages (loaded from `splits.json`)
+- **Stage 0 Split:** Further 90/10 split of train for pretrain_train/pretrain_val
 
 ---
 
-## Model Architecture
+## Stage 0: Domain Contrastive Pretraining
 
-### ConceptAwareGeoModel (`src/models/concept_aware_cbm.py`)
+### Stage0PretrainingModel
 
-#### Component Overview
+**Purpose:** Pretrain image encoder for domain alignment
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    ConceptAwareGeoModel                             │
-│                                                                     │
-│  Inputs:                                                            │
-│    - images: [B, 3, H, W]  (batch of images)                       │
-│    - gps_coords: [B, 2]    (lat, lng) - optional for training      │
-│                                                                     │
-│  Outputs:                                                           │
-│    - z_img: [B, k]         (image concept activations)              │
-│    - z_loc: [B, k]         (location concept activations) - if GPS │
-│    - country_logits: [B, C] (country classification)                │
-│    - cell_logits: [B, N_cells] (geocell classification)            │
-│    - pred_offsets: [B, 2] or [B, 3] (coordinate offsets)           │
-│    - fused_features: [B, k+d] (concatenated features)               │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-Where:
-- `B` = batch size
-- `k` = number of concepts
-- `d` = StreetCLIP feature dimension (typically 768)
-- `C` = number of countries
-- `N_cells` = number of semantic geocells
-
-#### Detailed Component Breakdown
-
-##### 1. Image Encoder (StreetCLIP)
+#### Components
 
 ```
-Image [B, 3, H, W]
+Image [B, 3, 336, 336]
     │
     ▼
-StreetCLIP Vision Encoder
+StreetCLIP Vision Encoder (partially frozen)
+    │
+    ├─── Top N layers trainable (unfreeze_layers parameter)
     │
     ▼
-x_img [B, d]  (d = 768 for StreetCLIP)
+x_img [B, 768]  (global features)
+    │
+    ├─── patch_tokens [B, 576, 1024] (ViT patch embeddings)
+    │
+    ▼
+┌──────────────────┐
+│ GPS Adapter     │
+│ 512 → 768      │
+└──────┬───────────┘
+       │
+       ▼
+gps_emb_768 [B, 768] (projected GPS features)
+
+┌──────────────────┐
+│ Concept        │
+│ Bottleneck     │
+│ 768 → 512      │
+└──────┬───────────┘
+       │
+       ▼
+concept_emb [B, 512]
+
+Text Prototypes (frozen base):
+- T_meta [k_m, 768]
+- T_parent [k_p, 768]
 ```
 
-- **Input:** `[B, 3, 336, 336]` (preprocessed images)
-- **Output:** `[B, 768]` (image embeddings)
-- **Frozen or Finetuned:** Controlled by `finetune_encoder` flag
+#### Loss Functions
 
-##### 2. Concept Basis (Learnable)
+**1. Image-GPS Contrastive:**
+```
+L_gps = InfoNCE(
+    img_features_norm [B, 768],
+    gps_emb_768_norm [B, 768],
+    temperature=0.07
+)
+```
+
+**2. Image-Child Concept Contrastive:**
+```
+L_child = InfoNCE(
+    concept_emb_norm [B, 512],
+    T_meta_projected [k_m, 512],
+    concept_idx [B],
+    temperature=0.07
+)
+```
+
+**3. Image-Parent Concept Contrastive:**
+```
+L_parent = InfoNCE(
+    concept_emb_norm [B, 512],
+    T_parent_projected [k_p, 512],
+    parent_idx [B],
+    temperature=0.07
+)
+```
+
+**4. Hierarchy Consistency (intra-batch supervised contrastive):**
+```
+L_hierarchy = -log(exp(sim(z_i, z_i_same_parent) / τ) / Σ_j exp(sim(z_i, z_j) / τ))
+```
+
+**5. Patch-GPS Contrastive (Stage2-aligned):**
+```
+patch_emb = patch_projection(patch_tokens)  # [B, 576] → pooled [B, 512]
+L_patch_gps = InfoNCE(
+    patch_emb_norm [B, 512],
+    gps_emb [B, 512],  # Original 512-dim GPS features
+    temperature=0.07
+)
+```
+
+**6. Anchor Loss (optional):**
+```
+L_anchor = MSE(
+    img_features,
+    vanilla_image_features  # From frozen vanilla encoder
+)
+```
+
+**Total Loss:**
+```
+L = λ_gps * L_gps 
+  + λ_child * L_child 
+  + λ_parent * L_parent 
+  + λ_hierarchy * L_hierarchy
+  + λ_patch_gps * L_patch_gps
+  + λ_anchor * L_anchor
+```
+
+#### Default Hyperparameters
+
+- **Batch size:** 128
+- **Learning rate:** Encoder 3e-5, Non-encoder 1e-4
+- **Epochs:** 20
+- **Unfreeze layers:** 2 (top vision layers)
+- **Loss weights:**
+  - λ_gps: 1.0
+  - λ_child: 1.0
+  - λ_parent: 0.5
+  - λ_hierarchy: 0.3
+  - λ_patch_gps: 0.2
+  - λ_anchor: 0.01 (optional)
+
+---
+
+## Stage 1: Text-Prototype Concept Learning
+
+### Stage1ConceptModel
+
+**Purpose:** Learn concept representations with text-anchored classification
+
+#### Components
 
 ```
-E_concept [k, d]  (Initial concept embeddings from text encoder)
+Image [B, 3, 336, 336]
     │
-    ├─── Register as buffer (frozen)
+    ▼
+StreetCLIP Vision Encoder (frozen)
     │
-    └─── Delta [k, d]  (Learnable parameter, initialized to zeros)
+    ▼
+x_img [B, 768]
+    │
+    ▼
+┌──────────────────┐
+│ Concept         │
+│ Bottleneck      │
+│                  │
+│ Option 1: MLP  │
+│ 768 → 1024     │
+│   → 512        │
+│                  │
+│ Option 2:       │
+│ Transformer      │
+│ (with CLS token │
+│  + attn pool)   │
+└────────┬─────────┘
          │
          ▼
-    B = E_concept + Delta  (Concept Basis)
-    B^T [d, k]  (Transposed for matrix multiplication)
+concept_emb [B, 512]
+    │
+    │
+    ├───┐
+    │   ▼
+    │  Normalize
+    │    │
+    │    ▼
+    │  concept_emb_norm [B, 512]
+    │
+    ├───┐───────────────────────────────────┐
+    │   │                               │
+    │   ▼                               ▼
+    │  Cosine Similarity           Cosine Similarity
+    │   │                               │
+    │   ▼                               ▼
+    │  meta_logits [B, k_m]          parent_logits [B, k_p]
+    │   │                               │
+    │   ▼                               ▼
+    │  meta_probs [B, k_m]          parent_probs [B, k_p]
 ```
 
-- **E_concept**: Pre-computed by encoding concept descriptions (notes) using StreetCLIP text encoder
-- **Delta**: Learnable offset allowing concept embeddings to adapt during training
-- **B**: Final concept basis matrix `[d, k]` used for projection
-
-##### 3. Image Projector
+#### Prototype Construction
 
 ```
-x_img [B, d]
-    │
-    ▼
-Linear(d → 512)
-    │
-    ▼
-LayerNorm(512)
-    │
-    ▼
-GELU()
-    │
-    ▼
-Dropout(0.3)
-    │
-    ▼
-Linear(512 → k)
-    │
-    ▼
-z_img [B, k]  (Concept activations)
+T_meta_base = encode_text(meta_names, templates)  # [k_m, 768]
+T_parent_base = encode_text(parent_names, templates)  # [k_p, 768]
+
+# Learnable residuals (fine-tune prototypes)
+Δ_meta ~ N(0, 0.01)  # [k_m, 768]
+Δ_parent ~ N(0, 0.01)  # [k_p, 768]
+
+# Project to concept embedding space
+T_meta_projected = normalize(proj(T_meta_base + Δ_meta))  # [k_m, 512]
+T_parent_projected = normalize(proj(T_parent_base + Δ_parent))  # [k_p, 512]
 ```
 
-- **Purpose:** Maps image embeddings to concept space
-- **Architecture:** 2-layer MLP with LayerNorm and GELU
-- **Output:** Logits over `k` concepts (before softmax)
-
-##### 4. Location Encoder (GeoCLIP)
+#### Classification via Cosine Similarity
 
 ```
-GPS Coords [B, 2]  (lat, lng in degrees)
-    │
-    ▼
-LocationEncoder (GeoCLIP)
-    │
-    ▼
-x_loc_raw [B, 512]
-    │
-    ▼
-Location Adapter (Linear 512 → d)
-    │
-    ▼
-x_loc [B, d]
-    │
-    ▼
-MatMul with B^T [d, k]
-    │
-    ▼
-z_loc [B, k]  (Location concept activations)
+# Learnable temperature/logit scale (initialized to 14.0)
+meta_scale = logit_scale_meta.clamp(max=20.0)
+parent_scale = logit_scale_parent.clamp(max=20.0)
+
+# Per-concept bias for calibration
+meta_logits = meta_scale * (concept_emb_norm @ T_meta_projected.T) + meta_bias
+parent_logits = parent_scale * (concept_emb_norm @ T_parent_projected.T) + parent_bias
+
+meta_probs = softmax(meta_logits)
+parent_probs = softmax(parent_logits)
 ```
 
-- **LocationEncoder**: GeoCLIP's LocationEncoder (frozen)
-- **Location Adapter**: Projects 512-dim location features to StreetCLIP dimension `d`
-- **Concept Projection**: Uses same concept basis `B` as image path
+#### Loss Functions
 
-##### 5. Feature Fusion
-
+**1. Meta Concept Classification (Focal Loss):**
 ```
-z_img [B, k]  ──┐
-                ├─── Concatenate
-x_img [B, d]  ──┘
-                │
-                ▼
-    fused_features [B, k+d]
+L_meta = FocalLoss(
+    meta_logits,
+    meta_labels,
+    gamma=2.0,
+    alpha=class_weights,
+    label_smoothing=0.2
+)
 ```
 
-- **Purpose:** Combines concept activations with raw image features
-- **Used by:** Cell head and Offset head for hierarchical prediction
-
-##### 6. Cell Head (Coarse Location)
-
+**2. Parent Concept Classification (Focal Loss):**
 ```
-fused_features [B, k+d]
-    │
-    ▼
-Linear(k+d → 1024)
-    │
-    ▼
-LayerNorm(1024)
-    │
-    ▼
-GELU()
-    │
-    ▼
-Dropout(0.3)
-    │
-    ▼
-Linear(1024 → N_cells)
-    │
-    ▼
-cell_logits [B, N_cells]
+L_parent = FocalLoss(
+    parent_logits,
+    parent_labels,
+    gamma=2.0,
+    alpha=parent_class_weights,
+    label_smoothing=0.2
+)
 ```
 
-- **Purpose:** Predicts which semantic geocell the image belongs to
-- **Output:** Logits over `N_cells` geocells
-
-##### 7. Offset Head (Fine Location)
-
+**3. Hierarchical Consistency Loss:**
 ```
-fused_features [B, k+d]
-    │
-    ▼
-Linear(k+d → 512)
-    │
-    ▼
-LayerNorm(512)
-    │
-    ▼
-GELU()
-    │
-    ▼
-Dropout(0.3)
-    │
-    ▼
-Linear(512 → coord_output_dim)
-    │
-    ▼
-pred_offsets [B, 2] or [B, 3]
+# Expected parent distribution from meta predictions
+expected_parent_probs = meta_probs @ M_hier  # M_hier maps meta→parent
+
+# KL divergence
+L_consistency = KL(expected_parent_probs || parent_probs)
 ```
 
-- **Purpose:** Predicts fine-grained offset from cell center
-- **Output dimension:**
-  - `2` for lat/lng offsets (degrees)
-  - `3` for 3D Cartesian offsets (on unit sphere)
-
-##### 8. Country Head (Auxiliary)
-
+**4. Parent-Guided Meta Loss:**
 ```
-z_img [B, k]
-    │
-    ▼
-Linear(k → 256)
-    │
-    ▼
-LayerNorm(256)
-    │
-    ▼
-GELU()
-    │
-    ▼
-Dropout(0.3)
-    │
-    ▼
-Linear(256 → C)
-    │
-    ▼
-country_logits [B, C]
+# Soft constraint: meta prediction should be consistent with parent
+L_meta_guided = weighted_sum(
+    -log(P(meta_i | parent_i))  # Guide meta towards parent's children
+)
 ```
 
-- **Purpose:** Predicts country from concept activations (interpretability check)
-- **Output:** Logits over `C` countries
+**5. Inter-Parent Contrastive Loss:**
+```
+# Push apart concept embeddings from different parents
+L_parent_contrastive = InfoNCE(
+    concept_emb,
+    parent_labels,
+    temperature=0.1
+)
+```
+
+**6. Prototype Contrastive Loss:**
+```
+L_contrastive = InfoNCE(
+    concept_emb,
+    T_meta_projected,
+    meta_labels,
+    temperature=0.07
+)
+```
+
+**7. Prototype Regularization:**
+```
+L_reg = λ_reg * (||Δ_meta||^2 + ||Δ_parent||^2)
+```
+
+**8. Intra-Parent Consistency:**
+```
+# Encourage meta prototypes within same parent to be similar
+L_intra_parent = Σ_parent Σ_{i,j∈children(parent)} ||T_i - T_j||^2
+```
+
+**9. Semantic Soft Cross-Entropy (Anti-Overfitting):**
+```
+# Build similarity matrix between all meta prototypes
+S = T_meta_base @ T_meta_base.T  # [k_m, k_m]
+
+# Soft targets for wrong but similar concepts
+L_semantic = -log(Σ_{j≠label} S[i,j] * softmax(logits)[j])
+```
+
+**Total Loss:**
+```
+L = λ_meta * L_meta 
+  + λ_parent * L_parent 
+  + λ_consistency * L_consistency 
+  + λ_parent_contrastive * L_parent_contrastive 
+  + λ_contrastive * L_contrastive 
+  + L_reg 
+  + L_intra_parent 
+  + λ_semantic * L_semantic
+```
+
+#### Default Hyperparameters
+
+- **Batch size:** 256 (with precomputed embeddings)
+- **Learning rate:** 3e-4
+- **Epochs:** 50
+- **Bottleneck:** MLP with 0.4 dropout or Transformer (2 layers, 8 heads)
+- **Loss weights:**
+  - λ_meta: 1.0
+  - λ_parent: 0.5
+  - λ_consistency: 0.3
+  - λ_parent_contrastive: 0.2
+  - λ_contrastive: 0.5
+  - λ_reg: 0.001
+  - λ_intra_parent: 0.01
+  - λ_semantic: 0.15
 
 ---
 
-## Training Process
+## Stage 2: Cross-Attention Geolocation
 
-### Forward Pass Flow
+### Stage2CrossAttentionGeoHead
+
+**Purpose:** Interpretable geolocation prediction with attention visualization
+
+#### Components
 
 ```
-Batch: (images, concept_idx, target_idx, coords, metadata, cell_labels, note_embs)
-    │
-    ├─── images [B, 3, H, W] ──────────────────────────────┐
-    │                                                       │
-    ├─── coords [B, 2] ────────────────────────────────────┤
-    │                                                       │
-    └─── note_embs [B, d_note] ───────────────────────────┤
-                                                            │
-                                                            ▼
-                                    ┌───────────────────────────────┐
-                                    │   ConceptAwareGeoModel        │
-                                    │                               │
-                                    │   Image Path:                 │
-                                    │     images → x_img → z_img    │
-                                    │                               │
-                                    │   Location Path:              │
-                                    │     coords → x_loc → z_loc    │
-                                    │                               │
-                                    │   Heads:                      │
-                                    │     fused → cell_logits       │
-                                    │     fused → pred_offsets      │
-                                    │     z_img → country_logits    │
-                                    └───────────┬───────────────────┘
-                                                │
-                                                ▼
-                    ┌───────────────────────────────────────────┐
-                    │         Outputs                            │
-                    │  - z_img [B, k]                            │
-                    │  - z_loc [B, k]                            │
-                    │  - country_logits [B, C]                   │
-                    │  - cell_logits [B, N_cells]                │
-                    │  - pred_offsets [B, 2/3]                  │
-                    └───────────┬───────────────────────────────┘
-                                │
-                                ▼
-                    ┌───────────────────────────────────────────┐
-                    │         Loss Computation                  │
-                    │                                            │
-                    │  1. Contrastive Loss                      │
-                    │     L_contrastive = contrastive(z_img, z_loc)│
-                    │                                            │
-                    │  2. Concept Divergence Loss                │
-                    │     L_divergence = divergence(z_img, z_loc)│
-                    │                                            │
-                    │  3. Concept Classification Loss           │
-                    │     L_concept = CE(z_img, concept_idx)    │
-                    │                                            │
-                    │  4. Country Classification Loss            │
-                    │     L_country = CE(country_logits, target_idx)│
-                    │                                            │
-                    │  5. Semantic Reconstruction Loss           │
-                    │     pred_note = softmax(z_img) @ B^T      │
-                    │     L_semantic = MSE(pred_note, note_embs)│
-                    │                                            │
-                    │  6. Cell Classification Loss               │
-                    │     L_cell = CE(cell_logits, cell_labels) │
-                    │                                            │
-                    │  7. Offset Regression Loss                 │
-                    │     cell_center = cell_centers[cell_labels]│
-                    │     pred_coords = cell_center + pred_offsets│
-                    │     L_offset = loss(pred_coords, coords)  │
-                    │                                            │
-                    │  Total Loss:                               │
-                    │    L = λ_contrastive * L_contrastive       │
-                    │      + λ_divergence * L_divergence         │
-                    │      + λ_concept * L_concept                │
-                    │      + λ_country * L_country                │
-                    │      + λ_semantic * L_semantic              │
-                    │      + λ_cell * L_cell                      │
-                    │      + λ_offset * L_offset                 │
-                    └───────────┬───────────────────────────────┘
-                                │
-                                ▼
-                    ┌───────────────────────────────────────────┐
-                    │         Backward Pass                      │
-                    │  - Gradient accumulation                   │
-                    │  - AMP (Automatic Mixed Precision)        │
-                    │  - Optimizer step (AdamW)                 │
-                    └───────────────────────────────────────────┘
+┌──────────────────┐    ┌──────────────────┐
+│ concept_emb     │    │ patch_tokens     │
+│ [B, 512]      │    │ [B, 576, 1024]  │
+│ (frozen)        │    │ (frozen)         │
+└────────┬─────────┘    └────────┬─────────┘
+         │                     │
+         │                     ▼
+         │              ┌──────────────────┐
+         │              │ Patch Projection │
+         │              │ 1024 → 512      │
+         │              └────────┬─────────┘
+         │                     │
+         │                     ▼
+         │              patch_proj [B, 576, 512]
+         │                     │
+         └──────────┬──────────┘
+                    │
+                    ▼
+         ┌──────────────────┐
+         │ Query: concept_emb.unsqueeze(1)  │ [B, 1, 512]
+         │ Key/Value: patch_proj              │ [B, 576, 512]
+         └──────────────────┘
+                    │
+                    ▼
+         ┌──────────────────┐
+         │ Cross-Attention │
+         │ (multi-head)     │
+         └────────┬─────────┘
+                  │
+                  ├─▶ attn_weights [B, 1, 576] (for viz)
+                  │
+                  ▼
+         attn_output [B, 512]
+                  │
+                  ▼
+         ┌──────────────────┐
+         │ Residual + Norm │
+         │               │
+         │ fused = norm(concept_emb + attn_output)
+         └────────┬─────────┘
+                  │
+                  ▼
+         ┌──────────────────┐
+         │ FFN            │
+         │ 512 → 1024     │
+         │   → 512        │
+         └────────┬─────────┘
+                  │
+                  ▼
+         ┌──────────────────┐
+         │ Residual + Norm │
+         └────────┬─────────┘
+                  │
+                  ▼
+         fused_emb [B, 512]
+                  │
+         ┌────────┴────────┐
+         │                 │
+         ▼                 ▼
+    ┌──────────┐     ┌──────────┐
+    │ Cell Head │     │ Offset   │
+    │           │     │ Head     │
+    │           │     │           │
+    │ 512 → N  │     │ 512 → 2/3│
+    └──────────┘     └──────────┘
+         │                 │
+         ▼                 ▼
+    cell_logits      pred_offsets
+    [B, N_cells]     [B, 2/3]
 ```
 
-### Training Hyperparameters
+#### Ablation Modes
 
-**Default Values:**
-- Batch size: 32
-- Learning rate: 1e-4
-- Weight decay: 0.1
-- Epochs: 20
-- Gradient accumulation steps: 1
-- AMP: Optional (flag)
+**Mode `both` (default):**
+- Full cross-attention with concept + image fusion
+- Explicit fusion: `concat([concept_emb, fused_emb])`
+- Optional gating: `gate * concept_emb + (1-gate) * fused_emb`
 
-**Loss Weights (λ):**
-- `λ_contrastive`: 0.1
-- `λ_divergence`: 0.1
-- `λ_concept`: 10.0
-- `λ_country`: 0.1
-- `λ_semantic`: 1.0
-- `λ_cell`: 1.0
-- `λ_offset`: 10.0
+**Mode `concept_only`:**
+- Only concept embedding contributes to prediction
+- Skips cross-attention entirely
+- `final_emb = concept_only_proj(concept_emb)`
+
+**Mode `image_only`:**
+- Only image patches contribute to prediction
+- Pools patch tokens and projects
+- `final_emb = image_pool(mean(patch_proj))`
+
+#### Loss Functions
+
+**1. Cell Classification:**
+```
+L_cell = CrossEntropy(cell_logits, cell_labels)
+```
+
+**2. Offset Regression:**
+
+For 3D Cartesian (coord_output_dim=3):
+```
+cell_center = cell_centers[cell_label]  # [B, 3]
+gt_cart = latlon_to_cartesian(coords)  # [B, 3]
+target_offsets = gt_cart - cell_center
+L_offset = MSE(pred_offsets, target_offsets)
+```
+
+For 2D Lat/Lng (coord_output_dim=2):
+```
+cell_center_lat, cell_center_lng = cartesian_to_latlng(cell_centers)
+target_lat_offset = lat - cell_center_lat
+target_lng_offset = ((lng - cell_center_lng + 180) % 360) - 180
+target_offsets = [target_lat_offset, target_lng_offset]
+L_offset = MSE(pred_offsets, target_offsets)
+```
+
+**Total Loss:**
+```
+L = λ_cell * L_cell + λ_offset * L_offset
+```
+
+#### Default Hyperparameters
+
+- **Batch size:** 32
+- **Learning rate:** 1e-4
+- **Epochs:** 30
+- **Loss weights:**
+  - λ_cell: 1.0
+  - λ_offset: 5.0
+- **Ablation mode:** `both` (default)
 
 ---
 
 ## Loss Functions
 
-### 1. Contrastive Alignment Loss
+### Focal Loss
 
-**Purpose:** Aligns image and location concept activations in the same space.
-
-```
-z_img [B, k]  ──┐
-                ├─── Normalize (L2)
-z_loc [B, k]  ──┘
-                │
-                ▼
-    similarity = z_img_norm @ z_loc_norm^T  [B, B]
-                │
-                ▼
-    L_contrastive = InfoNCE(similarity, temperature=0.07)
-```
-
-**Formula:**
-```
-L_contrastive = -log(exp(sim(z_img_i, z_loc_i) / τ) / Σ_j exp(sim(z_img_i, z_loc_j) / τ))
-```
-
-Where `τ` is the temperature parameter (default: 0.07).
-
-### 2. Concept Divergence Loss
-
-**Purpose:** Encourages image and location concept activations to be similar.
+Handles class imbalance by focusing on hard examples:
 
 ```
-L_divergence = ||z_img - z_loc||^2 / (2 * σ^2)
+FL(p_t) = -α_t * (1 - p_t)^γ * log(p_t)
 ```
 
-Where `σ` is a scaling parameter (default: 1.0).
+Where:
+- `p_t`: Predicted probability for true class
+- `α_t`: Class weight (inverse frequency)
+- `γ`: Focusing parameter (default: 2.0)
 
-### 3. Concept Classification Loss
-
-**Purpose:** Supervised learning of concept predictions from images.
-
-```
-L_concept = CrossEntropy(z_img, concept_idx)
-```
-
-With label smoothing (default: 0.1).
-
-### 4. Country Classification Loss
-
-**Purpose:** Auxiliary task to predict country from concepts.
+### InfoNCE (Contrastive) Loss
 
 ```
-L_country = CrossEntropy(country_logits, target_idx)
+L = -log(exp(sim(z_i, z_pos_i) / τ) / Σ_j exp(sim(z_i, z_j) / τ))
 ```
 
-### 5. Semantic Reconstruction Loss
+Where:
+- `sim(z_a, z_b) = z_a · z_b / (||z_a|| * ||z_b||)` (cosine similarity)
+- `τ`: Temperature (default: 0.07)
 
-**Purpose:** Neuro-symbolic loss ensuring concept activations reconstruct semantic embeddings.
+### Hierarchical Consistency Loss
 
-```
-concept_probs = softmax(z_img)  [B, k]
-basis = B^T  [d, k]
-pred_note_embs = concept_probs @ basis  [B, d]
-
-# Normalize for cosine distance
-pred_note_norm = normalize(pred_note_embs)
-target_note_norm = normalize(note_embs)
-
-L_semantic = MSE(pred_note_norm, target_note_norm)
-```
-
-**Note:** If dimension mismatch, pred_note_embs is sliced/padded to match note_embs.
-
-### 6. Cell Classification Loss
-
-**Purpose:** Predicts coarse location (semantic geocell).
+KL divergence between expected parent from meta predictions and actual parent predictions:
 
 ```
-L_cell = CrossEntropy(cell_logits, cell_labels)
+P_expected(parent_j) = Σ_{i: meta_i → parent_j} P(meta_i)
+L_consistency = Σ_i KL(P_expected(parent) || P_actual(parent))
 ```
 
-### 7. Offset Regression Loss
+### Semantic Soft Cross-Entropy
 
-**Purpose:** Predicts fine-grained offset from cell center.
+Anti-overfitting loss that allows predictions to be "close" to semantically similar concepts:
 
-**For 3D Cartesian (coord_output_dim=3):**
 ```
-cell_centers = cell_centers[cell_labels]  [B, 3]
-true_cart = latlon_to_cartesian(coords)  [B, 3]
-target_offsets = true_cart - cell_centers  [B, 3]
-L_offset = MSE(pred_offsets, target_offsets)
-```
+# Build similarity matrix from base text prototypes
+S_ij = cosine_similarity(T_i_base, T_j_base)
 
-**For 2D Lat/Lng (coord_output_dim=2):**
-```
-cell_latlng = cartesian_to_latlng(cell_centers)  [B, 2]
-target_offsets = coords - cell_latlng  [B, 2]
-# Handle longitude wraparound
-target_offsets[:, 1] = (target_offsets[:, 1] + 180) % 360 - 180
+# For each sample, compute soft target over similar concepts
+soft_target_j = S[i,j] / Σ_{k≠i} S[i,k]
 
-# If coordinate_loss_type == "haversine":
-pred_latlng = cell_latlng + pred_offsets
-L_offset = haversine_distance(pred_latlng, coords)
-# Else (MSE):
-L_offset = MSE(pred_offsets, target_offsets)
+L_semantic = -Σ_{j≠label} soft_target_j * log(P(meta_j))
 ```
 
 ---
@@ -651,7 +848,7 @@ L_offset = MSE(pred_offsets, target_offsets)
 
 ### Generation Process
 
-Semantic geocells are generated using **per-country K-Means clustering**:
+Semantic geocells are generated using **per-country K-Means clustering in 3D**:
 
 ```
 For each country:
@@ -685,83 +882,90 @@ Geocells are visualized on a world map:
 
 ---
 
-## Dataset Structure
-
-### Sample Format
-
-Each sample in the dataset contains:
-
-```python
-{
-    'pano_id': str,           # Unique identifier
-    'image_path': Path,       # Path to image file
-    'meta_name': str,          # Concept name (e.g., "Urban Street")
-    'country': str,            # Country name
-    'lat': float,              # Latitude in degrees
-    'lng': float,              # Longitude in degrees
-    'note': str,               # Text description of concept
-    'images': List[str],       # Additional image URLs (optional)
-    'cell_label': int,         # Semantic geocell ID (added during training)
-    'note_embedding': Tensor   # Pre-computed note embedding [d] (added during training)
-}
-```
-
-### Label Mappings
-
-**Concepts:**
-- `concept_to_idx`: `Dict[str, int]` - Maps concept name to index
-- `idx_to_concept`: `Dict[int, str]` - Maps index to concept name
-- Concepts are sorted alphabetically for determinism
-
-**Countries:**
-- `country_to_idx`: `Dict[str, int]` - Maps country name to index
-- `idx_to_country`: `Dict[int, str]` - Maps index to country name
-- Countries are sorted alphabetically
-
-### Data Loading
-
-**Training:**
-- Shuffled batches
-- `drop_last=True` for contrastive loss stability
-- Gradient accumulation support
-
-**Validation/Test:**
-- No shuffling
-- Full dataset evaluation
-
----
-
 ## Key Design Decisions
 
-### 1. Concept Basis Learning
+### 1. Three-Stage Curriculum
 
-The concept basis `B = E_concept + Δ` allows:
-- **Initialization:** Concepts start with semantic meaning from text descriptions
-- **Adaptation:** Learnable `Δ` allows concepts to adapt to visual patterns
-- **Interpretability:** Concepts remain grounded in semantic descriptions
+**Stage 0:** Domain alignment without concept supervision
+- Learns general visual-geographic correspondence
+- Aligns encoder with GPS and concept domains
+- Optional anchor loss prevents catastrophic forgetting
 
-### 2. Hierarchical Location Prediction
+**Stage 1:** Concept-focused learning
+- Text-anchored classification ensures semantic grounding
+- Hierarchical supervision provides multi-scale signals
+- Frozen encoder prevents overfitting to concept distribution
 
-Two-stage prediction:
-- **Coarse:** Cell classification (semantic geocells)
-- **Fine:** Offset regression (from cell center)
+**Stage 2:** Geolocation with interpretability
+- Cross-attention provides patch-level explanations
+- Enforced concept usage prevents bypassing bottleneck
+- Hierarchical prediction (coarse cell + fine offset)
 
-This mimics human geolocation: first identify region, then refine location.
+### 2. Text-Anchored Prototypes
 
-### 3. Multi-Task Learning
+**Benefits:**
+- Semantic initialization from CLIP's multimodal space
+- Learnable residuals allow adaptation to visual patterns
+- Per-concept bias and logit scale provide calibration
 
-Multiple losses ensure:
-- **Concept alignment:** Images and locations share concept space
-- **Semantic consistency:** Concept activations reconstruct text embeddings
-- **Geographic accuracy:** Direct coordinate prediction
-- **Auxiliary supervision:** Country prediction for interpretability
+**Alternative:** Could use pure MLP classifiers, but loses semantic interpretability
 
-### 4. Stratified Splits
+### 3. Strict CBM Architecture
 
-Splitting by concept ensures:
-- All concepts seen during training
-- No concept leakage between splits
-- Fair evaluation of generalization
+**All downstream tasks operate on concept embeddings only:**
+
+**Benefits:**
+- Enforces interpretability: predictions traceable to concepts
+- Prevents shortcut learning via raw image features
+- Compact 512-dim bottleneck for Stage 2
+
+**Implementation:**
+- Stage 1: Only bottleneck and downstream heads trained
+- Stage 2: Only cross-attn and prediction heads trained
+
+### 4. Cross-Attention Interpretability
+
+**Concept as Query, Patches as Key/Value:**
+- Attention weights show which image regions support concept-based prediction
+- Spatial attention map (24×24) for visualization
+
+**Gating Mechanism:**
+- Learns balance between concept and spatial information
+- Prevents model from ignoring concepts
+
+### 5. Hierarchical Concept Structure
+
+**Fine → Coarse:**
+- Meta: ~100 fine-grained concepts
+- Parent: ~10-20 coarse categories
+
+**Uses:**
+- Parent-guided meta loss
+- Hierarchical consistency loss
+- Intra-parent prototype consistency (soft weight sharing)
+
+**Benefits:**
+- Multi-scale supervision improves generalization
+- Coarse parent concepts stabilize fine-grained learning
+- Better handling of rare meta concepts
+
+### 6. Regularization Strategies
+
+**Stage 0:**
+- Anchor loss to prevent forgetting
+- Early stopping on validation
+
+**Stage 1:**
+- Focal loss for class imbalance
+- Label smoothing (0.2)
+- Heavy dropout (0.4 in bottleneck)
+- Prototype regularization (L2 on residuals)
+- Semantic soft cross-entropy (anti-overfitting)
+
+**Stage 2:**
+- Cross-attention dropout
+- Residual connections
+- Layer normalization
 
 ---
 
@@ -770,15 +974,21 @@ Splitting by concept ensures:
 ```
 Project_AI/
 ├── scripts/training/
-│   └── train_concept_aware.py      # Main training script
+│   ├── train_stage0_prototype.py      # Stage 0 pretraining
+│   ├── train_stage1_prototype.py      # Stage 1 concept learning
+│   └── train_stage2_cross_attention.py  # Stage 2 geolocation
 ├── src/
 │   ├── models/
-│   │   └── concept_aware_cbm.py   # Model architecture
-│   ├── dataset.py                  # PanoramaCBMDataset
-│   ├── iwo_dataset.py              # CBMDataset (CSV-based)
+│   │   ├── concept_aware_cbm.py     # All model definitions
+│   │   ├── streetclip_encoder.py      # StreetCLIP wrapper
+│   │   └── baseline.py              # Baseline models
+│   ├── dataset.py                    # Dataset class
+│   ├── losses.py                     # Loss functions
 │   └── concepts/
-│       └── utils.py                # Concept extraction utilities
-└── README_ARCHITECTURE.md          # This file
+│       └── utils.py                 # Concept extraction
+├── docs/
+│   └── README_ARCHITECTURE.md        # This file
+└── README.md
 ```
 
 ---
@@ -786,53 +996,52 @@ Project_AI/
 ## Usage Example
 
 ```python
-# Initialize dataset
-dataset = CBMDataset(
-    dataframe=pd.read_csv("data/dataset-43k.csv"),
-    encoder_model="geolocal/StreetCLIP",
-    country=None  # Global training
-)
+# Stage 0: Pretraining
+python scripts/training/train_stage0_prototype.py \
+    --csv_path data/dataset-43k-mapped.csv \
+    --stage0_epochs 20 \
+    --unfreeze_layers 2 \
+    --use_wandb
 
-# Extract concepts
-concept_names, concept_map = extract_concepts_from_dataset(dataset)
+# Stage 1: Concept Learning
+python scripts/training/train_stage1_prototype.py \
+    --csv_path data/dataset-43k-mapped.csv \
+    --resume_from_checkpoint results/stage0-.../best_model_stage0.pt \
+    --stage1_epochs 50 \
+    --use_wandb
 
-# Encode concepts
-base_encoder = StreetCLIPEncoder(...)
-E_concept = encode_concepts(concept_names, concept_map, base_encoder)
-
-# Generate geocells
-cell_centers, sample_to_cell = generate_semantic_geocells(
-    dataset, min_samples_per_cell=500
-)
-
-# Initialize model
-model = ConceptAwareGeoModel(
-    image_encoder=image_encoder,
-    concept_features=E_concept,
-    num_concepts=len(concept_names),
-    num_countries=len(dataset.country_to_idx),
-    num_cells=len(cell_centers),
-    streetclip_dim=768,
-    location_encoder_dim=512,
-    coord_output_dim=2,  # or 3 for sphere
-    text_encoder=base_encoder
-)
-
-# Training loop (see train_concept_aware.py)
+# Stage 2: Geolocation
+python scripts/training/train_stage2_cross_attention.py \
+    --csv_path data/dataset-43k-mapped.csv \
+    --stage1_checkpoint results/stage1-.../best_model_stage1.pt \
+    --epochs 30 \
+    --ablation_mode both \
+    --use_wandb
 ```
 
 ---
 
 ## Evaluation Metrics
 
-**Concept Accuracy:**
-- Top-1 accuracy of concept predictions
+### Stage 1 (Concept)
 
-**Country Accuracy:**
-- Top-1 accuracy of country predictions
+**Meta Concept Accuracy:**
+- Top-1 accuracy: P(pred_meta == gt_meta)
+- Top-5 accuracy: P(gt_meta ∈ top-5 predictions)
+- Recall (macro average)
+
+**Parent Concept Accuracy:**
+- Top-1 accuracy
+- Top-5 accuracy
+- Recall (macro average)
+
+**Semantic-Close Accuracy:**
+- Accuracy within semantic similarity threshold (e.g., 0.7)
+
+### Stage 2 (Geolocation)
 
 **Cell Accuracy:**
-- Top-1 accuracy of geocell predictions
+- Top-1 accuracy of geocell classification
 
 **Distance Metrics:**
 - Median error (km)
@@ -847,9 +1056,8 @@ model = ConceptAwareGeoModel(
 
 ## Notes
 
-- The model uses **frozen text encoder** for semantic alignment (note embeddings)
-- **Image encoder** can be frozen or finetuned (controlled by `finetune_encoder`)
-- **Location encoder** (GeoCLIP) is always frozen
-- Concept basis `Δ` is learnable, allowing concept adaptation
-- All losses are weighted and can be tuned via hyperparameters
-
+- **Strict CBM:** All downstream predictions use concept embeddings, not raw image features
+- **Frozen Encoders:** Image encoder frozen after Stage 0; concept bottleneck frozen after Stage 1
+- **Learnable Prototypes:** Residuals allow adaptation while preserving semantic grounding
+- **Multi-Task Losses:** Each stage has multiple complementary losses for robust learning
+- **Ablation Support:** Stage 2 supports concept_only, image_only, and both modes for analysis
