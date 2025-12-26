@@ -1,0 +1,127 @@
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+=============================================
+Geocell Visualization (Geographic Map)
+=============================================
+Batch mode: Auto-detecting latest Stage 2 checkpoints
+Results root: results
+Country filter: all
+Max cells: all
+=============================================
+INFO:__main__:Loading world basemap...
+INFO:__main__:Downloaded Natural Earth countries (177 features)
+INFO:__main__:Batch mode: Auto-detecting latest Stage 2 checkpoints...
+INFO:__main__:Found latest Stage 2 checkpoint: results/stage2_cross_attention_both/2025-12-25_09-13-54/checkpoints/best_model_stage2_xattn.pt (variant=finetuned, mode=both)
+INFO:__main__:Found latest Stage 2 checkpoint: results/stage2_cross_attention_both/vanilla_stage1/2025-12-24_12-23-31/checkpoints/best_model_stage2_xattn.pt (variant=vanilla, mode=both)
+INFO:__main__:Found latest Stage 2 checkpoint: results/stage2_cross_attention_concept_only/2025-12-25_09-13-56/checkpoints/best_model_stage2_xattn.pt (variant=finetuned, mode=concept_only)
+INFO:__main__:Found latest Stage 2 checkpoint: results/stage2_cross_attention_concept_only/vanilla_stage1/2025-12-24_12-23-31/checkpoints/best_model_stage2_xattn.pt (variant=vanilla, mode=concept_only)
+INFO:__main__:Found latest Stage 2 checkpoint: results/stage2_cross_attention_image_only/2025-12-25_09-13-56/checkpoints/best_model_stage2_xattn.pt (variant=finetuned, mode=image_only)
+INFO:__main__:Found latest Stage 2 checkpoint: results/stage2_cross_attention_image_only/vanilla_stage1/2025-12-24_12-23-30/checkpoints/best_model_stage2_xattn.pt (variant=vanilla, mode=image_only)
+INFO:__main__:Found 6 checkpoint(s) to process
+INFO:__main__:
+============================================================
+INFO:__main__:Processing: results/stage2_cross_attention_both/2025-12-25_09-13-54/checkpoints/best_model_stage2_xattn.pt
+INFO:__main__:Tag: finetuned_both
+INFO:__main__:============================================================
+INFO:__main__:Loading cell centers from results/stage2_cross_attention_both/2025-12-25_09-13-54/checkpoints/best_model_stage2_xattn.pt
+INFO:__main__:Computing spherical Voronoi tessellation...
+INFO:__main__:Computed 1045 Voronoi regions
+INFO:__main__:Adding country labels using column: NAME
+/gpfs/scratch1/shared/pnair/Project_AI/scripts/analysis/visualize_geocells_map.py:331: UserWarning: Legend does not support handles for PatchCollection instances.
+See: https://matplotlib.org/stable/tutorials/intermediate/legend_guide.html#implementing-a-custom-legend-handler
+  ax.legend(loc='lower right', fontsize=11, framealpha=0.9)
+INFO:__main__:Saved geocell map to results/geocells_map/geocells_map_finetuned_both.png
+INFO:__main__:Saved cell distribution plot to results/geocells_map/cell_distribution_finetuned_both.png
+INFO:__main__:
+============================================================
+INFO:__main__:Processing: results/stage2_cross_attention_both/vanilla_stage1/2025-12-24_12-23-31/checkpoints/best_model_stage2_xattn.pt
+INFO:__main__:Tag: vanilla_both
+INFO:__main__:============================================================
+INFO:__main__:Loading cell centers from results/stage2_cross_attention_both/vanilla_stage1/2025-12-24_12-23-31/checkpoints/best_model_stage2_xattn.pt
+INFO:__main__:Computing spherical Voronoi tessellation...
+INFO:__main__:Computed 1045 Voronoi regions
+INFO:__main__:Adding country labels using column: NAME
+/gpfs/scratch1/shared/pnair/Project_AI/scripts/analysis/visualize_geocells_map.py:331: UserWarning: Legend does not support handles for PatchCollection instances.
+See: https://matplotlib.org/stable/tutorials/intermediate/legend_guide.html#implementing-a-custom-legend-handler
+  ax.legend(loc='lower right', fontsize=11, framealpha=0.9)
+INFO:__main__:Saved geocell map to results/geocells_map/geocells_map_vanilla_both.png
+INFO:__main__:Saved cell distribution plot to results/geocells_map/cell_distribution_vanilla_both.png
+INFO:__main__:
+============================================================
+INFO:__main__:Processing: results/stage2_cross_attention_concept_only/2025-12-25_09-13-56/checkpoints/best_model_stage2_xattn.pt
+INFO:__main__:Tag: finetuned_concept_only
+INFO:__main__:============================================================
+INFO:__main__:Loading cell centers from results/stage2_cross_attention_concept_only/2025-12-25_09-13-56/checkpoints/best_model_stage2_xattn.pt
+INFO:__main__:Computing spherical Voronoi tessellation...
+INFO:__main__:Computed 1045 Voronoi regions
+INFO:__main__:Adding country labels using column: NAME
+/gpfs/scratch1/shared/pnair/Project_AI/scripts/analysis/visualize_geocells_map.py:331: UserWarning: Legend does not support handles for PatchCollection instances.
+See: https://matplotlib.org/stable/tutorials/intermediate/legend_guide.html#implementing-a-custom-legend-handler
+  ax.legend(loc='lower right', fontsize=11, framealpha=0.9)
+INFO:__main__:Saved geocell map to results/geocells_map/geocells_map_finetuned_concept_only.png
+INFO:__main__:Saved cell distribution plot to results/geocells_map/cell_distribution_finetuned_concept_only.png
+INFO:__main__:
+============================================================
+INFO:__main__:Processing: results/stage2_cross_attention_concept_only/vanilla_stage1/2025-12-24_12-23-31/checkpoints/best_model_stage2_xattn.pt
+INFO:__main__:Tag: vanilla_concept_only
+INFO:__main__:============================================================
+INFO:__main__:Loading cell centers from results/stage2_cross_attention_concept_only/vanilla_stage1/2025-12-24_12-23-31/checkpoints/best_model_stage2_xattn.pt
+INFO:__main__:Computing spherical Voronoi tessellation...
+INFO:__main__:Computed 1045 Voronoi regions
+INFO:__main__:Adding country labels using column: NAME
+/gpfs/scratch1/shared/pnair/Project_AI/scripts/analysis/visualize_geocells_map.py:331: UserWarning: Legend does not support handles for PatchCollection instances.
+See: https://matplotlib.org/stable/tutorials/intermediate/legend_guide.html#implementing-a-custom-legend-handler
+  ax.legend(loc='lower right', fontsize=11, framealpha=0.9)
+INFO:__main__:Saved geocell map to results/geocells_map/geocells_map_vanilla_concept_only.png
+INFO:__main__:Saved cell distribution plot to results/geocells_map/cell_distribution_vanilla_concept_only.png
+INFO:__main__:
+============================================================
+INFO:__main__:Processing: results/stage2_cross_attention_image_only/2025-12-25_09-13-56/checkpoints/best_model_stage2_xattn.pt
+INFO:__main__:Tag: finetuned_image_only
+INFO:__main__:============================================================
+INFO:__main__:Loading cell centers from results/stage2_cross_attention_image_only/2025-12-25_09-13-56/checkpoints/best_model_stage2_xattn.pt
+INFO:__main__:Computing spherical Voronoi tessellation...
+INFO:__main__:Computed 1045 Voronoi regions
+INFO:__main__:Adding country labels using column: NAME
+/gpfs/scratch1/shared/pnair/Project_AI/scripts/analysis/visualize_geocells_map.py:331: UserWarning: Legend does not support handles for PatchCollection instances.
+See: https://matplotlib.org/stable/tutorials/intermediate/legend_guide.html#implementing-a-custom-legend-handler
+  ax.legend(loc='lower right', fontsize=11, framealpha=0.9)
+INFO:__main__:Saved geocell map to results/geocells_map/geocells_map_finetuned_image_only.png
+INFO:__main__:Saved cell distribution plot to results/geocells_map/cell_distribution_finetuned_image_only.png
+INFO:__main__:
+============================================================
+INFO:__main__:Processing: results/stage2_cross_attention_image_only/vanilla_stage1/2025-12-24_12-23-30/checkpoints/best_model_stage2_xattn.pt
+INFO:__main__:Tag: vanilla_image_only
+INFO:__main__:============================================================
+INFO:__main__:Loading cell centers from results/stage2_cross_attention_image_only/vanilla_stage1/2025-12-24_12-23-30/checkpoints/best_model_stage2_xattn.pt
+INFO:__main__:Computing spherical Voronoi tessellation...
+INFO:__main__:Computed 1045 Voronoi regions
+INFO:__main__:Adding country labels using column: NAME
+/gpfs/scratch1/shared/pnair/Project_AI/scripts/analysis/visualize_geocells_map.py:331: UserWarning: Legend does not support handles for PatchCollection instances.
+See: https://matplotlib.org/stable/tutorials/intermediate/legend_guide.html#implementing-a-custom-legend-handler
+  ax.legend(loc='lower right', fontsize=11, framealpha=0.9)
+INFO:__main__:Saved geocell map to results/geocells_map/geocells_map_vanilla_image_only.png
+INFO:__main__:Saved cell distribution plot to results/geocells_map/cell_distribution_vanilla_image_only.png
+INFO:__main__:
+============================================================
+INFO:__main__:Geocell visualization complete!
+INFO:__main__:Output directory: results/geocells_map
+INFO:__main__:============================================================
+
+=============================================
+Geocell visualization complete!
+Check output directory: results/geocells_map/
+=============================================

@@ -66,12 +66,12 @@ def find_latest_stage1_checkpoints(results_root: Path) -> List[Path]:
     checkpoints = []
     results_root = Path(results_root)
     
-    # Finetuned: results/stage1-prototype/geolocal_StreetCLIP/<latest_datetime>/checkpoints/checkpoint_epoch_50.pt
+    # Finetuned: results/stage1-prototype/geolocal_StreetCLIP/<latest_datetime>/checkpoints/best_model_stage1.pt
     finetuned_dir = results_root / "stage1-prototype" / "geolocal_StreetCLIP"
     if finetuned_dir.exists():
         latest_dt = find_latest_datetime_dir(finetuned_dir)
         if latest_dt:
-            ckpt_path = latest_dt / "checkpoints" / "checkpoint_epoch_50.pt"
+            ckpt_path = latest_dt / "checkpoints" / "best_model_stage1.pt"
             if ckpt_path.exists():
                 checkpoints.append(ckpt_path)
                 logger.info(f"Found latest finetuned Stage 1 checkpoint: {ckpt_path}")

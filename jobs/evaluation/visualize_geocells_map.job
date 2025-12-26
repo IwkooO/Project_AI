@@ -1,0 +1,89 @@
+#!/bin/bash
+#SBATCH --partition=cbuild
+#SBATCH --job-name=viz-geocells
+#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/evaluation/visualize_geocells_map.log
+#SBATCH --time=1:00:00
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=16G
+
+# ============================================
+# JOB: Geocell Visualization (Geographic Map)
+# ============================================
+# This job generates geographic visualizations of geocells:
+# - World basemap with country labels
+# - Voronoi tessellation of geocells
+# - Distribution plots (by latitude, hemisphere)
+# - Supports filtering by countries and subsetting cells
+#
+# Use this when you want:
+# - Geocells shown as actual geographic regions on a world map
+# - Clean, publication-quality visualizations
+# - Subset by specific countries to reduce clutter
+#
+# Usage:
+#   sbatch jobs/evaluation/visualize_geocells_map.job
+#
+# Filter by countries (comma-separated):
+#   COUNTRIES="USA,Japan,United Kingdom" \
+#   sbatch jobs/evaluation/visualize_geocells_map.job
+#
+# Limit cells shown (for cleaner plots):
+#   MAX_CELLS=200 \
+#   sbatch jobs/evaluation/visualize_geocells_map.job
+#
+# With custom output directory:
+#   OUTPUT_DIR=results/my_geocells \
+#   sbatch jobs/evaluation/visualize_geocells_map.job
+# ============================================
+
+# Activate environment
+module load 2025
+module load Anaconda3/2025.06-1
+cd /scratch-shared/pnair/Project_AI/
+
+source activate streetview_pnair
+export PYTHONNOUSERSITE=1
+export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
+export PATH="$CONDA_PREFIX/bin:$PATH"
+
+# Configuration
+RESULTS_ROOT="${RESULTS_ROOT:-results}"
+OUTPUT_DIR="${OUTPUT_DIR:-}"
+COUNTRIES="${COUNTRIES:-}"
+MAX_CELLS="${MAX_CELLS:-}"
+
+echo "============================================="
+echo "Geocell Visualization (Geographic Map)"
+echo "============================================="
+echo "Batch mode: Auto-detecting latest Stage 2 checkpoints"
+echo "Results root: $RESULTS_ROOT"
+echo "Country filter: ${COUNTRIES:-all}"
+echo "Max cells: ${MAX_CELLS:-all}"
+echo "============================================="
+
+# Build command
+CMD="python scripts/analysis/visualize_geocells_map.py \
+    --batch_mode \
+    --results_root \"$RESULTS_ROOT\""
+
+# Add optional parameters
+if [ -n "$OUTPUT_DIR" ]; then
+    CMD="$CMD --output_dir \"$OUTPUT_DIR\""
+fi
+
+if [ -n "$COUNTRIES" ]; then
+    CMD="$CMD --countries \"$COUNTRIES\""
+fi
+
+if [ -n "$MAX_CELLS" ]; then
+    CMD="$CMD --max_cells $MAX_CELLS"
+fi
+
+# Execute
+eval $CMD
+
+echo ""
+echo "============================================="
+echo "Geocell visualization complete!"
+echo "Check output directory: ${OUTPUT_DIR:-$RESULTS_ROOT/geocells_map/}"
+echo "============================================="

@@ -1,0 +1,49 @@
+#!/bin/bash
+#SBATCH --partition=cbuild
+#SBATCH --job-name=viz-geocells
+#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/evaluation/visualize_geocells.log
+#SBATCH --time=1:00:00
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=32G
+
+# Activate environment
+module load 2025
+module load Anaconda3/2025.06-1
+cd /scratch-shared/pnair/Project_AI/
+# No CUDA needed for this lightweight visualization
+
+source activate streetview_pnair
+export PYTHONNOUSERSITE=1
+export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
+export PATH="$CONDA_PREFIX/bin:$PATH"
+
+# Configuration
+RESULTS_ROOT="${RESULTS_ROOT:-results}"
+OUTPUT_DIR="${OUTPUT_DIR:-}"
+
+echo "============================================="
+echo "Geocell Visualization"
+echo "============================================="
+echo "Batch mode: Auto-detecting latest Stage 2 checkpoints"
+echo "Results root: $RESULTS_ROOT"
+echo "============================================="
+
+# Build command
+CMD="python scripts/analysis/visualize_geocells.py \
+    --batch_mode \
+    --results_root \"$RESULTS_ROOT\""
+
+# Add output_dir if specified
+if [ -n "$OUTPUT_DIR" ]; then
+    CMD="$CMD --output_dir \"$OUTPUT_DIR\""
+fi
+
+# Execute
+eval $CMD
+
+echo ""
+echo "============================================="
+echo "Geocell visualization complete!"
+echo "Check output directory: $RESULTS_ROOT/geocells/"
+echo "============================================="
+

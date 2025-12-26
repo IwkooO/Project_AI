@@ -651,10 +651,10 @@ def main():
                         help="Auto-detect and process all latest Stage 2 checkpoints")
     parser.add_argument("--results_root", type=str, default="results",
                         help="Root directory containing results (for batch mode)")
-    parser.add_argument("--csv_path", type=str, required=True,
-                        help="Path to CSV dataset")
-    parser.add_argument("--splits_json", type=str, required=True,
-                        help="Path to splits.json file")
+    parser.add_argument("--csv_path", type=str, default=None,
+                        help="Path to CSV dataset (not required with --skip_model_viz)")
+    parser.add_argument("--splits_json", type=str, default=None,
+                        help="Path to splits.json file (not required with --skip_model_viz)")
     parser.add_argument("--data_root", type=str, default="data")
     parser.add_argument("--geoguessr_id", type=str, default="6906237dc7731161a37282b2")
     parser.add_argument("--batch_size", type=int, default=32)
@@ -662,17 +662,88 @@ def main():
     parser.add_argument("--output_dir", type=str, default=None,
                         help="Output directory for plots. Default: results/interpretability/<checkpoint_name>")
     parser.add_argument("--split", type=str, default="test", choices=["train", "val", "test"],
-                        help="Which split to visualize")
+                        help="Which split to visualize (not required with --skip_model_viz)")
     parser.add_argument("--force_vanilla_encoder_for_patches", action="store_true", default=False)
+    parser.add_argument("--skip_model_viz", action="store_true", default=False,
+                        help="Skip checkpoint-based visualizations and only visualize geocells from cell_centers")
     
     args = parser.parse_args()
     
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    logger.info(f"Using device: {device}")
+    # Check if --skip_model_viz requires dataset args
+    if args.skip_model_viz:
+        if args.csv_path is None or args.splits_json is None:
+            parser.error("--csv_path and --splits_json are required for normal mode")
+        logger.info("--skip_model_viz flag set: Will only visualize geocells from checkpoints (no model loading/inference)")
+    else:
+        if args.csv_path is None:
+            parser.error("--csv_path is required when not using --skip_model_viz")
+        if args.splits_json is None:
+            parser.error("--splits_json is required when not using --skip_model_viz")
+    
+    # Setup output directory
+    if args.output_dir:
+        output_dir = Path(args.output_dir)
+    else:
+        if args.skip_model_viz:
+            output_dir = Path(args.results_root) / "geocells"
+        else:
+            output_dir = Path(args.results_root) / "interpretability"
+    output_dir.mkdir(parents=True, exist_ok=True)
     
     # Load world basemap once
     logger.info("Loading world basemap...")
     world_basemap = load_world_basemap()
+    
+    # ============ SKIP MODEL VIZ MODE (lightweight geocells only) ============
+    if args.skip_model_viz:
+        # Determine checkpoints to process
+        if args.batch_mode:
+            logger.info("Batch mode: Auto-detecting latest Stage 2 checkpoints...")
+            results_root = Path(args.results_root)
+            checkpoint_tuples = find_latest_stage2_checkpoints(results_root)
+            
+            if len(checkpoint_tuples) == 0:
+                logger.error("No Stage 2 checkpoints found!")
+                return
+            
+            logger.info(f"Found {len(checkpoint_tuples)} checkpoint(s) to process")
+        else:
+            if args.stage2_checkpoint is None:
+                parser.error("--stage2_checkpoint is required when not using --batch_mode")
+            checkpoint_tuples = [(Path(args.stage2_checkpoint), "checkpoint", "none")]
+        
+        # Process each checkpoint (only for cell_centers)
+        for ckpt_path, variant, ablation_mode in checkpoint_tuples:
+            tag = f"{variant}_{ablation_mode}" if variant != "checkpoint" else "checkpoint"
+            logger.info(f"\n{'='*60}")
+            logger.info(f"Processing: {ckpt_path}")
+            logger.info(f"Tag: {tag}")
+            logger.info(f"{'='*60}")
+            
+            # Load checkpoint (only for cell_centers)
+            logger.info(f"Loading cell centers from {ckpt_path}")
+            ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+            cell_centers = ckpt["cell_centers"]
+            
+            # Generate geocell visualization
+            title_suffix = f"({tag})" if variant != "checkpoint" else ""
+            output_path = output_dir / f"geocells_voronoi_{tag}.png"
+            plot_geocells_voronoi(
+                cell_centers, output_path,
+                world_basemap=world_basemap,
+                title_suffix=title_suffix
+            )
+        
+        logger.info("\n" + "="*60)
+        logger.info("Geocell visualization complete!")
+        logger.info(f"Output directory: {output_dir}")
+        logger.info("="*60)
+        return
+    
+    # ============ NORMAL MODE: Full interpretability analysis ============
+    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logger.info(f"Using device: {device}")
     
     # Load splits
     logger.info(f"Loading splits from {args.splits_json}")
