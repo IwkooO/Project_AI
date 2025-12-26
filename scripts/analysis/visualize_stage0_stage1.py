@@ -50,6 +50,7 @@ from PIL import Image
 
 import torch
 import torch.nn.functional as F
+from torch.utils.data import DataLoader
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -58,6 +59,12 @@ from scipy.spatial.distance import pdist, squareform
 from scipy.stats import pearsonr
 from sklearn.manifold import TSNE
 from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.cluster import KMeans
+try:
+    from umap import UMAP
+    HAS_UMAP = True
+except ImportError:
+    HAS_UMAP = False
 from tqdm import tqdm
 
 from src.dataset import PanoramaCBMDataset
@@ -209,58 +216,93 @@ def plot_parent_child_confusion(
     meta_to_parent: Dict[str, str],
     output_path: Path,
 ):
-    """Plot confusion matrix between predicted child and parent concepts."""
-    logger.info("Generating parent-child confusion matrix...")
+    """Plot UMAP visualization of parent-child concept relationships."""
+    logger.info("Generating parent-child relationship visualization...")
     
     model.eval()
-    all_pred_child = []
-    all_pred_parent = []
-    all_gt_child = []
-    all_gt_parent = []
     
-    with torch.no_grad():
-        for batch in tqdm(dataloader, desc="Computing confusion"):
-            if len(batch) == 7:
-                embeddings, concept_idx, parent_idx, _, _, _, _ = batch
-            else:
-                embeddings, concept_idx, parent_idx, _, _, _ = batch
-            embeddings = embeddings.to(device)
-            
-            outputs = model.forward_from_features(embeddings)
-            pred_child = outputs["meta_logits"].argmax(dim=1).cpu()
-            pred_parent = outputs["parent_logits"].argmax(dim=1).cpu()
-            
-            all_pred_child.extend(pred_child.numpy())
-            all_pred_parent.extend(pred_parent.numpy())
-            all_gt_child.extend(concept_idx.numpy())
-            all_gt_parent.extend(parent_idx.numpy())
+    # Get concept embeddings from model
+    T_meta = model.T_meta.detach().cpu()
+    T_parent = model.T_parent.detach().cpu()
     
-    # Map predicted child concepts to their parent
-    pred_child_to_parent = []
-    for child_idx in all_pred_child:
-        child_name = concept_names[child_idx]
+    # Combine all embeddings
+    all_embeddings = torch.cat([T_meta, T_parent], dim=0).detach().numpy()
+    
+    # Create labels and colors
+    all_labels = concept_names + parent_names
+    all_types = ['child'] * len(concept_names) + ['parent'] * len(parent_names)
+    
+    # Map each child to its parent index for coloring
+    parent_to_idx = {name: idx for idx, name in enumerate(parent_names)}
+    child_colors = []
+    for child_name in concept_names:
         parent_name = meta_to_parent.get(child_name, "Unknown")
-        parent_idx = parent_names.index(parent_name) if parent_name in parent_names else 0
-        pred_child_to_parent.append(parent_idx)
+        parent_idx = parent_to_idx.get(parent_name, 0)
+        child_colors.append(parent_idx)
     
-    # Create confusion matrix
-    cm = confusion_matrix(all_gt_parent, pred_child_to_parent, 
-                         labels=list(range(len(parent_names))))
+    # Use UMAP if available, otherwise t-SNE
+    if HAS_UMAP:
+        reducer = UMAP(n_components=2, random_state=42, n_neighbors=15, min_dist=0.1, metric='cosine')
+        logger.info("Using UMAP for dimensionality reduction...")
+    else:
+        reducer = TSNE(n_components=2, random_state=42, perplexity=min(30, len(all_embeddings)//4))
+        logger.info("Using t-SNE for dimensionality reduction...")
     
-    # Plot
-    fig, ax = plt.subplots(figsize=VIZ_FIGSIZE)
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax,
-                xticklabels=[name[:15] for name in parent_names],
-                yticklabels=[name[:15] for name in parent_names])
-    ax.set_xlabel('Predicted Parent (from Child Prediction)', fontsize=14)
-    ax.set_ylabel('Ground Truth Parent', fontsize=14)
-    ax.set_title('Parent-Child Concept Confusion Matrix', fontsize=16, fontweight='bold')
-    plt.xticks(rotation=45, ha='right')
-    plt.yticks(rotation=0)
+    embeddings_2d = reducer.fit_transform(all_embeddings)
+    
+    # Create figure with better styling
+    fig, ax = plt.subplots(figsize=(16, 12), facecolor='white')
+    
+    # Get a colormap for parents
+    n_parents = len(parent_names)
+    try:
+        cmap = plt.colormaps.get_cmap('tab20')
+    except AttributeError:
+        cmap = plt.cm.get_cmap('tab20')
+    parent_colors = [cmap(i / max(n_parents - 1, 1)) for i in range(n_parents)]
+    
+    # Plot child concepts colored by parent
+    child_embeddings = embeddings_2d[:len(concept_names)]
+    for i, (emb, parent_idx) in enumerate(zip(child_embeddings, child_colors)):
+        color = parent_colors[parent_idx]
+        ax.scatter(emb[0], emb[1], c=[color], s=30, alpha=0.6, 
+                  edgecolors='white', linewidth=0.3, zorder=1)
+    
+    # Plot parent concepts with larger markers
+    parent_embeddings = embeddings_2d[len(concept_names):]
+    for i, (emb, parent_name) in enumerate(zip(parent_embeddings, parent_names)):
+        color = parent_colors[i]
+        ax.scatter(emb[0], emb[1], c=[color], s=300, alpha=0.9, 
+                  marker='^', edgecolors='black', linewidth=1.5, zorder=3,
+                  label=parent_name[:20])
+        
+        # Add parent labels
+        ax.annotate(parent_name[:15], (emb[0], emb[1]), 
+                   fontsize=9, fontweight='bold', ha='center', va='bottom',
+                   bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8, edgecolor='black', linewidth=0.5))
+    
+    # Draw connections from children to their parents (sample a subset to avoid clutter)
+    sample_rate = max(1, len(concept_names) // 200)  # Show ~200 connections max
+    for i in range(0, len(concept_names), sample_rate):
+        child_emb = child_embeddings[i]
+        parent_name = meta_to_parent.get(concept_names[i], "Unknown")
+        if parent_name in parent_to_idx:
+            parent_idx = parent_to_idx[parent_name]
+            parent_emb = parent_embeddings[parent_idx]
+            ax.plot([child_emb[0], parent_emb[0]], [child_emb[1], parent_emb[1]], 
+                   'gray', alpha=0.15, linewidth=0.5, zorder=0)
+    
+    ax.set_xlabel('UMAP 1' if HAS_UMAP else 't-SNE 1', fontsize=14, fontweight='bold')
+    ax.set_ylabel('UMAP 2' if HAS_UMAP else 't-SNE 2', fontsize=14, fontweight='bold')
+    ax.set_title('Parent-Child Concept Relationships\n(Child concepts colored by parent, triangles = parents)', 
+                fontsize=16, fontweight='bold', pad=20)
+    ax.grid(True, alpha=0.2, linestyle='--')
+    ax.set_facecolor('#f8f9fa')
+    
     plt.tight_layout()
-    plt.savefig(output_path, dpi=VIZ_DPI, bbox_inches='tight')
+    plt.savefig(output_path, dpi=VIZ_DPI, bbox_inches='tight', facecolor='white')
     plt.close()
-    logger.info(f"Saved parent-child confusion matrix to {output_path}")
+    logger.info(f"Saved parent-child relationship visualization to {output_path}")
 
 
 def plot_hierarchical_accuracy_breakdown(
@@ -272,11 +314,12 @@ def plot_hierarchical_accuracy_breakdown(
     meta_to_parent: Dict[str, str],
     output_path: Path,
 ):
-    """Plot accuracy breakdown by parent concept."""
+    """Plot accuracy breakdown using UMAP visualization colored by accuracy."""
     logger.info("Generating hierarchical accuracy breakdown...")
     
     model.eval()
     parent_stats = defaultdict(lambda: {"correct": 0, "total": 0, "child_acc": []})
+    concept_accuracies = {}
     
     with torch.no_grad():
         for batch in tqdm(dataloader, desc="Computing hierarchical accuracy"):
@@ -293,56 +336,82 @@ def plot_hierarchical_accuracy_breakdown(
             for i in range(len(concept_idx)):
                 gt_parent_idx = parent_idx[i].item()
                 gt_parent_name = parent_names[gt_parent_idx]
+                gt_concept_idx = concept_idx[i].item()
                 
                 parent_stats[gt_parent_name]["total"] += 1
                 parent_stats[gt_parent_name]["correct"] += (pred_parent[i] == gt_parent_idx).item()
-                parent_stats[gt_parent_name]["child_acc"].append((pred_child[i] == concept_idx[i]).item())
+                child_correct = float((pred_child[i] == gt_concept_idx).item())
+                parent_stats[gt_parent_name]["child_acc"].append(child_correct)
+                
+                # Track per-concept accuracy
+                if gt_concept_idx not in concept_accuracies:
+                    concept_accuracies[gt_concept_idx] = []
+                concept_accuracies[gt_concept_idx].append(child_correct)
     
-    # Create dataframe
-    data = []
-    for parent_name, stats in parent_stats.items():
-        data.append({
-            "Parent": parent_name[:20],
-            "Parent Acc": stats["correct"] / stats["total"],
-            "Mean Child Acc": np.mean(stats["child_acc"]),
-            "Std Child Acc": np.std(stats["child_acc"]),
-            "Num Samples": stats["total"],
-        })
-    df = pd.DataFrame(data).sort_values("Parent Acc", ascending=False)
+    # Get concept embeddings and compute mean accuracy per concept
+    T_meta = model.T_meta.detach().cpu().numpy()
+    concept_mean_acc = [np.mean(concept_accuracies.get(i, [0.5])) for i in range(len(concept_names))]
     
-    # Plot
-    fig, axes = plt.subplots(1, 2, figsize=VIZ_FIGSIZE)
+    # Use UMAP if available
+    if HAS_UMAP:
+        reducer = UMAP(n_components=2, random_state=42, n_neighbors=15, min_dist=0.1, metric='cosine')
+    else:
+        reducer = TSNE(n_components=2, random_state=42, perplexity=min(30, len(T_meta)//4))
     
-    # Parent accuracy bar chart
+    embeddings_2d = reducer.fit_transform(T_meta)
+    
+    # Create figure
+    fig, axes = plt.subplots(1, 2, figsize=(20, 8), facecolor='white')
+    
+    # Left plot: Child concepts colored by accuracy
     ax1 = axes[0]
-    bars = ax1.barh(df["Parent"], df["Parent Acc"], color='steelblue', alpha=0.8)
-    ax1.set_xlabel('Accuracy', fontsize=12)
-    ax1.set_title('Parent Concept Accuracy', fontsize=14, fontweight='bold')
-    ax1.set_xlim(0, 1.0)
-    ax1.grid(axis='x', alpha=0.3)
-    for i, bar in enumerate(bars):
-        width = bar.get_width()
-        ax1.text(width + 0.01, bar.get_y() + bar.get_height()/2, 
-                f'{width:.3f}', va='center', fontsize=9)
+    scatter = ax1.scatter(embeddings_2d[:, 0], embeddings_2d[:, 1], 
+                         c=concept_mean_acc, cmap='RdYlGn', s=50, 
+                         alpha=0.7, edgecolors='white', linewidth=0.3)
+    cbar1 = plt.colorbar(scatter, ax=ax1, label='Child Concept Accuracy')
+    cbar1.set_label('Child Concept Accuracy', fontsize=12, fontweight='bold')
+    ax1.set_xlabel('UMAP 1' if HAS_UMAP else 't-SNE 1', fontsize=12, fontweight='bold')
+    ax1.set_ylabel('UMAP 2' if HAS_UMAP else 't-SNE 2', fontsize=12, fontweight='bold')
+    ax1.set_title('Child Concept Accuracy Distribution', fontsize=14, fontweight='bold')
+    ax1.grid(True, alpha=0.2, linestyle='--')
+    ax1.set_facecolor('#f8f9fa')
     
-    # Child accuracy box plot grouped by parent
+    # Right plot: Parent concepts with accuracy
+    parent_acc = [parent_stats[name]["correct"] / max(parent_stats[name]["total"], 1) 
+                  for name in parent_names]
+    parent_counts = [parent_stats[name]["total"] for name in parent_names]
+    
+    # Get parent embeddings
+    T_parent = model.T_parent.detach().cpu().numpy()
+    if HAS_UMAP:
+        parent_reducer = UMAP(n_components=2, random_state=42, n_neighbors=min(10, len(T_parent)-1), 
+                             min_dist=0.1, metric='cosine')
+    else:
+        parent_reducer = TSNE(n_components=2, random_state=42, perplexity=min(30, len(T_parent)//4))
+    parent_embeddings_2d = parent_reducer.fit_transform(T_parent)
+    
     ax2 = axes[1]
-    child_acc_by_parent = [
-        parent_stats[parent_name]["child_acc"] 
-        for parent_name in df["Parent"]
-    ]
-    bp = ax2.boxplot(child_acc_by_parent, labels=df["Parent"], vert=True, patch_artist=True)
-    for patch in bp['boxes']:
-        patch.set_facecolor('lightcoral')
-        patch.set_alpha(0.7)
-    ax2.set_ylabel('Child Concept Accuracy', fontsize=12)
-    ax2.set_title('Child Accuracy Distribution by Parent', fontsize=14, fontweight='bold')
-    ax2.set_ylim(0, 1.0)
-    ax2.grid(axis='y', alpha=0.3)
-    plt.xticks(rotation=45, ha='right')
+    scatter2 = ax2.scatter(parent_embeddings_2d[:, 0], parent_embeddings_2d[:, 1],
+                          c=parent_acc, cmap='RdYlGn', s=[c*5 for c in parent_counts],
+                          alpha=0.8, edgecolors='black', linewidth=1.5)
+    
+    # Add parent labels
+    for i, (emb, name, acc) in enumerate(zip(parent_embeddings_2d, parent_names, parent_acc)):
+        ax2.annotate(f"{name[:12]}\n{acc:.2f}", (emb[0], emb[1]), 
+                    fontsize=8, ha='center', va='center',
+                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white', 
+                             alpha=0.9, edgecolor='black', linewidth=0.5))
+    
+    cbar2 = plt.colorbar(scatter2, ax=ax2, label='Parent Accuracy')
+    cbar2.set_label('Parent Concept Accuracy', fontsize=12, fontweight='bold')
+    ax2.set_xlabel('UMAP 1' if HAS_UMAP else 't-SNE 1', fontsize=12, fontweight='bold')
+    ax2.set_ylabel('UMAP 2' if HAS_UMAP else 't-SNE 2', fontsize=12, fontweight='bold')
+    ax2.set_title('Parent Concept Accuracy\n(Size = sample count)', fontsize=14, fontweight='bold')
+    ax2.grid(True, alpha=0.2, linestyle='--')
+    ax2.set_facecolor('#f8f9fa')
     
     plt.tight_layout()
-    plt.savefig(output_path, dpi=VIZ_DPI, bbox_inches='tight')
+    plt.savefig(output_path, dpi=VIZ_DPI, bbox_inches='tight', facecolor='white')
     plt.close()
     logger.info(f"Saved hierarchical accuracy breakdown to {output_path}")
 
@@ -352,28 +421,99 @@ def plot_concept_similarity_matrix(
     concept_names: List[str],
     output_path: Path,
 ):
-    """Plot concept similarity matrix."""
-    logger.info("Generating concept similarity matrix...")
+    """Plot concept similarity using UMAP with clustering visualization."""
+    logger.info("Generating concept similarity visualization...")
     
-    # Compute cosine similarity
+    # Compute cosine similarity matrix for reference
     T_meta_norm = F.normalize(T_meta, p=2, dim=1)
-    similarity = torch.mm(T_meta_norm, T_meta_norm.T).cpu().numpy()
+    similarity = torch.mm(T_meta_norm, T_meta_norm.T).detach().cpu().numpy()
     
-    # Plot
-    fig, ax = plt.subplots(figsize=min(20, len(concept_names) * 0.4), 
-                           dpi=VIZ_DPI)
-    sns.heatmap(similarity, 
-                xticklabels=[name[:20] for name in concept_names],
-                yticklabels=[name[:20] for name in concept_names],
-                cmap='RdBu_r', center=0, 
-                cbar_kws={'label': 'Cosine Similarity'}, ax=ax)
-    ax.set_title('Concept Similarity Matrix', fontsize=16, fontweight='bold')
-    plt.xticks(rotation=90)
-    plt.yticks(rotation=0)
+    # Use UMAP to visualize concept relationships
+    T_meta_np = T_meta.detach().cpu().numpy()
+    
+    if HAS_UMAP:
+        reducer = UMAP(n_components=2, random_state=42, n_neighbors=15, min_dist=0.1, metric='cosine')
+        logger.info("Using UMAP for concept similarity visualization...")
+    else:
+        reducer = TSNE(n_components=2, random_state=42, perplexity=min(30, len(T_meta_np)//4))
+        logger.info("Using t-SNE for concept similarity visualization...")
+    
+    embeddings_2d = reducer.fit_transform(T_meta_np)
+    
+    # Perform clustering to identify concept groups
+    n_clusters = min(20, len(concept_names) // 10)  # Adaptive number of clusters
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+    cluster_labels = kmeans.fit_predict(T_meta_np)
+    
+    # Create figure with two subplots
+    fig, axes = plt.subplots(1, 2, figsize=(20, 9), facecolor='white')
+    
+    # Left plot: UMAP with clusters
+    ax1 = axes[0]
+    scatter = ax1.scatter(embeddings_2d[:, 0], embeddings_2d[:, 1], 
+                         c=cluster_labels, cmap='tab20', s=40, 
+                         alpha=0.7, edgecolors='white', linewidth=0.3)
+    
+    # Add cluster centers
+    cluster_centers_2d = reducer.transform(kmeans.cluster_centers_)
+    ax1.scatter(cluster_centers_2d[:, 0], cluster_centers_2d[:, 1],
+               c='black', s=200, marker='X', edgecolors='white', linewidth=2,
+               label='Cluster Centers', zorder=5)
+    
+    ax1.set_xlabel('UMAP 1' if HAS_UMAP else 't-SNE 1', fontsize=12, fontweight='bold')
+    ax1.set_ylabel('UMAP 2' if HAS_UMAP else 't-SNE 2', fontsize=12, fontweight='bold')
+    ax1.set_title(f'Concept Clustering ({n_clusters} clusters)', fontsize=14, fontweight='bold')
+    ax1.grid(True, alpha=0.2, linestyle='--')
+    ax1.set_facecolor('#f8f9fa')
+    ax1.legend()
+    
+    # Right plot: Similarity heatmap (sampled for readability)
+    ax2 = axes[1]
+    # Sample concepts if too many
+    max_concepts = 50
+    if len(concept_names) > max_concepts:
+        # Select diverse concepts using cluster representatives
+        selected_indices = []
+        for cluster_id in range(n_clusters):
+            cluster_mask = cluster_labels == cluster_id
+            cluster_indices = np.where(cluster_mask)[0]
+            if len(cluster_indices) > 0:
+                # Select a few from each cluster
+                n_select = max(1, len(cluster_indices) * max_concepts // len(concept_names))
+                selected = np.random.choice(cluster_indices, 
+                                          size=min(n_select, len(cluster_indices)), 
+                                          replace=False)
+                selected_indices.extend(selected)
+        selected_indices = sorted(selected_indices[:max_concepts])
+        sampled_similarity = similarity[np.ix_(selected_indices, selected_indices)]
+        sampled_names = [concept_names[i] for i in selected_indices]
+    else:
+        sampled_similarity = similarity
+        sampled_names = concept_names
+    
+    im = ax2.imshow(sampled_similarity, cmap='RdYlBu_r', aspect='auto', 
+                   vmin=-1, vmax=1, interpolation='nearest')
+    
+    # Add colorbar
+    cbar = plt.colorbar(im, ax=ax2, label='Cosine Similarity')
+    cbar.set_label('Cosine Similarity', fontsize=12, fontweight='bold')
+    
+    # Set ticks
+    tick_positions = np.arange(len(sampled_names))
+    ax2.set_xticks(tick_positions)
+    ax2.set_yticks(tick_positions)
+    ax2.set_xticklabels([name[:15] for name in sampled_names], 
+                       rotation=90, ha='right', fontsize=8)
+    ax2.set_yticklabels([name[:15] for name in sampled_names], fontsize=8)
+    
+    ax2.set_title(f'Concept Similarity Matrix\n(Sampled {len(sampled_names)} concepts)', 
+                 fontsize=14, fontweight='bold')
+    ax2.set_facecolor('#f8f9fa')
+    
     plt.tight_layout()
-    plt.savefig(output_path, dpi=VIZ_DPI, bbox_inches='tight')
+    plt.savefig(output_path, dpi=VIZ_DPI, bbox_inches='tight', facecolor='white')
     plt.close()
-    logger.info(f"Saved concept similarity matrix to {output_path}")
+    logger.info(f"Saved concept similarity visualization to {output_path}")
 
 
 # ============================================================================
@@ -392,7 +532,7 @@ def plot_embedding_tsne(
     logger.info("Generating embedding t-SNE visualization...")
     
     # Combine meta and parent embeddings
-    all_embeddings = torch.cat([T_meta, T_parent], dim=0).cpu().numpy()
+    all_embeddings = torch.cat([T_meta, T_parent], dim=0).detach().cpu().numpy()
     all_labels = concept_names + parent_names
     all_types = ['child'] * len(concept_names) + ['parent'] * len(parent_names)
     
@@ -461,8 +601,11 @@ def plot_gps_concept_correlation(
             embeddings = embeddings.to(device)
             
             outputs = model.forward_from_features(embeddings)
-            all_gps_embs.append(coords.numpy())
-            all_concept_embs.append(outputs["concept_emb"].cpu().numpy())
+            if torch.is_tensor(coords):
+                all_gps_embs.append(coords.detach().cpu().numpy())
+            else:
+                all_gps_embs.append(coords)
+            all_concept_embs.append(outputs["concept_emb"].detach().cpu().numpy())
     
     gps_embs = np.vstack(all_gps_embs)
     concept_embs = np.vstack(all_concept_embs)
@@ -569,7 +712,8 @@ def plot_class_distribution(
     }).sort_values('Count', ascending=False)
     
     # Plot
-    fig, ax = plt.subplots(figsize=min(20, len(concept_names) * 0.3))
+    figsize_width = min(20, len(concept_names) * 0.3)
+    fig, ax = plt.subplots(figsize=(figsize_width, max(8, len(concept_names) * 0.15)))
     bars = ax.barh(df['Concept'], df['Count'], color='steelblue', alpha=0.7)
     ax.set_xlabel('Number of Samples', fontsize=12)
     ax.set_ylabel('Concept', fontsize=12)
@@ -663,12 +807,28 @@ def plot_prototype_residuals(
     """Plot prototype residuals (learned adjustments from base prototypes)."""
     logger.info("Generating prototype residuals visualization...")
     
-    # Compute residuals
-    T_meta_learned = model.T_meta.cpu()
-    T_parent_learned = model.T_parent.cpu()
+    # Get learned prototypes
+    T_meta_learned = model.T_meta.detach().cpu()
+    T_parent_learned = model.T_parent.detach().cpu()
+    T_meta_base_cpu = T_meta_base.detach().cpu() if torch.is_tensor(T_meta_base) else T_meta_base.cpu()
+    T_parent_base_cpu = T_parent_base.detach().cpu() if torch.is_tensor(T_parent_base) else T_parent_base.cpu()
     
-    meta_residual = torch.norm(T_meta_learned - T_meta_base.cpu(), dim=1).numpy()
-    parent_residual = torch.norm(T_parent_learned - T_parent_base.cpu(), dim=1).numpy()
+    # Check dimensions and compute appropriate distance metric
+    if T_meta_learned.shape[1] == T_meta_base_cpu.shape[1]:
+        # Same dimension - use L2 distance
+        meta_residual = torch.norm(T_meta_learned - T_meta_base_cpu, dim=1).detach().numpy()
+    else:
+        # Different dimensions - compute norm of learned as proxy for "activation magnitude"
+        logger.info(f"Dimension mismatch: T_meta_learned {T_meta_learned.shape} vs T_meta_base {T_meta_base_cpu.shape}, using learned prototype magnitude")
+        meta_residual = torch.norm(T_meta_learned, dim=1).detach().numpy()
+    
+    if T_parent_learned.shape[1] == T_parent_base_cpu.shape[1]:
+        # Same dimension - use L2 distance
+        parent_residual = torch.norm(T_parent_learned - T_parent_base_cpu, dim=1).detach().numpy()
+    else:
+        # Different dimensions - compute norm of learned as proxy
+        logger.info(f"Dimension mismatch: T_parent_learned {T_parent_learned.shape} vs T_parent_base {T_parent_base_cpu.shape}, using learned prototype magnitude")
+        parent_residual = torch.norm(T_parent_learned, dim=1).detach().numpy()
     
     # Plot
     fig, axes = plt.subplots(1, 2, figsize=VIZ_FIGSIZE)
@@ -678,8 +838,8 @@ def plot_prototype_residuals(
     ax1.barh(range(len(concept_names)), meta_residual, color='steelblue', alpha=0.7)
     ax1.set_yticks(range(len(concept_names)))
     ax1.set_yticklabels([name[:15] for name in concept_names], fontsize=8)
-    ax1.set_xlabel('Residual Magnitude', fontsize=12)
-    ax1.set_title('Child Concept Prototype Residuals', fontsize=14, fontweight='bold')
+    ax1.set_xlabel('Residual Magnitude / Prototype Magnitude', fontsize=12)
+    ax1.set_title('Child Concept Prototype Magnitude', fontsize=14, fontweight='bold')
     ax1.grid(axis='x', alpha=0.3)
     
     # Parent concept residuals
@@ -687,8 +847,8 @@ def plot_prototype_residuals(
     ax2.barh(range(len(parent_names)), parent_residual, color='crimson', alpha=0.7)
     ax2.set_yticks(range(len(parent_names)))
     ax2.set_yticklabels([name[:15] for name in parent_names], fontsize=10)
-    ax2.set_xlabel('Residual Magnitude', fontsize=12)
-    ax2.set_title('Parent Concept Prototype Residuals', fontsize=14, fontweight='bold')
+    ax2.set_xlabel('Residual Magnitude / Prototype Magnitude', fontsize=12)
+    ax2.set_title('Parent Concept Prototype Magnitude', fontsize=14, fontweight='bold')
     ax2.grid(axis='x', alpha=0.3)
     
     plt.tight_layout()
@@ -716,7 +876,7 @@ def plot_intra_parent_consistency(
     
     # Compute variance for each parent
     consistency_data = []
-    T_meta_learned = F.normalize(model.T_meta, p=2, dim=1).cpu().numpy()
+    T_meta_learned = F.normalize(model.T_meta, p=2, dim=1).detach().cpu().numpy()
     
     for parent_name, children in parent_to_children.items():
         if len(children) < 2:
@@ -785,11 +945,11 @@ def plot_stage0_stage1_feature_comparison(
             
             # Stage 0 concept embeddings
             stage0_out = stage0_model.concept_bottleneck(embeddings)
-            all_stage0_features.append(stage0_out.cpu().numpy())
+            all_stage0_features.append(stage0_out.detach().cpu().numpy())
             
             # Stage 1 concept embeddings
             stage1_out = stage1_model.concept_bottleneck(embeddings)
-            all_stage1_features.append(stage1_out.cpu().numpy())
+            all_stage1_features.append(stage1_out.detach().cpu().numpy())
     
     stage0_features = np.vstack(all_stage0_features)
     stage1_features = np.vstack(all_stage1_features)
@@ -799,7 +959,7 @@ def plot_stage0_stage1_feature_comparison(
         torch.from_numpy(stage0_features),
         torch.from_numpy(stage1_features),
         dim=1
-    ).numpy()
+    ).detach().numpy()
     
     # Plot
     fig, axes = plt.subplots(1, 2, figsize=VIZ_FIGSIZE)
@@ -933,70 +1093,161 @@ def main():
     
     val_dataset = SubsetDataset(full_dataset, val_samples)
     
-    # Precompute embeddings
-    logger.info("Precomputing embeddings for visualization...")
-    all_embeddings = []
-    all_concept_idx = []
-    all_parent_idx = []
-    all_country_idx = []
-    all_coords = []
+    # Load precomputed embeddings
+    logger.info("Loading precomputed embeddings...")
+    from scripts.training.train_stage1_prototype import (
+        PrecomputedEmbeddingsDataset,
+        get_embedding_cache_path,
+        load_cached_embeddings,
+    )
     
-    stage1_model.image_encoder.eval()
-    with torch.no_grad():
-        for idx in tqdm(range(len(val_dataset)), desc="Precomputing"):
-            # Get sample directly from parent dataset using parent_indices
-            parent_idx = val_dataset.parent_indices[idx]
-            sample = val_dataset.parent_dataset.samples[parent_idx]
+    # Load stage1 checkpoint to get encoder_model and stage0_checkpoint
+    stage1_ckpt = torch.load(args.stage1_checkpoint, map_location=device, weights_only=False)
+    encoder_model = stage1_ckpt.get("encoder_model", "geolocal/StreetCLIP")
+    
+    # Determine stage0 checkpoint path for embedding lookup
+    stage0_ckpt_path = args.stage0_checkpoint
+    if not stage0_ckpt_path:
+        stage0_ckpt_path = stage1_ckpt.get("stage0_checkpoint")
+    
+    # Get embedding cache path
+    cache_path = get_embedding_cache_path(
+        checkpoint_path=stage0_ckpt_path,
+        encoder_model=encoder_model,
+        data_root=args.data_root,
+        split="val",
+    )
+    
+    # Load cached embeddings
+    cached_data = load_cached_embeddings(cache_path)
+    if cached_data is None:
+        logger.warning(f"No precomputed embeddings found at {cache_path}")
+        logger.info("Falling back to computing embeddings on-the-fly...")
+        # Fallback to computing embeddings
+        all_embeddings = []
+        all_concept_idx = []
+        all_parent_idx = []
+        all_country_idx = []
+        all_coords = []
+        
+        stage1_model.image_encoder.eval()
+        with torch.no_grad():
+            for idx in tqdm(range(len(val_dataset)), desc="Computing embeddings"):
+                parent_sample_idx = val_dataset.parent_indices[idx]
+                sample = val_dataset.parent_dataset.samples[parent_sample_idx]
+                
+                image_path = sample['image_path']
+                if not isinstance(image_path, Path):
+                    image_path = Path(image_path)
+                image = Image.open(image_path).convert('RGB')
+                
+                if val_dataset.parent_dataset.transform:
+                    image = val_dataset.parent_dataset.transform(image)
+                else:
+                    image = image.resize(val_dataset.parent_dataset.image_size, Image.LANCZOS)
+                    image = np.array(image).astype(np.float32) / 255.0
+                    image = torch.from_numpy(image).permute(2, 0, 1)
+                
+                concept_idx = val_dataset.parent_dataset.concept_to_idx[sample['meta_name']]
+                parent_concept = sample.get('parent_concept', 'unknown')
+                parent_idx_tensor = torch.tensor([val_dataset.parent_dataset.parent_to_idx.get(parent_concept, 0)], dtype=torch.long)
+                country_idx_tensor = torch.tensor([val_dataset.parent_dataset.country_to_idx[sample['country']]], dtype=torch.long)
+                
+                lat = sample['lat']
+                lng = sample['lng']
+                coords_tensor = torch.tensor([lat / 90.0, lng / 180.0], dtype=torch.float32)
+                
+                images = image.unsqueeze(0).to(device)
+                features = stage1_model.image_encoder(images)
+                all_embeddings.append(features.squeeze(0).cpu())
+                all_concept_idx.append(torch.tensor([concept_idx], dtype=torch.long))
+                all_parent_idx.append(parent_idx_tensor)
+                all_country_idx.append(country_idx_tensor)
+                all_coords.append(coords_tensor)
+        
+        embeddings = torch.cat(all_embeddings, dim=0)
+        concept_idx = torch.cat(all_concept_idx, dim=0)
+        parent_idx = torch.cat(all_parent_idx, dim=0)
+        country_idx = torch.cat(all_country_idx, dim=0)
+        coords = torch.cat(all_coords, dim=0)
+        
+        metadata_list = []
+        for idx in range(len(val_dataset)):
+            parent_sample_idx = val_dataset.parent_indices[idx]
+            metadata_list.append(val_dataset.parent_dataset.samples[parent_sample_idx])
+    else:
+        # Filter cached embeddings to match val_samples
+        logger.info(f"Loaded precomputed embeddings from {cache_path}")
+        (cached_embeddings, cached_concept_idx, cached_parent_idx, 
+         cached_country_idx, cached_coords, cached_cell_labels) = cached_data[0]
+        cached_metadata = cached_data[1]
+        
+        # Create a mapping from sample to index in cached data
+        # Match by image_path (normalized) or pano_id
+        def normalize_path(path):
+            """Normalize path for comparison."""
+            if path is None:
+                return None
+            return str(Path(path).resolve())
+        
+        sample_to_cache_idx = {}
+        for i, meta in enumerate(cached_metadata or []):
+            # Try multiple keys for matching
+            key = None
+            for k in ['image_path', 'pano_id', 'pano']:
+                val = meta.get(k)
+                if val:
+                    key = normalize_path(val) if k == 'image_path' else str(val)
+                    break
+            if key:
+                sample_to_cache_idx[key] = i
+        
+        # Filter to val samples
+        filtered_indices = []
+        metadata_list = []
+        for sample in val_samples:
+            key = None
+            for k in ['image_path', 'pano_id', 'pano']:
+                val = sample.get(k)
+                if val:
+                    key = normalize_path(val) if k == 'image_path' else str(val)
+                    break
             
-            # Load and process the image
-            image_path = sample['image_path']
-            if not isinstance(image_path, Path):
-                image_path = Path(image_path)
-            image = Image.open(image_path).convert('RGB')
-            
-            # Apply transforms from the full dataset
-            if val_dataset.parent_dataset.transform:
-                image = val_dataset.parent_dataset.transform(image)
+            if key and key in sample_to_cache_idx:
+                cache_idx = sample_to_cache_idx[key]
+                filtered_indices.append(cache_idx)
+                metadata_list.append(sample)
             else:
-                image = image.resize(val_dataset.parent_dataset.image_size, Image.LANCZOS)
-                image = np.array(image).astype(np.float32) / 255.0
-                image = torch.from_numpy(image).permute(2, 0, 1)  # HWC -> CHW
-            
-            # Get indices directly
-            concept_idx = val_dataset.parent_dataset.concept_to_idx[sample['meta_name']]
-            parent_concept = sample.get('parent_concept', 'unknown')
-            parent_idx_tensor = torch.tensor([val_dataset.parent_dataset.parent_to_idx.get(parent_concept, 0)], dtype=torch.long)
-            country_idx_tensor = torch.tensor([val_dataset.parent_dataset.country_to_idx[sample['country']]], dtype=torch.long)
-            
-            # Get coordinates
-            lat = sample['lat']
-            lng = sample['lng']
-            coords_tensor = torch.tensor([lat / 90.0, lng / 180.0], dtype=torch.float32)
-            
-            # Move to device and add batch dimension
-            images = image.unsqueeze(0).to(device)
-            
-            features = stage1_model.image_encoder(images)
-            all_embeddings.append(features.squeeze(0).cpu())
-            all_concept_idx.append(torch.tensor([concept_idx], dtype=torch.long))
-            all_parent_idx.append(parent_idx_tensor)
-            all_country_idx.append(country_idx_tensor)
-            all_coords.append(coords_tensor)
+                logger.debug(f"Sample not found in cache: {sample.get('image_path', sample.get('pano_id', 'unknown'))}")
+        
+        if len(filtered_indices) == 0:
+            logger.warning("No matching samples found in cached embeddings. Using all cached data.")
+            filtered_indices = list(range(len(cached_embeddings)))
+            metadata_list = cached_metadata or [{}] * len(cached_embeddings)
+        
+        logger.info(f"Using {len(filtered_indices)} precomputed embeddings out of {len(val_samples)} val samples")
+        
+        embeddings = cached_embeddings[filtered_indices]
+        concept_idx = cached_concept_idx[filtered_indices]
+        parent_idx = cached_parent_idx[filtered_indices]
+        country_idx = cached_country_idx[filtered_indices]
+        coords = cached_coords[filtered_indices]
     
-    embeddings = torch.cat(all_embeddings, dim=0)
-    concept_idx = torch.cat(all_concept_idx, dim=0)
-    parent_idx = torch.cat(all_parent_idx, dim=0)
-    country_idx = torch.cat(all_country_idx, dim=0)
-    coords = torch.cat(all_coords, dim=0)
-    
-    # Build metadata from val_dataset samples (use parent_indices for fast lookup)
-    metadata_list = []
-    for idx in range(len(val_dataset)):
-        parent_idx = val_dataset.parent_indices[idx]
-        metadata_list.append(val_dataset.parent_dataset.samples[parent_idx])
-    
+    # Final sanitization of metadata to ensure no Path or None objects (which break torch collate)
+    sanitized_metadata = []
+    for meta in metadata_list:
+        meta_copy = {}
+        for k, v in meta.items():
+            if v is None:
+                continue # Skip None values
+            if isinstance(v, Path):
+                meta_copy[k] = str(v)
+            else:
+                meta_copy[k] = v
+        sanitized_metadata.append(meta_copy)
+    metadata_list = sanitized_metadata
+
     # Create precomputed dataset
-    from scripts.training.train_stage1_prototype import PrecomputedEmbeddingsDataset
     precomputed_dataset = PrecomputedEmbeddingsDataset(
         embeddings=embeddings,
         concept_indices=concept_idx,

@@ -1,0 +1,32 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=geoguessr-api
+#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/bot/api_server.log
+#SBATCH --time=24:00:00
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=32G
+
+# Activate environment
+module load 2025
+module load Anaconda3/2025.06-1
+cd /scratch-shared/pnair/Project_AI/
+module load CUDA/12.8.0
+
+source activate streetview_pnair
+export PYTHONNOUSERSITE=1
+export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
+export PATH="$CONDA_PREFIX/bin:$PATH"
+
+# Install flask-cors if not available
+pip install flask-cors
+
+# Stage 2 checkpoint path
+STAGE2_CHECKPOINT="/scratch-shared/pnair/Project_AI/results/stage2_cross_attention_both/2025-12-25_09-13-54/checkpoints/best_model_stage2_xattn.pt"
+
+# Run API server
+python bot/api_server.py \
+    --checkpoint $STAGE2_CHECKPOINT \
+    --host 0.0.0.0 \
+    --port 5000 \
+    --device cuda:0
