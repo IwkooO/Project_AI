@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import json
 
-from cbm.phase1.model import Phase1CBMTopKMil
+from cbm.phase1.model import Phase1CBMTopKMil, Phase1CBMCrossAttention
 from cbm.phase1.data import ConceptDataset, collate_fn
 from cbm.viz.attention import visualize_predictions_summary
 
@@ -120,6 +120,49 @@ def main():
         choices=["simple", "two_stage", "bottleneck"],
         help="Patch projection architecture type (must match training checkpoint)",
     )
+    parser.add_argument(
+        "--use-pos-encoding",
+        action="store_true",
+        default=True,
+        help="Use positional encoding (must match training checkpoint)",
+    )
+    parser.add_argument(
+        "--no-pos-encoding",
+        dest="use_pos_encoding",
+        action="store_false",
+        help="Disable positional encoding (must match training checkpoint)",
+    )
+    parser.add_argument(
+        "--max-patches",
+        type=int,
+        default=576,
+        help="Maximum number of patches for positional encoding (must match training checkpoint)",
+    )
+    parser.add_argument(
+        "--head-type",
+        type=str,
+        default="topk_mil",
+        choices=["topk_mil", "cross_attention"],
+        help="Concept head architecture (must match training checkpoint)",
+    )
+    parser.add_argument(
+        "--xattn-heads",
+        type=int,
+        default=8,
+        help="Number of attention heads for cross-attention head",
+    )
+    parser.add_argument(
+        "--xattn-temperature",
+        type=float,
+        default=1.0,
+        help="Attention temperature for cross-attention head",
+    )
+    parser.add_argument(
+        "--xattn-topk",
+        type=int,
+        default=16,
+        help="Top-K patches to attend to in cross-attention",
+    )
     
     # Options
     parser.add_argument("--batch-size", type=int, default=256, help="Batch size")
@@ -180,23 +223,42 @@ def main():
     print(f"Patch dimension: {patch_dim}")
     
     # Initialize model (patch-only)
-    print("Initializing model (canonical Phase-1)...")
     mix_local_kernel_size = int(args.mix_local_kernel_size)
     if mix_local_kernel_size == 0:
         mix_local_kernel_size = None
-    model = Phase1CBMTopKMil(
-        num_concepts=test_ds.num_concepts,
-        patch_dim=patch_dim,
-        concept_dim=args.concept_dim,
-        dropout=args.dropout,
-        mil_topk=args.mil_topk,
-        mil_tau=args.mil_tau,
-        mix_depth=args.mix_depth,
-        mix_heads=args.mix_heads,
-        mix_mlp_ratio=args.mix_mlp_ratio,
-        mix_local_kernel_size=mix_local_kernel_size,
-        proj_type=args.proj_type,
-    )
+    
+    if args.head_type == "cross_attention":
+        print("Initializing model (cross-attention head)...")
+        use_topk_attn = args.xattn_topk > 0
+        model = Phase1CBMCrossAttention(
+            num_concepts=test_ds.num_concepts,
+            patch_dim=patch_dim,
+            concept_dim=args.concept_dim,
+            dropout=args.dropout,
+            num_heads=args.xattn_heads,
+            mix_depth=args.mix_depth,
+            mix_mlp_ratio=args.mix_mlp_ratio,
+            attn_temperature=args.xattn_temperature,
+            use_topk_attn=use_topk_attn,
+            topk=args.xattn_topk if use_topk_attn else 16,
+        )
+    else:
+        print("Initializing model (canonical Phase-1)...")
+        model = Phase1CBMTopKMil(
+            num_concepts=test_ds.num_concepts,
+            patch_dim=patch_dim,
+            concept_dim=args.concept_dim,
+            dropout=args.dropout,
+            mil_topk=args.mil_topk,
+            mil_tau=args.mil_tau,
+            mix_depth=args.mix_depth,
+            mix_heads=args.mix_heads,
+            mix_mlp_ratio=args.mix_mlp_ratio,
+            mix_local_kernel_size=mix_local_kernel_size,
+            proj_type=args.proj_type,
+            use_pos_encoding=args.use_pos_encoding,
+            max_patches=args.max_patches,
+        )
     model = model.to(device)
     
     # Load checkpoint
