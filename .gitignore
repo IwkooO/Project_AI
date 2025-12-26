@@ -10,3 +10,4 @@ visualzations/cbm
 wandb/
 jobs/outputs/
 jobs/logs/
+comparisons/

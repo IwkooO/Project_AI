@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=24:00:00
-#SBATCH --output=jobs/outputs/stage2_geo_%j.out
+#SBATCH --output=jobs/outputs/stage2_geo_concept_only%j.out
 
 # Note: this env has activate.d scripts that reference optional env vars.
 # Using `set -u` (nounset) can crash `source activate` on unset vars (e.g. GEOTIFF_CSV).
@@ -36,21 +36,57 @@ TEST_CSV="${SPLITS_DIR}/dataset_test.csv"
 CACHED_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip_v2"
 
 # Concept vocab/priors
-CONCEPT_DATA="data/concept_data_v2"
+CONCEPT_DATA="${CONCEPT_DATA:-data/concept_data_v2}"
 
 # Phase1 checkpoint (must be from query_topk_256 training)
-# Update this path to point to your Phase1 checkpoint
-PHASE1_CHECKPOINT="/home/igodzwon/Project_AI/checkpoints/cbm_query_topk_256_neighborhood_k5_v2_higheracc/phase1/best_phase1.pt"
+# Best performing: DIV=1.0 with test Acc@1=0.3991
+# Can be overridden via environment variable
+PHASE1_CHECKPOINT="${PHASE1_CHECKPOINT:-/home/igodzwon/Project_AI/checkpoints/reruns/rerun_20251225_184801/SIMPLE_DIM256/PHASE1_SIMPLE_DIM256_TAU0.25_K6_STK0.40_LK5_DIV1.0/phase1/best_phase1.pt}"
 
-# Output directory for Stage 2 run
-OUTPUT_DIR="checkpoints/STAGE2_BOTH_GATE"
+# Phase1 config (must match checkpoint)
+PHASE1_TAU="${PHASE1_TAU:-0.25}"
+PHASE1_TOPK="${PHASE1_TOPK:-6}"
+PHASE1_STK="${PHASE1_STK:-0.40}"
+PHASE1_LK="${PHASE1_LK:-5}"
+PHASE1_DIV="${PHASE1_DIV:-1.0}"
+PHASE1_PROJ_TYPE="${PHASE1_PROJ_TYPE:-simple}"
 
 # Stage2 mode: 'both', 'concept_only', or 'image_only'
-# Set to empty string "" to auto-detect based on patch tokens availability
-STAGE2_MODE="both"
+# Can be overridden via environment variable
+STAGE2_MODE="${STAGE2_MODE:-concept_only}"
+
+# Output directory for Stage 2 run (includes mode and phase1 config)
+OUTPUT_DIR="${OUTPUT_DIR:-checkpoints/stage2_${PHASE1_PROJ_TYPE}_tau${PHASE1_TAU}_k${PHASE1_TOPK}_stk${PHASE1_STK}_lk${PHASE1_LK}_div${PHASE1_DIV}_${STAGE2_MODE}}"
+
+# WandB run name (can be overridden via environment variable)
+WANDB_RUN_NAME="${WANDB_RUN_NAME:-stage2_${PHASE1_PROJ_TYPE}_tau${PHASE1_TAU}_k${PHASE1_TOPK}_stk${PHASE1_STK}_lk${PHASE1_LK}_div${PHASE1_DIV}_${STAGE2_MODE}}"
 
 mkdir -p jobs/outputs
 mkdir -p "$OUTPUT_DIR"
+
+# --------------------------------------------------------------------------------------
+# IMPORTANT: Avoid race conditions / split drift during long Stage2 runs.
+# Copy split CSVs into a per-run working directory so training/eval is consistent even if
+# some other job regenerates or rewrites the shared splits.
+# --------------------------------------------------------------------------------------
+RUN_ID="${SLURM_JOB_ID:-local_$(date +%Y%m%d_%H%M%S)}"
+RUN_WORKDIR="${OUTPUT_DIR}/run_${RUN_ID}"
+RUN_SPLITS_DIR="${RUN_WORKDIR}/splits"
+mkdir -p "$RUN_SPLITS_DIR"
+
+for split in train val test; do
+  src="${SPLITS_DIR}/dataset_${split}.csv"
+  if [[ -f "${src}.bak" ]]; then
+    cp "${src}.bak" "${RUN_SPLITS_DIR}/dataset_${split}.csv"
+  else
+    cp "${src}" "${RUN_SPLITS_DIR}/dataset_${split}.csv"
+  fi
+done
+
+SPLITS_DIR="$RUN_SPLITS_DIR"
+TRAIN_CSV="${SPLITS_DIR}/dataset_train.csv"
+VAL_CSV="${SPLITS_DIR}/dataset_val.csv"
+TEST_CSV="${SPLITS_DIR}/dataset_test.csv"
 
 echo "============================================================"
 echo "Stage 2 Geolocation Training"
@@ -58,6 +94,7 @@ echo "============================================================"
 echo "Phase1 checkpoint: $PHASE1_CHECKPOINT"
 echo "Cached embeddings: $CACHED_DIR"
 echo "Output directory: $OUTPUT_DIR"
+echo "WandB run name: $WANDB_RUN_NAME"
 echo "============================================================"
 
 # Verify Phase1 checkpoint exists
@@ -104,6 +141,7 @@ fi
 echo "============================================================"
 echo "Training Stage 2 Geolocation Model"
 echo "  - Mode: $STAGE2_MODE"
+echo "  - WandB run name: $WANDB_RUN_NAME"
 echo "  - Num cells: 1000"
 echo "  - Hidden dim: 512"
 echo "  - Cross-attention layers: 2"
@@ -115,7 +153,7 @@ else
 fi
 echo "============================================================"
 
-python scripts/training/train_stage2.py \
+python -m cbm.phase2.train \
   --train-csv "$TRAIN_CSV" \
   --val-csv "$VAL_CSV" \
   ${TEST_CSV:+--test-csv "$TEST_CSV"} \
@@ -138,17 +176,17 @@ python scripts/training/train_stage2.py \
   --concept-dim 256 \
   --patch-dim 1024 \
   --phase1-dropout 0.3 \
-  --phase1-mil-topk 8 \
-  --phase1-mil-tau 0.3 \
+  --phase1-mil-topk "$PHASE1_TOPK" \
+  --phase1-mil-tau "$PHASE1_TAU" \
   --phase1-mix-depth 1 \
   --phase1-mix-heads 4 \
   --phase1-mix-mlp-ratio 2.0 \
-  --phase1-mix-local-kernel-size 5 \
+  --phase1-mix-local-kernel-size "$PHASE1_LK" \
   --text-model-name "geolocal/StreetCLIP" \
   --concept-prompt-template "a street view photo containing {}" \
   --wandb \
   --wandb-project "cbm_stage2" \
-  --wandb-run-name "stage2_geo_$(date +%Y%m%d_%H%M%S)" \
+  --wandb-run-name "$WANDB_RUN_NAME" \
   --early-stop-patience 10
 
 echo "============================================================"
@@ -161,3 +199,11 @@ if [[ -n "$TEST_CSV" ]]; then
   echo "  - Test visualizations: $OUTPUT_DIR/phase2/visualizations/test_set/"
 fi
 echo "============================================================"
+
+# Cleanup: Remove temporary CSV files to save disk space (they don't change)
+echo "Cleaning up temporary CSV files..."
+if [[ -d "$RUN_SPLITS_DIR" ]]; then
+  rm -f "${RUN_SPLITS_DIR}"/*.csv
+  echo "Removed CSV files from: $RUN_SPLITS_DIR"
+fi
+echo "Cleanup complete!"

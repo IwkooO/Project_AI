@@ -177,13 +177,19 @@ class ConceptHeadTopKMil(nn.Module):
                 nn.Dropout(dropout),
             )
         elif proj_type == "two_stage":
+            # Two-stage projection with increased regularization to prevent overfitting
+            # Two-stage has more capacity (patch_dim -> patch_dim -> concept_dim)
+            # so we need more aggressive dropout to prevent overfitting
+            intermediate_dropout = min(dropout * 1.5, 0.5)  # Higher dropout for intermediate layer
+            final_dropout = dropout  # Standard dropout after final projection
             self.patch_proj = nn.Sequential(
                 nn.LayerNorm(patch_dim),
                 nn.Linear(patch_dim, patch_dim, bias=False),
                 nn.GELU(),
-                nn.Dropout(dropout),
+                nn.Dropout(intermediate_dropout),  # Higher dropout: 0.45 if dropout=0.3
                 nn.Linear(patch_dim, concept_dim, bias=False),
                 nn.GELU(),
+                nn.Dropout(final_dropout),  # Additional dropout after final projection
             )
         else:  # bottleneck
             mid_dim = (patch_dim + concept_dim) // 2

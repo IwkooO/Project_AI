@@ -1,0 +1,77 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=eval_2stage_24
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=2:00:00
+#SBATCH --output=jobs/outputs/eval_two_stage_config_24_%j.out
+
+set -eo pipefail
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd "$HOME/Project_AI/"
+mkdir -p jobs/outputs
+
+echo "============================================================"
+echo "Activating environment"
+echo "============================================================"
+
+# Activate environment
+set +u
+source activate streetview
+set -u
+
+# Paths
+CACHED_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip_v2"
+BASE_DIR="checkpoints/phase1_architectures"
+
+echo "============================================================"
+echo "Configuration 24: two_stage K=6, DIV=1.0, STK=0.0"
+echo "============================================================"
+
+CHECKPOINT="${BASE_DIR}/cbm_stage_1_two_stage_tau0.25_k6_stk0.0_lk5_div1.0/phase1/best_phase1.pt"
+TEST_CSV="${BASE_DIR}/cbm_stage_1_two_stage_tau0.25_k6_stk0.0_lk5_div1.0/run_17871893/splits/dataset_test.csv"
+CONCEPT_DATA="${BASE_DIR}/cbm_stage_1_two_stage_tau0.25_k6_stk0.0_lk5_div1.0/run_17871893/concept_data_v2"
+EVAL_OUTPUT="${BASE_DIR}/cbm_stage_1_two_stage_tau0.25_k6_stk0.0_lk5_div1.0/test_evaluation"
+
+if [[ ! -f "$CHECKPOINT" ]]; then
+  echo "ERROR: Checkpoint not found at $CHECKPOINT"
+  exit 1
+fi
+
+if [[ ! -f "$TEST_CSV" ]]; then
+  echo "ERROR: Test CSV not found at $TEST_CSV"
+  exit 1
+fi
+
+mkdir -p "$EVAL_OUTPUT"
+
+python -m cbm.phase1.eval \
+  --checkpoint "$CHECKPOINT" \
+  --test-csv "$TEST_CSV" \
+  --cached-dir "$CACHED_DIR" \
+  --concept-data-dir "$CONCEPT_DATA" \
+  --output-dir "$EVAL_OUTPUT" \
+  --concept-dim 256 \
+  --dropout 0.4 \
+  --mil-topk 6 \
+  --mil-tau 0.25 \
+  --mix-depth 1 \
+  --mix-heads 4 \
+  --mix-mlp-ratio 2.0 \
+  --mix-local-kernel-size 5 \
+  --proj-type two_stage \
+  --batch-size 64 \
+  --num-workers 4 \
+  --generate-visualizations \
+  --num-viz-samples 20 \
+  --device cuda
+
+echo ""
+echo "Configuration 24 evaluation complete!"
+echo "Results saved to: $EVAL_OUTPUT"
+

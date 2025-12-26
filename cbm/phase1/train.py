@@ -9,6 +9,7 @@ import argparse
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from pathlib import Path
 from tqdm import tqdm
@@ -128,6 +129,50 @@ def check_for_nan(tensor, name="tensor"):
         raise ValueError(f"Inf detected in {name}")
 
 
+def attention_diversity_loss(
+    attn_selected: torch.Tensor,
+    *,
+    mode: str = "offdiag",
+) -> torch.Tensor:
+    """
+    Attention diversity penalty inspired by Lin et al. (2017):
+      P = || A A^T - I ||_F^2
+
+    Where A contains one attention distribution per concept (row), and we want different
+    concepts to attend to different patches (low redundancy).
+
+    Args:
+        attn_selected: [B, M, P] attention weights for M selected concepts per sample.
+        mode:
+          - "offdiag": only penalize off-diagonal redundancy (recommended default).
+          - "full": penalize (A A^T - I) directly.
+    """
+    if attn_selected is None:
+        raise ValueError("attn_selected is None")
+    if attn_selected.dim() != 3:
+        raise ValueError(f"attn_selected must be [B,M,P], got {tuple(attn_selected.shape)}")
+
+    b, m, _p = attn_selected.shape
+    if m <= 1:
+        # Nothing to diversify if there's 0/1 concept.
+        return attn_selected.new_zeros(())
+
+    # L2-normalize over patches so dot-products in AA^T are cosine similarities.
+    A = F.normalize(attn_selected, p=2, dim=-1)  # [B, M, P]
+    G = torch.bmm(A, A.transpose(1, 2))  # [B, M, M]
+
+    mode = str(mode).lower().strip()
+    if mode == "offdiag":
+        # Zero the diagonal and penalize redundancy only.
+        G = G - torch.diag_embed(torch.diagonal(G, dim1=1, dim2=2))
+        return (G ** 2).mean()
+    if mode == "full":
+        I = torch.eye(m, device=G.device, dtype=G.dtype).unsqueeze(0).expand(b, -1, -1)
+        return ((G - I) ** 2).mean()
+
+    raise ValueError(f"Unknown diversity mode: {mode!r} (expected 'offdiag' or 'full')")
+
+
 def train_epoch(
     model,
     loader,
@@ -139,6 +184,10 @@ def train_epoch(
     anneal_attn_tau: bool = False,
     attn_tau_start: float = 0.5,
     attn_tau_end: float = 0.2,
+    attn_diversity_weight: float = 0.0,
+    attn_diversity_topm: int = 8,
+    attn_diversity_warmup_epochs: int = 5,
+    attn_diversity_mode: str = "offdiag",
 ):
     """Train for one epoch."""
     model.train()
@@ -155,6 +204,7 @@ def train_epoch(
     
     total_loss = 0.0
     total_ce_loss = 0.0
+    total_div_loss = 0.0
     correct_top1 = 0
     correct_top5 = 0
     total_samples = 0
@@ -182,6 +232,23 @@ def train_epoch(
         # CE loss
         ce_loss = criterion(c_logits, c_labels)
         loss = ce_loss
+
+        # Optional attention diversity loss (regularizer).
+        div_loss = None
+        if (
+            float(attn_diversity_weight) > 0.0
+            and epoch >= int(attn_diversity_warmup_epochs)
+            and attn_w is not None
+            and attn_w.dim() == 3
+        ):
+            # Select the top-M concepts PER SAMPLE by logits (more meaningful than attention peakiness).
+            M = min(int(attn_diversity_topm), int(c_logits.size(1)))
+            if M > 1:
+                top_idx = c_logits.topk(M, dim=1).indices  # [B, M]
+                idx_exp = top_idx.unsqueeze(-1).expand(-1, -1, attn_w.size(-1))  # [B, M, P]
+                attn_sel = torch.gather(attn_w, dim=1, index=idx_exp)  # [B, M, P]
+                div_loss = attention_diversity_loss(attn_sel, mode=attn_diversity_mode)
+                loss = loss + float(attn_diversity_weight) * div_loss
         
         # Check for NaN in loss
         if torch.isnan(loss) or torch.isinf(loss):
@@ -208,13 +275,18 @@ def train_epoch(
         batch_size = c_labels.size(0)
         total_loss += loss.item() * batch_size
         total_ce_loss += ce_loss.item() * batch_size
+        if div_loss is not None:
+            total_div_loss += float(div_loss.item()) * batch_size
         total_samples += batch_size
         
-        pbar.set_postfix({
+        postfix = {
             "Loss": f"{loss.item():.4f}",
             "Acc@1": f"{correct_top1/total_samples:.3f}",
             "Acc@5": f"{correct_top5/total_samples:.3f}",
-        })
+        }
+        if div_loss is not None:
+            postfix["Div"] = f"{float(div_loss.item()):.4f}"
+        pbar.set_postfix(postfix)
     
     avg_grad_norm = grad_norm_accum / (grad_norm_count + 1e-8) if grad_norm_count > 0 else 0.0
     
@@ -224,6 +296,7 @@ def train_epoch(
         correct_top1 / total_samples,
         correct_top5 / total_samples,
         avg_grad_norm,
+        (total_div_loss / total_samples) if total_samples > 0 else 0.0,
     )
 
 
@@ -367,6 +440,31 @@ def main():
         help="Prompt template used to compute text embeddings. Must include a '{}' placeholder for the concept name.",
     )
     parser.add_argument("--selection-metric", type=str, default="acc5", choices=["acc1", "acc5"], help="Best checkpoint selection")
+    parser.add_argument(
+        "--attn-diversity-weight",
+        type=float,
+        default=0.0,
+        help="Optional attention diversity regularizer weight (0 disables).",
+    )
+    parser.add_argument(
+        "--attn-diversity-topm",
+        type=int,
+        default=8,
+        help="When diversity is enabled, regularize only the top-M concepts per sample (selected by logits).",
+    )
+    parser.add_argument(
+        "--attn-diversity-warmup-epochs",
+        type=int,
+        default=5,
+        help="Enable attention diversity only after this many epochs (stabilizes early training).",
+    )
+    parser.add_argument(
+        "--attn-diversity-mode",
+        type=str,
+        default="offdiag",
+        choices=["offdiag", "full"],
+        help="Diversity penalty type: 'offdiag' penalizes redundancy only; 'full' matches (AA^T - I).",
+    )
     parser.add_argument("--wandb", action="store_true", help="Log to Weights & Biases")
     parser.add_argument("--wandb-project", type=str, default="cbm_concept_bottleneck")
     parser.add_argument("--wandb-entity", type=str, default=None)
@@ -591,7 +689,7 @@ def main():
     print(f"\nStarting training for {args.epochs} epochs...")
     for epoch in range(start_epoch, args.epochs):
         # Train
-        train_loss, train_ce, train_acc1, train_acc5, grad_norm = train_epoch(
+        train_loss, train_ce, train_acc1, train_acc5, grad_norm, train_div = train_epoch(
             model,
             train_loader,
             device,
@@ -602,6 +700,10 @@ def main():
             anneal_attn_tau=args.anneal_attn_tau,
             attn_tau_start=args.attn_tau_start,
             attn_tau_end=args.attn_tau_end,
+            attn_diversity_weight=args.attn_diversity_weight,
+            attn_diversity_topm=args.attn_diversity_topm,
+            attn_diversity_warmup_epochs=args.attn_diversity_warmup_epochs,
+            attn_diversity_mode=args.attn_diversity_mode,
         )
         
         scheduler.step()
@@ -615,7 +717,10 @@ def main():
         
         # Print metrics
         print(f"\nEpoch {epoch+1}/{args.epochs}:")
-        print(f"  Train: Loss={train_loss:.4f}, CE={train_ce:.4f}, Acc@1={train_acc1:.4f}, Acc@5={train_acc5:.4f}, GradNorm={grad_norm:.2f}")
+        print(
+            f"  Train: Loss={train_loss:.4f}, CE={train_ce:.4f}, Acc@1={train_acc1:.4f}, "
+            f"Acc@5={train_acc5:.4f}, GradNorm={grad_norm:.2f}, Div={train_div:.4f}"
+        )
         print(f"  Val:   CE={val_ce:.4f}, Acc@1={val_acc1:.4f}, Acc@5={val_acc5:.4f}")
         if hasattr(model.concept_head, "attn_tau"):
             tau_str = f"{float(model.concept_head.attn_tau):.3f}"
@@ -640,6 +745,7 @@ def main():
                 "train/acc1": train_acc1,
                 "train/acc5": train_acc5,
                 "train/grad_norm": grad_norm,
+                "train/div": train_div,
                 "val/ce": val_ce,
                 "val/acc1": val_acc1,
                 "val/acc5": val_acc5,

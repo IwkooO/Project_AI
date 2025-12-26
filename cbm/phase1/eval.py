@@ -113,6 +113,13 @@ def main():
         default=0,
         help="Neighborhood Attention kernel size for patch mixing (0 disables; must be odd, e.g. 3/5/7).",
     )
+    parser.add_argument(
+        "--proj-type",
+        type=str,
+        default="simple",
+        choices=["simple", "two_stage", "bottleneck"],
+        help="Patch projection architecture type (must match training checkpoint)",
+    )
     
     # Options
     parser.add_argument("--batch-size", type=int, default=256, help="Batch size")
@@ -176,6 +183,7 @@ def main():
         mix_heads=args.mix_heads,
         mix_mlp_ratio=args.mix_mlp_ratio,
         mix_local_kernel_size=mix_local_kernel_size,
+        proj_type=args.proj_type,
     )
     model = model.to(device)
     

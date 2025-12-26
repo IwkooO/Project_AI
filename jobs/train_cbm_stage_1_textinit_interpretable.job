@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=12:00:00
-#SBATCH --output=jobs/outputs/cbm_stage_1_textinit_interpretable_%j.out
+#SBATCH --output=jobs/outputs/cbm_stage_1_textinit_interpretable_REG%j.out
 
 set -eo pipefail
 
@@ -30,11 +30,25 @@ export WANDB_API_KEY="$wandb_api_key"
 # ---------------------------
 # If attention collapses to sky/floor, the most common culprit is "too soft + too many patches":
 #   high tau + high top-k makes it easy to spread mass onto correlated background.
-TAU="${TAU:-0.25}"              # try 0.25 / 0.30 / 0.35
-TOPK="${TOPK:-6}"               # try 6 / 8 / 10
-STK_MASK_PROB="${STK_MASK_PROB:-0.35}"   # try 0.15 / 0.25 / 0.35
+TAU="${TAU:-0.15}"              # Lower tau (0.15) for sharper attention, reduces overfitting
+TOPK="${TOPK:-6}"               # Keep at 6 for good balance
+STK_MASK_PROB="${STK_MASK_PROB:-0.50}"   # Increased to 0.50 to prevent single-patch shortcutting
 STK_K_MASK="${STK_K_MASK:-1}"             # usually 1; 2 is stronger
-MIX_LOCAL_KERNEL="${MIX_LOCAL_KERNEL:-5}" # keep 0 unless you explicitly want local coherence (3/5)
+MIX_LOCAL_KERNEL="${MIX_LOCAL_KERNEL:-5}" # Neighborhood attention for local coherence
+
+# Optional attention diversity loss (default: enabled with moderate weight)
+ATTN_DIV_W="${ATTN_DIV_W:-0.20}"          # Reduced from 10.0 to 0.20 for moderate regularization
+ATTN_DIV_TOPM="${ATTN_DIV_TOPM:-5}"      # Reduced from 8 to 5
+ATTN_DIV_WARMUP="${ATTN_DIV_WARMUP:-5}"
+ATTN_DIV_MODE="${ATTN_DIV_MODE:-offdiag}"  # offdiag|full
+
+# Regularization: Increased to prevent overfitting
+DROPOUT="${DROPOUT:-0.45}"              # Increased from 0.3 to 0.45
+WEIGHT_DECAY="${WEIGHT_DECAY:-0.1}"     # Increased from 0.05 to 0.1
+EARLY_STOP_PATIENCE="${EARLY_STOP_PATIENCE:-7}"  # Aggressive early stopping (default 10)
+
+# Wandb run name (optional, defaults to phase1_{run_id} in training script)
+WANDB_RUN_NAME="${WANDB_RUN_NAME:-}"
 
 RUN_TAG="tau${TAU}_k${TOPK}_stk${STK_MASK_PROB}_lk${MIX_LOCAL_KERNEL}"
 
@@ -50,11 +64,35 @@ CACHED_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_ba
 # Concept vocab/priors
 CONCEPT_DATA="data/concept_data_v2"
 
-# Output directory
-OUTPUT_DIR="checkpoints/cbm_stage_1_textinit_visinit_interpretable_${RUN_TAG}"
+# Output directory - save in phase1_textinit subdirectory
+OUTPUT_DIR="checkpoints/phase1_textinit/reg-cbm_stage_1_textinit_visinit_interpretable_${RUN_TAG}"
 CONCEPT_MAPPING="data/concept_refinement_mapped.csv"
 
-mkdir -p "$OUTPUT_DIR" "$CONCEPT_DATA"
+# --------------------------------------------------------------------------------------
+# IMPORTANT: Avoid race conditions in sweeps.
+# Do NOT overwrite shared splits or shared concept_data_v2. Use per-job working dirs.
+# --------------------------------------------------------------------------------------
+RUN_ID="${SLURM_JOB_ID:-local_$(date +%Y%m%d_%H%M%S)}"
+RUN_WORKDIR="${OUTPUT_DIR}/run_${RUN_ID}"
+RUN_SPLITS_DIR="${RUN_WORKDIR}/splits"
+RUN_CONCEPT_DATA="${RUN_WORKDIR}/concept_data_v2"
+
+mkdir -p "$OUTPUT_DIR" "$RUN_SPLITS_DIR" "$RUN_CONCEPT_DATA"
+
+for split in train val test; do
+  src="${SPLITS_DIR}/dataset_${split}.csv"
+  if [[ -f "${src}.bak" ]]; then
+    cp "${src}.bak" "${RUN_SPLITS_DIR}/dataset_${split}.csv"
+  else
+    cp "${src}" "${RUN_SPLITS_DIR}/dataset_${split}.csv"
+  fi
+done
+
+SPLITS_DIR="$RUN_SPLITS_DIR"
+TRAIN_CSV="${SPLITS_DIR}/dataset_train.csv"
+VAL_CSV="${SPLITS_DIR}/dataset_val.csv"
+TEST_CSV="${SPLITS_DIR}/dataset_test.csv"
+CONCEPT_DATA="$RUN_CONCEPT_DATA"
 
 echo "============================================================"
 echo "Step 0: Mapping meta_name -> generalized concepts"
@@ -99,6 +137,7 @@ python -m cbm.phase1.train \
   --lr 7e-5 \
   --warmup-epochs 5 \
   --wandb \
+  ${WANDB_RUN_NAME:+--wandb-run-name "$WANDB_RUN_NAME"} \
   --init-concepts-from-text \
   --concept-dim 768 \
   --concept-prompt-template "a street view photo containing {}" \
@@ -107,11 +146,16 @@ python -m cbm.phase1.train \
   --mil-topk "$TOPK" \
   --mix-depth 1 --mix-heads 4 --mix-mlp-ratio 2.0 \
   --mix-local-kernel-size "$MIX_LOCAL_KERNEL" \
-  --dropout 0.3 --weight-decay 0.05 \
+  --dropout "$DROPOUT" --weight-decay "$WEIGHT_DECAY" \
   --selection-metric acc1 \
   --stk-mask-prob "$STK_MASK_PROB" \
   --stk-k-mask "$STK_K_MASK" \
-  --stk-mask-fill min
+  --stk-mask-fill min \
+  --attn-diversity-weight "$ATTN_DIV_W" \
+  --attn-diversity-topm "$ATTN_DIV_TOPM" \
+  --attn-diversity-warmup-epochs "$ATTN_DIV_WARMUP" \
+  --attn-diversity-mode "$ATTN_DIV_MODE" \
+  --early-stop-patience "$EARLY_STOP_PATIENCE"
 
 echo "============================================================"
 echo "Training complete!"
@@ -145,7 +189,7 @@ python -m cbm.phase1.eval \
   --concept-data-dir "$CONCEPT_DATA" \
   --output-dir "$EVAL_OUTPUT_DIR" \
   --concept-dim 768 \
-  --dropout 0.3 \
+  --dropout "$DROPOUT" \
   --mil-topk "$TOPK" \
   --mil-tau "$TAU" \
   --mix-depth 1 \

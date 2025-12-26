@@ -41,8 +41,30 @@ OUTPUT_DIR="checkpoints/cbm_query_topk_scratch"
 CONCEPT_MAPPING="data/concept_refinement_mapped.csv"
 
 mkdir -p jobs/outputs
-mkdir -p "$OUTPUT_DIR"
-mkdir -p "$CONCEPT_DATA"
+# --------------------------------------------------------------------------------------
+# IMPORTANT: Avoid race conditions in sweeps.
+# Do NOT overwrite shared splits or shared concept_data_v2. Use per-job working dirs.
+# --------------------------------------------------------------------------------------
+RUN_ID="${SLURM_JOB_ID:-local_$(date +%Y%m%d_%H%M%S)}"
+RUN_WORKDIR="${OUTPUT_DIR}/run_${RUN_ID}"
+RUN_SPLITS_DIR="${RUN_WORKDIR}/splits"
+RUN_CONCEPT_DATA="${RUN_WORKDIR}/concept_data_v2"
+
+mkdir -p "$OUTPUT_DIR" "$RUN_SPLITS_DIR" "$RUN_CONCEPT_DATA"
+
+for split in train val test; do
+  src="${SPLITS_DIR}/dataset_${split}.csv"
+  if [[ -f "${src}.bak" ]]; then
+    cp "${src}.bak" "${RUN_SPLITS_DIR}/dataset_${split}.csv"
+  else
+    cp "${src}" "${RUN_SPLITS_DIR}/dataset_${split}.csv"
+  fi
+done
+
+SPLITS_DIR="$RUN_SPLITS_DIR"
+TRAIN_CSV="${SPLITS_DIR}/dataset_train.csv"
+VAL_CSV="${SPLITS_DIR}/dataset_val.csv"
+CONCEPT_DATA="$RUN_CONCEPT_DATA"
 
 echo "============================================================"
 echo "Step 0: Mapping meta_name -> generalized concepts"
