@@ -61,7 +61,7 @@ else
 fi
 
 # Optional attention diversity loss (default: disabled)
-ATTN_DIV_W="${ATTN_DIV_W:-0.0}"
+ATTN_DIV_W="${ATTN_DIV_W:-1.0}"
 ATTN_DIV_TOPM="${ATTN_DIV_TOPM:-8}"
 ATTN_DIV_WARMUP="${ATTN_DIV_WARMUP:-5}"
 ATTN_DIV_MODE="${ATTN_DIV_MODE:-offdiag}"  # offdiag|full

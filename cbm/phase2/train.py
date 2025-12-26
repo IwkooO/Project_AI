@@ -15,6 +15,7 @@ Outputs:
 import argparse
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from pathlib import Path
@@ -24,7 +25,12 @@ import json
 from datetime import datetime
 
 from cbm.phase1.model import Phase1CBMTopKMil
-from cbm.phase2.model import ConceptEmbeddingAdapter, Stage2CrossAttentionGeoHead
+from cbm.phase2.model import (
+    ConceptEmbeddingAdapter,
+    Phase1LogitsAdapter,
+    Stage2CrossAttentionGeoHead,
+    Stage2PooledLogitsGeoHead,
+)
 from cbm.phase2.data import Stage2Dataset, collate_fn_stage2
 from cbm.phase2.geocells import fit_semantic_geocells, assign_geocells, compute_offsets, latlng_to_xyz
 from cbm.phase2.metrics import haversine_km, threshold_accuracies_km, cell_accuracy, xyz_to_latlng
@@ -92,6 +98,7 @@ def load_phase1_checkpoint(
     mix_mlp_ratio: float = 4.0,
     mix_dropout: float | None = None,
     mix_local_kernel_size: int | None = None,
+    proj_type: str = "simple",
 ) -> Phase1CBMTopKMil:
     """Load and freeze Phase1 checkpoint."""
     print(f"Loading Phase1 checkpoint from {checkpoint_path}...")
@@ -109,6 +116,7 @@ def load_phase1_checkpoint(
         mix_mlp_ratio=mix_mlp_ratio,
         mix_dropout=mix_dropout,
         mix_local_kernel_size=mix_local_kernel_size,
+        proj_type=proj_type,
     )
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
@@ -157,8 +165,8 @@ def build_concept_vectors(
 
 
 def train_epoch(
-    model: Stage2CrossAttentionGeoHead,
-    concept_adapter: ConceptEmbeddingAdapter,
+    model,
+    concept_adapter,
     phase1_model: Phase1CBMTopKMil,
     loader: DataLoader,
     device: torch.device,
@@ -168,6 +176,8 @@ def train_epoch(
     epoch: int,
     cell_loss_weight: float = 1.0,
     offset_loss_weight: float = 1.0,
+    orthogonality_weight: float = 0.1,
+    balance_weight: float = 0.05,
 ):
     """Train for one epoch."""
     model.train()
@@ -202,16 +212,57 @@ def train_epoch(
                 print("Warning: No patch tokens available, skipping batch")
                 continue
         
-        # Convert logits to concept embeddings
-        concept_emb = concept_adapter(phase1_logits)  # [B, concept_dim]
+        # Convert logits to concept embeddings (or logit features for pooled_logits)
+        concept_emb = concept_adapter(phase1_logits)  # [B, K] for pooled_logits, [B, concept_dim] for others
         
         # Forward through Stage2
-        cell_logits, offset_pred, gate = model(concept_emb, patch_tokens, pooled_emb)  # [B, num_cells], [B, 3], [B, hidden_dim] | None
+        forward_output = model(concept_emb, patch_tokens, pooled_emb)
+        
+        # Handle different return signatures based on mode
+        if model.mode == "both":
+            cell_logits, offset_pred, gate, img_h_orig, concept_h_orig = forward_output
+        else:
+            cell_logits, offset_pred, gate = forward_output
+            img_h_orig = None
+            concept_h_orig = None
         
         # Losses
         cell_loss = cell_criterion(cell_logits, cell_labels)
         offset_loss = offset_criterion(offset_pred, offset_targets)
-        loss = cell_loss_weight * cell_loss + offset_loss_weight * offset_loss
+        # Scale offset loss to be on similar magnitude as cell loss
+        # Offset loss is typically ~0.0001, cell loss is ~2-6, so scale by 1000
+        offset_loss_scaled = offset_loss * 1000.0
+        loss = cell_loss_weight * cell_loss + offset_loss_weight * offset_loss_scaled
+        
+        # Orthogonality regularization: encourage complementary features
+        # Penalize high correlation between image and concept features
+        # DISABLED for pooled_logits mode: if both image and concept say "Paris", 
+        # we want the model to be twice as sure, not penalized.
+        if model.mode == "both" and img_h_orig is not None and concept_h_orig is not None and orthogonality_weight > 0.0:
+            # Normalize features
+            img_h_norm = F.normalize(img_h_orig, p=2, dim=-1)  # [B, hidden_dim]
+            concept_h_norm = F.normalize(concept_h_orig, p=2, dim=-1)  # [B, hidden_dim]
+            
+            # Compute cosine similarity (correlation) between features
+            # We want this to be low (orthogonal/complementary)
+            cosine_sim = (img_h_norm * concept_h_norm).sum(dim=-1)  # [B]
+            orthogonality_loss = (cosine_sim ** 2).mean()  # Penalize high correlation
+            loss = loss + orthogonality_weight * orthogonality_loss
+        else:
+            orthogonality_loss = torch.tensor(0.0, device=device)
+        
+        # Balance loss: prevent extreme fusion weights (too much reliance on one modality)
+        if model.mode == "both" and gate is not None and gate.numel() > 0:
+            # gate is [B, hidden_dim] with concept_weight values
+            # Extract concept_weight (first value, since it's expanded)
+            concept_weight = gate[:, 0]  # [B]
+            # Penalize extreme weights (too close to 0 or 1)
+            # Target: weights around 0.3-0.7 range (both modalities contribute)
+            target_weight = 0.5
+            balance_loss = ((concept_weight - target_weight) ** 2).mean()
+            loss = loss + balance_weight * balance_loss
+        else:
+            balance_loss = torch.tensor(0.0, device=device)
         
         loss.backward()
         optimizer.step()
@@ -227,21 +278,28 @@ def train_epoch(
         total_samples += batch_size
         
         weighted_cell_loss = cell_loss_weight * cell_loss.item()
-        weighted_offset_loss = offset_loss_weight * offset_loss.item()
+        weighted_offset_loss = offset_loss_weight * (offset_loss.item() * 1000.0)
         
         # Print mean gate weight if available
-        gate_mean = gate.mean().item() if gate is not None else None
+        if gate is not None and gate.numel() > 0:
+            gate_mean = gate[:, 0].mean().item()
+        else:
+            gate_mean = None
         
         postfix_dict = {
             "Loss": f"{loss.item():.4f}",
             "Cell": f"{cell_loss.item():.4f}",
             "Offset": f"{offset_loss.item():.4f}",
+            "OffsetScaled": f"{(offset_loss.item() * 1000.0):.4f}",
             "WCell": f"{weighted_cell_loss:.4f}",
             "WOffset": f"{weighted_offset_loss:.4f}",
             "CellAcc": f"{correct_cells/total_samples:.3f}",
         }
         if gate_mean is not None:
             postfix_dict["GateMean"] = f"{gate_mean:.4f}"
+        if model.mode == "both":
+            postfix_dict["Ortho"] = f"{orthogonality_loss.item():.4f}"
+            postfix_dict["Balance"] = f"{balance_loss.item():.4f}"
         pbar.set_postfix(postfix_dict)
     
     return (
@@ -254,8 +312,8 @@ def train_epoch(
 
 @torch.no_grad()
 def eval_epoch(
-    model: Stage2CrossAttentionGeoHead,
-    concept_adapter: ConceptEmbeddingAdapter,
+    model,
+    concept_adapter,
     phase1_model: Phase1CBMTopKMil,
     loader: DataLoader,
     device: torch.device,
@@ -298,12 +356,21 @@ def eval_epoch(
             continue
         
         concept_emb = concept_adapter(phase1_logits)
-        cell_logits, offset_pred, gate = model(concept_emb, patch_tokens, pooled_emb)
+        forward_output = model(concept_emb, patch_tokens, pooled_emb)
+        
+        # Handle different return signatures based on mode
+        if model.mode == "both":
+            cell_logits, offset_pred, gate, _, _ = forward_output
+        else:
+            cell_logits, offset_pred, gate = forward_output
         
         # Losses
         cell_loss = cell_criterion(cell_logits, cell_labels)
         offset_loss = offset_criterion(offset_pred, offset_targets)
-        loss = cell_loss_weight * cell_loss + offset_loss_weight * offset_loss
+        # Scale offset loss to be on similar magnitude as cell loss
+        # Offset loss is typically ~0.0001, cell loss is ~2-6, so scale by 1000
+        offset_loss_scaled = offset_loss * 1000.0
+        loss = cell_loss_weight * cell_loss + offset_loss_weight * offset_loss_scaled
         
         # Predictions
         pred_cells = cell_logits.argmax(dim=1).cpu().numpy()
@@ -377,7 +444,19 @@ def main():
     parser.add_argument("--num-heads", type=int, default=8, help="Number of attention heads")
     parser.add_argument("--num-layers", type=int, default=2, help="Number of cross-attention layers")
     parser.add_argument("--dropout", type=float, default=0.1, help="Dropout rate")
-    parser.add_argument("--mode", type=str, default="both", choices=["both", "concept_only", "image_only"], help="Stage2 mode")
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default="both",
+        choices=["both", "concept_only", "image_only", "pooled_logits"],
+        help="Stage2 mode",
+    )
+    parser.add_argument(
+        "--phase1-logits-temperature",
+        type=float,
+        default=1.0,
+        help="Temperature scaling for Phase1 logits when used as features (pooled_logits mode).",
+    )
     
     # Training args
     parser.add_argument("--batch-size", type=int, default=64)
@@ -386,6 +465,8 @@ def main():
     parser.add_argument("--weight-decay", type=float, default=0.01)
     parser.add_argument("--cell-loss-weight", type=float, default=1.0, help="Weight for cell classification loss")
     parser.add_argument("--offset-loss-weight", type=float, default=1.0, help="Weight for offset regression loss")
+    parser.add_argument("--orthogonality-weight", type=float, default=0.1, help="Weight for orthogonality regularization (encourages complementary features)")
+    parser.add_argument("--balance-weight", type=float, default=0.05, help="Weight for balance loss (prevents extreme fusion weights)")
     
     # Concept vector args
     parser.add_argument("--text-model-name", type=str, default="geolocal/StreetCLIP", help="HF model for text embeddings (fallback)")
@@ -402,6 +483,7 @@ def main():
     parser.add_argument("--phase1-mix-mlp-ratio", type=float, default=4.0, help="Phase1 mix MLP ratio (must match checkpoint)")
     parser.add_argument("--phase1-mix-dropout", type=float, default=None, help="Phase1 mix dropout (must match checkpoint)")
     parser.add_argument("--phase1-mix-local-kernel-size", type=int, default=None, help="Phase1 mix local kernel size (must match checkpoint, 0=None)")
+    parser.add_argument("--phase1-proj-type", type=str, default="simple", choices=["simple", "two_stage", "bottleneck"], help="Phase1 projection type (must match checkpoint)")
     
     # Other
     parser.add_argument("--wandb", action="store_true", help="Log to Weights & Biases")
@@ -564,34 +646,47 @@ def main():
         mix_mlp_ratio=args.phase1_mix_mlp_ratio,
         mix_dropout=args.phase1_mix_dropout,
         mix_local_kernel_size=mix_local_kernel_size,
+        proj_type=args.phase1_proj_type,
     )
     
-    # Build concept vectors
-    concept_vectors = build_concept_vectors(
-        phase1_model,
-        concept_names,
-        device,
-        args.text_model_name,
-        args.concept_prompt_template,
-    )
-    concept_vectors = concept_vectors.to(device)
-    
-    # Create concept adapter
-    concept_adapter = ConceptEmbeddingAdapter(concept_vectors, temperature=1.0).to(device)
-    
-    # Create Stage2 model
     num_cells_actual = len(centers_xyz)
-    stage2_model = Stage2CrossAttentionGeoHead(
-        concept_dim=args.concept_dim,
-        patch_dim=args.patch_dim,
-        num_cells=num_cells_actual,
-        hidden_dim=args.hidden_dim,
-        num_heads=args.num_heads,
-        num_layers=args.num_layers,
-        dropout=args.dropout,
-        mode=args.mode,
-        pooled_dim=detected_pooled_dim,
-    ).to(device)
+
+    if args.mode == "pooled_logits":
+        # Probe-aligned fusion: pooled embedding + Phase1 logits (no concept vectors)
+        concept_adapter = Phase1LogitsAdapter(temperature=args.phase1_logits_temperature, layernorm=True).to(device)
+        stage2_model = Stage2PooledLogitsGeoHead(
+            pooled_dim=detected_pooled_dim,
+            logits_dim=num_concepts,
+            num_cells=num_cells_actual,
+            hidden_dim=args.hidden_dim,
+            dropout=args.dropout,
+        ).to(device)
+    else:
+        # Build concept vectors
+        concept_vectors = build_concept_vectors(
+            phase1_model,
+            concept_names,
+            device,
+            args.text_model_name,
+            args.concept_prompt_template,
+        )
+        concept_vectors = concept_vectors.to(device)
+
+        # Create concept adapter
+        concept_adapter = ConceptEmbeddingAdapter(concept_vectors, temperature=1.0).to(device)
+
+        # Create Stage2 model
+        stage2_model = Stage2CrossAttentionGeoHead(
+            concept_dim=args.concept_dim,
+            patch_dim=args.patch_dim,
+            num_cells=num_cells_actual,
+            hidden_dim=args.hidden_dim,
+            num_heads=args.num_heads,
+            num_layers=args.num_layers,
+            dropout=args.dropout,
+            mode=args.mode,
+            pooled_dim=detected_pooled_dim,
+        ).to(device)
     
     print(f"Stage2 model parameters: {sum(p.numel() for p in stage2_model.parameters())/1e6:.2f}M")
     
@@ -612,12 +707,10 @@ def main():
     cell_criterion = nn.CrossEntropyLoss()
     offset_criterion = nn.MSELoss()
     
-    # Optimizer (concept_adapter has no trainable parameters, only buffers)
-    optimizer = optim.AdamW(
-        stage2_model.parameters(),
-        lr=args.lr,
-        weight_decay=args.weight_decay,
-    )
+    # Optimizer
+    # Note: some adapters (e.g., Phase1LogitsAdapter with LayerNorm) have trainable params.
+    opt_params = list(stage2_model.parameters()) + list(concept_adapter.parameters())
+    optimizer = optim.AdamW(opt_params, lr=args.lr, weight_decay=args.weight_decay)
     
     # LR scheduler
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
@@ -650,6 +743,8 @@ def main():
             epoch,
             args.cell_loss_weight,
             args.offset_loss_weight,
+            args.orthogonality_weight,
+            args.balance_weight,
         )
         
         scheduler.step()
@@ -680,11 +775,11 @@ def main():
         
         # Log to W&B
         if wandb_run:
-            # Calculate weighted losses
+            # Calculate weighted losses (offset loss is scaled by 1000 in loss calculation)
             train_weighted_cell = args.cell_loss_weight * train_cell_loss
-            train_weighted_offset = args.offset_loss_weight * train_offset_loss
+            train_weighted_offset = args.offset_loss_weight * (train_offset_loss * 1000.0)
             val_weighted_cell = args.cell_loss_weight * val_cell_loss
-            val_weighted_offset = args.offset_loss_weight * val_offset_loss
+            val_weighted_offset = args.offset_loss_weight * (val_offset_loss * 1000.0)
             
             log_dict = {
                 "epoch": epoch + 1,
@@ -861,9 +956,9 @@ def main():
         
         # Log to W&B
         if wandb_run:
-            # Calculate weighted losses
+            # Calculate weighted losses (offset loss is scaled by 1000 in loss calculation)
             test_weighted_cell = args.cell_loss_weight * test_cell_loss
-            test_weighted_offset = args.offset_loss_weight * test_offset_loss
+            test_weighted_offset = args.offset_loss_weight * (test_offset_loss * 1000.0)
             
             wandb_run.log({
                 'test/loss': test_loss,

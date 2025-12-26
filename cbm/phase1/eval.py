@@ -126,6 +126,18 @@ def main():
     parser.add_argument("--num-workers", type=int, default=4, help="Number of data workers")
     parser.add_argument("--generate-visualizations", action="store_true", help="Generate attention overlay visualizations")
     parser.add_argument("--num-viz-samples", type=int, default=20, help="Number of samples to visualize")
+    parser.add_argument(
+        "--viz-seed",
+        type=int,
+        default=0,
+        help="Seed for choosing visualization samples (ensures same images across models).",
+    )
+    parser.add_argument(
+        "--viz-indices",
+        type=str,
+        default="",
+        help="Optional comma-separated dataset indices to visualize (overrides --viz-seed/--num-viz-samples).",
+    )
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     
     args = parser.parse_args()
@@ -224,7 +236,29 @@ def main():
     
     # Generate visualizations if requested
     if args.generate_visualizations:
-        print(f"\nGenerating {args.num_viz_samples} sample visualizations...")
+        # Pick deterministic indices so different models produce comparable overlays.
+        if args.viz_indices.strip():
+            viz_indices = []
+            for part in args.viz_indices.split(","):
+                part = part.strip()
+                if not part:
+                    continue
+                viz_indices.append(int(part))
+            viz_indices = sorted(set(viz_indices))
+            print(f"\nGenerating visualizations for explicit indices: {viz_indices}")
+        else:
+            n = max(1, min(int(args.num_viz_samples), len(test_ds)))
+            rng = np.random.default_rng(int(args.viz_seed))
+            viz_indices = rng.choice(len(test_ds), n, replace=False).astype(int).tolist()
+            viz_indices = sorted(viz_indices)
+            print(f"\nGenerating {n} sample visualizations (viz_seed={args.viz_seed})...")
+
+        # Save chosen indices for reproducibility/debugging.
+        viz_idx_file = output_dir / "viz_sample_indices.json"
+        with open(viz_idx_file, "w") as f:
+            json.dump({"viz_indices": viz_indices}, f, indent=2)
+        print(f"Visualization indices saved to {viz_idx_file}")
+
         visualize_predictions_summary(
             model=model,
             dataset=test_ds,
@@ -235,6 +269,7 @@ def main():
             run_id="eval",
             reason="evaluation",
             num_samples=args.num_viz_samples,
+            sample_indices=viz_indices,
         )
         print(f"Visualizations saved to {output_dir / 'visualizations'}")
     

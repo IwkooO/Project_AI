@@ -51,12 +51,19 @@ PHASE1_LK="${PHASE1_LK:-5}"
 PHASE1_DIV="${PHASE1_DIV:-1.0}"
 PHASE1_PROJ_TYPE="${PHASE1_PROJ_TYPE:-simple}"
 
-# Stage2 mode: 'both', 'concept_only', or 'image_only'
+# Phase1 dropout (two_stage uses 0.4, others use 0.3)
+if [[ "$PHASE1_PROJ_TYPE" == "two_stage" ]]; then
+  PHASE1_DROPOUT="${PHASE1_DROPOUT:-0.4}"
+else
+  PHASE1_DROPOUT="${PHASE1_DROPOUT:-0.3}"
+fi
+
+# Stage2 mode: 'both', 'concept_only', 'image_only', or 'pooled_logits'
 # Can be overridden via environment variable
-STAGE2_MODE="${STAGE2_MODE:-concept_only}"
+STAGE2_MODE="${STAGE2_MODE:-both}"
 
 # Output directory for Stage 2 run (includes mode and phase1 config)
-OUTPUT_DIR="${OUTPUT_DIR:-checkpoints/stage2_${PHASE1_PROJ_TYPE}_tau${PHASE1_TAU}_k${PHASE1_TOPK}_stk${PHASE1_STK}_lk${PHASE1_LK}_div${PHASE1_DIV}_${STAGE2_MODE}}"
+OUTPUT_DIR="${OUTPUT_DIR:-checkpoints/stage2/stage2_${PHASE1_PROJ_TYPE}_tau${PHASE1_TAU}_k${PHASE1_TOPK}_stk${PHASE1_STK}_lk${PHASE1_LK}_div${PHASE1_DIV}_${STAGE2_MODE}}"
 
 # WandB run name (can be overridden via environment variable)
 WANDB_RUN_NAME="${WANDB_RUN_NAME:-stage2_${PHASE1_PROJ_TYPE}_tau${PHASE1_TAU}_k${PHASE1_TOPK}_stk${PHASE1_STK}_lk${PHASE1_LK}_div${PHASE1_DIV}_${STAGE2_MODE}}"
@@ -130,7 +137,8 @@ if [[ -z "$STAGE2_MODE" ]]; then
 fi
 
 # Verify mode is valid and compatible with available data
-if [[ "$STAGE2_MODE" == "both" || "$STAGE2_MODE" == "image_only" ]]; then
+# Note: pooled_logits also requires patch tokens to compute Phase1 logits.
+if [[ "$STAGE2_MODE" == "both" || "$STAGE2_MODE" == "image_only" || "$STAGE2_MODE" == "pooled_logits" ]]; then
   if [[ ! -f "$CACHED_DIR/train_patch_tokens.pt" ]]; then
     echo "ERROR: Mode '$STAGE2_MODE' requires patch tokens, but they are not found."
     echo "Please set STAGE2_MODE='concept_only' or ensure patch tokens are cached."
@@ -144,8 +152,13 @@ echo "  - Mode: $STAGE2_MODE"
 echo "  - WandB run name: $WANDB_RUN_NAME"
 echo "  - Num cells: 1000"
 echo "  - Hidden dim: 512"
-echo "  - Cross-attention layers: 2"
-echo "  - Offset loss weight: 50.0 (to balance with cell loss)"
+if [[ "$STAGE2_MODE" == "pooled_logits" ]]; then
+  echo "  - Architecture: Logit Fusion (BatchNorm on logits, separate image/logit pathways)"
+  echo "  - Orthogonality weight: 0.0 (disabled - allow complementary signals)"
+else
+  echo "  - Cross-attention layers: 2"
+fi
+echo "  - Offset loss weight: 50.0 (offset loss scaled by 1000x in code to match cell loss scale)"
 if [[ -n "$TEST_CSV" ]]; then
   echo "  - Test evaluation: Enabled"
 else
@@ -167,21 +180,24 @@ python -m cbm.phase2.train \
   --num-layers 2 \
   --dropout 0.1 \
   --mode "$STAGE2_MODE" \
-  --batch-size 64 \
+  --batch-size 128 \
   --epochs 100 \
   --lr 1e-4 \
   --weight-decay 0.01 \
   --cell-loss-weight 1.0 \
-  --offset-loss-weight 6371.0 \
+  --offset-loss-weight 50.0 \
+  --orthogonality-weight 0.0 \
+  --balance-weight 0.05 \
   --concept-dim 256 \
   --patch-dim 1024 \
-  --phase1-dropout 0.3 \
+  --phase1-dropout "$PHASE1_DROPOUT" \
   --phase1-mil-topk "$PHASE1_TOPK" \
   --phase1-mil-tau "$PHASE1_TAU" \
   --phase1-mix-depth 1 \
   --phase1-mix-heads 4 \
   --phase1-mix-mlp-ratio 2.0 \
   --phase1-mix-local-kernel-size "$PHASE1_LK" \
+  --phase1-proj-type "$PHASE1_PROJ_TYPE" \
   --text-model-name "geolocal/StreetCLIP" \
   --concept-prompt-template "a street view photo containing {}" \
   --wandb \

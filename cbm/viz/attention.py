@@ -156,14 +156,31 @@ def visualize_predictions_summary(
     run_id: Optional[str] = None,
     reason: Optional[str] = None,
     num_samples: int = 5,
+    sample_indices: Optional[list[int]] = None,
+    seed: Optional[int] = None,
 ):
     """
     Generate summary visualizations for validation samples.
     """
     model.eval()
 
-    num_samples = max(1, min(num_samples, len(dataset)))
-    indices = np.random.choice(len(dataset), num_samples, replace=False)
+    # Choose which dataset items to visualize.
+    # - If sample_indices is provided, use them (after filtering/clamping).
+    # - Else if seed is provided, sample deterministically using that seed.
+    # - Else, fall back to global RNG (keeps older behavior for training scripts).
+    if sample_indices is not None:
+        indices = [int(i) for i in sample_indices]
+        indices = [i for i in indices if 0 <= i < len(dataset)]
+        if len(indices) == 0:
+            indices = [0]
+        indices = np.array(indices, dtype=int)
+    else:
+        num_samples = max(1, min(int(num_samples), len(dataset)))
+        if seed is None:
+            indices = np.random.choice(len(dataset), num_samples, replace=False)
+        else:
+            rng = np.random.default_rng(int(seed))
+            indices = rng.choice(len(dataset), num_samples, replace=False)
 
     fig_h = 5 if phase == 1 else 7
     fig, axes = plt.subplots(len(indices), 2, figsize=(14, fig_h * len(indices)))

@@ -1,0 +1,82 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=stage2_probe
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=02:00:00
+#SBATCH --output=jobs/outputs/stage2_probe_%j.out
+
+set -eo pipefail
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd "$HOME/Project_AI/"
+mkdir -p jobs/outputs
+
+# Activate environment
+export GEOTIFF_CSV="${GEOTIFF_CSV:-}"
+set +u
+source activate streetview
+set -u
+
+# Paths (override via env vars if needed)
+SPLITS_DIR="${SPLITS_DIR:-data/6921d7831744c5356b098bf7_balanced/splits}"
+TRAIN_CSV="${TRAIN_CSV:-${SPLITS_DIR}/dataset_train.csv}"
+VAL_CSV="${VAL_CSV:-${SPLITS_DIR}/dataset_val.csv}"
+TEST_CSV="${TEST_CSV:-${SPLITS_DIR}/dataset_test.csv}"
+
+CACHED_DIR="${CACHED_DIR:-/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip_v2}"
+CONCEPT_DATA="${CONCEPT_DATA:-data/concept_data_v2}"
+
+# Phase1 checkpoint/config (override)
+PHASE1_CHECKPOINT="${PHASE1_CHECKPOINT:-/home/igodzwon/Project_AI/checkpoints/reruns/rerun_20251225_184801/SIMPLE_DIM256/PHASE1_SIMPLE_DIM256_TAU0.25_K6_STK0.40_LK5_DIV1.0/phase1/best_phase1.pt}"
+
+# Probe settings
+NUM_CELLS="${NUM_CELLS:-1000}"
+PROBE_KIND="${PROBE_KIND:-linear}"     # linear|mlp
+EPOCHS="${EPOCHS:-10}"
+LR="${LR:-0.002}"
+WD="${WD:-0.0001}"
+SEED="${SEED:-0}"
+
+OUTPUT_DIR="${OUTPUT_DIR:-checkpoints/stage2_probe/seed${SEED}_${PROBE_KIND}}"
+mkdir -p "$OUTPUT_DIR"
+
+echo "============================================================"
+echo "Stage2 Probe"
+echo "============================================================"
+echo "Train CSV: $TRAIN_CSV"
+echo "Val CSV:   $VAL_CSV"
+echo "Test CSV:  $TEST_CSV"
+echo "Cached:    $CACHED_DIR"
+echo "Concept:   $CONCEPT_DATA"
+echo "Phase1:    $PHASE1_CHECKPOINT"
+echo "Output:    $OUTPUT_DIR"
+echo "============================================================"
+
+python scripts/evaluation/stage2_probe.py \
+  --train-csv "$TRAIN_CSV" \
+  --val-csv "$VAL_CSV" \
+  --test-csv "$TEST_CSV" \
+  --cached-dir "$CACHED_DIR" \
+  --concept-data-dir "$CONCEPT_DATA" \
+  --phase1-checkpoint "$PHASE1_CHECKPOINT" \
+  --num-cells "$NUM_CELLS" \
+  --probe-kind "$PROBE_KIND" \
+  --epochs "$EPOCHS" \
+  --lr "$LR" \
+  --weight-decay "$WD" \
+  --seed "$SEED" \
+  --device cuda \
+  --output-dir "$OUTPUT_DIR" \
+  --cache-phase1-logits
+
+echo "============================================================"
+echo "Probe complete!"
+echo "Results: $OUTPUT_DIR/probe_results.json"
+echo "============================================================"
+
+
