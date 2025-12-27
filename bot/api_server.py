@@ -76,6 +76,8 @@ def load_stage2_checkpoint(checkpoint_path: Path, device: torch.device) -> tuple
     """Load Stage 2 checkpoint."""
     logger.info(f"Loading Stage 2 checkpoint from {checkpoint_path}")
     ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    # Store the checkpoint path for API endpoint
+    ckpt["checkpoint_path"] = str(checkpoint_path)
 
     stage1_ckpt_path = Path(ckpt["stage1_checkpoint"])
     stage1_ckpt_data = torch.load(stage1_ckpt_path, map_location="cpu", weights_only=False)
@@ -421,6 +423,22 @@ def true_location():
             true_location_store = {}  # Clear after reading
             return jsonify({"status": "ok", "data": result})
         return jsonify({"status": "ok", "data": None})
+
+
+@app.route('/api/v1/checkpoints', methods=['GET'])
+def get_checkpoints():
+    """Get checkpoint information for logging."""
+    global ckpt
+
+    if ckpt is None:
+        return jsonify({"error": "No checkpoint loaded"}), 400
+
+    checkpoint_info = {
+        "stage1_checkpoint": str(ckpt.get("stage1_checkpoint", "")),
+        "stage2_checkpoint": str(ckpt.get("checkpoint_path", ""))  # The path passed to load_stage2_checkpoint
+    }
+
+    return jsonify(checkpoint_info)
 
 
 def main():

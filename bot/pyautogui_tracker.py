@@ -86,25 +86,33 @@ class PyAutoGUIResultsTracker:
     6. Closes the tab and returns to the game
     """
     
-    def __init__(self, output_dir: str = "results"):
+    def __init__(self, output_dir: str = "results", stage1_checkpoint: str = None, stage2_checkpoint: str = None):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         self.results: List[RoundResult] = []
         self.connected = True  # Always "connected" since we use PyAutoGUI
-        
+
+        # Checkpoint information
+        self.stage1_checkpoint = stage1_checkpoint
+        self.stage2_checkpoint = stage2_checkpoint
+
         # Session timestamp for CSV filename
         self.session_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.csv_path = self.output_dir / f"game_results_{self.session_timestamp}.csv"
-        
+
         # Path to marker image for recognition
         self.marker_image_path = Path(__file__).parent / "marker_icon.png"
-        
+
         # Initialize CSV with headers
         self._init_csv()
-        
+
         print(f"📊 PyAutoGUI Results Tracker initialized")
         print(f"   Output: {self.csv_path}")
+        if self.stage1_checkpoint:
+            print(f"   Stage1 checkpoint: {self.stage1_checkpoint}")
+        if self.stage2_checkpoint:
+            print(f"   Stage2 checkpoint: {self.stage2_checkpoint}")
     
     def _init_csv(self):
         """Initialize CSV file with headers."""
@@ -114,7 +122,8 @@ class PyAutoGUIResultsTracker:
                 'round', 'timestamp',
                 'predicted_lat', 'predicted_lng',
                 'true_lat', 'true_lng',
-                'distance_km', 'score'
+                'distance_km', 'score',
+                'stage1_checkpoint', 'stage2_checkpoint'
             ])
     
     def connect(self) -> bool:
@@ -445,7 +454,9 @@ class PyAutoGUIResultsTracker:
                 f"{result.true_lat:.6f}" if result.true_lat is not None else "",
                 f"{result.true_lng:.6f}" if result.true_lng is not None else "",
                 f"{result.distance_km:.2f}" if result.distance_km is not None else "",
-                result.score if result.score else ""
+                result.score if result.score else "",
+                self.stage1_checkpoint or "",
+                self.stage2_checkpoint or ""
             ])
     
     def get_summary(self) -> dict:

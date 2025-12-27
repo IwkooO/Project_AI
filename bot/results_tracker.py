@@ -82,23 +82,31 @@ class ResultsTracker:
     google-chrome --remote-debugging-port=9222
     """
     
-    def __init__(self, output_dir: str = "results", chrome_debug_port: int = 9222):
+    def __init__(self, output_dir: str = "results", chrome_debug_port: int = 9222, stage1_checkpoint: str = None, stage2_checkpoint: str = None):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         self.chrome_debug_port = chrome_debug_port
         self.driver: Optional[webdriver.Chrome] = None
         self.results: List[RoundResult] = []
-        
+
+        # Checkpoint information
+        self.stage1_checkpoint = stage1_checkpoint
+        self.stage2_checkpoint = stage2_checkpoint
+
         # Session timestamp for CSV filename
         self.session_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.csv_path = self.output_dir / f"game_results_{self.session_timestamp}.csv"
-        
+
         # Initialize CSV with headers
         self._init_csv()
-        
+
         print(f"📊 Results tracker initialized")
         print(f"   Output: {self.csv_path}")
+        if self.stage1_checkpoint:
+            print(f"   Stage1 checkpoint: {self.stage1_checkpoint}")
+        if self.stage2_checkpoint:
+            print(f"   Stage2 checkpoint: {self.stage2_checkpoint}")
     
     def _init_csv(self):
         """Initialize CSV file with headers."""
@@ -108,7 +116,8 @@ class ResultsTracker:
                 'round', 'timestamp',
                 'predicted_lat', 'predicted_lng',
                 'true_lat', 'true_lng',
-                'distance_km', 'score'
+                'distance_km', 'score',
+                'stage1_checkpoint', 'stage2_checkpoint'
             ])
     
     def connect_to_chrome(self) -> bool:
@@ -315,7 +324,9 @@ class ResultsTracker:
                 f"{result.true_lat:.6f}" if result.true_lat else "",
                 f"{result.true_lng:.6f}" if result.true_lng else "",
                 f"{result.distance_km:.2f}" if result.distance_km else "",
-                result.score if result.score else ""
+                result.score if result.score else "",
+                self.stage1_checkpoint or "",
+                self.stage2_checkpoint or ""
             ])
     
     def get_summary(self) -> dict:
@@ -385,16 +396,25 @@ class SimpleResultsTracker:
     Also supports OCR-based score extraction from screenshots.
     """
     
-    def __init__(self, output_dir: str = "results"):
+    def __init__(self, output_dir: str = "results", stage1_checkpoint: str = None, stage2_checkpoint: str = None):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         self.results: List[RoundResult] = []
+
+        # Checkpoint information
+        self.stage1_checkpoint = stage1_checkpoint
+        self.stage2_checkpoint = stage2_checkpoint
+
         self.session_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.csv_path = self.output_dir / f"game_results_{self.session_timestamp}.csv"
-        
+
         self._init_csv()
         print(f"📊 Simple results tracker initialized: {self.csv_path}")
+        if self.stage1_checkpoint:
+            print(f"   Stage1 checkpoint: {self.stage1_checkpoint}")
+        if self.stage2_checkpoint:
+            print(f"   Stage2 checkpoint: {self.stage2_checkpoint}")
     
     def _init_csv(self):
         with open(self.csv_path, 'w', newline='') as f:
@@ -403,7 +423,8 @@ class SimpleResultsTracker:
                 'round', 'timestamp',
                 'predicted_lat', 'predicted_lng',
                 'true_lat', 'true_lng',
-                'distance_km', 'score'
+                'distance_km', 'score',
+                'stage1_checkpoint', 'stage2_checkpoint'
             ])
     
     def record_round(
@@ -442,7 +463,9 @@ class SimpleResultsTracker:
                 f"{result.true_lat:.6f}" if result.true_lat else "",
                 f"{result.true_lng:.6f}" if result.true_lng else "",
                 f"{result.distance_km:.2f}" if result.distance_km else "",
-                result.score if result.score else ""
+                result.score if result.score else "",
+                self.stage1_checkpoint or "",
+                self.stage2_checkpoint or ""
             ])
         
         return result
