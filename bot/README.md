@@ -31,8 +31,21 @@ flowchart TD
 ### Local Machine
 - **Chrome browser** (recommended) or Chromium-based browser
 - SSH client with port forwarding capability
+- Python 3.8+ with required packages (for GUI automation)
 - Internet connection for GeoGuessr
 - **Extension permissions**: Allow access to GeoGuessr domain
+
+## Two Bot Approaches
+
+### **Approach 1: Chrome Extension + Server ML (Recommended)**
+- ✅ **Pros**: Works remotely, browser-independent, detailed logging
+- ✅ **Cons**: Requires SSH tunneling setup
+- **Use case**: Production deployment, remote GPU access
+
+### **Approach 2: Local GUI Automation + Server ML (Hybrid) - RECOMMENDED**
+- ✅ **Pros**: Works with any browser, no extension issues, local control, automatic game flow
+- ✅ **Cons**: Requires Python locally, screen region calibration
+- **Use case**: Best for most users - handles everything automatically
 
 ## Detailed Setup Guide
 
@@ -279,6 +292,80 @@ scp -r <username>@<ssh-server>:/scratch-shared/pnair/Project_AI/bot/chrome_exten
 **Keep both running:**
 - SSH tunnel terminal (background with `-N` flag)
 - API server job (monitor with `squeue`)
+
+## Alternative: Local GUI Automation Approach
+
+If SSH tunneling is problematic, use the **hybrid GUI approach** that combines local Python automation with your remote ML model.
+
+### **Setup GUI Automation Bot (Recommended):**
+
+1. **Download bot files:**
+```bash
+# Copy from SSH server to your local machine
+scp pnair@snellius.surf.nl:/scratch-shared/pnair/Project_AI/bot/main_single_player.py .
+scp pnair@snellius.surf.nl:/scratch-shared/pnair/Project_AI/bot/select_regions.py .
+scp pnair@snellius.surf.nl:/scratch-shared/pnair/Project_AI/bot/geoguessr_bot.py .
+scp pnair@snellius.surf.nl:/scratch-shared/pnair/Project_AI/bot/test_api.py .
+```
+
+2. **Install dependencies locally:**
+```bash
+pip install pyautogui pyyaml pillow requests pynput
+```
+
+3. **Start SSH tunnel (keep running):**
+```bash
+ssh -L 5000:gcn95:5000 -N pnair@snellius.surf.nl
+```
+
+4. **Test API connection:**
+```bash
+python test_api.py
+# Should show: ✅ API working! Prediction: 8.xxxx, 80.xxxx
+```
+
+5. **Calibrate screen regions:**
+```bash
+python select_regions.py
+# Follow prompts to click on panorama and map areas
+```
+
+6. **Open GeoGuessr in browser:**
+- Go to: https://www.geoguessr.com/game/QLUS51V077CRN06h
+- Wait for game to load
+
+7. **Run the bot:**
+```bash
+python main_single_player.py
+# Press Enter when ready, bot will play automatically!
+```
+
+### **How GUI Bot Works:**
+
+1. **Screenshot capture**: Uses `pyautogui` to capture panorama region
+2. **API prediction**: Sends to your ML server at `localhost:5000`
+3. **Map clicking**: Converts lat/lng to screen coordinates and clicks
+4. **Round progression**: Presses spacebar to continue
+
+### **GUI Bot Features:**
+
+- **No browser dependencies**: Works with any browser
+- **Local control**: Easy to debug and modify
+- **Screen calibration**: Adapts to your screen layout
+- **Fallback handling**: Graceful error recovery
+
+### **Comparing Approaches:**
+
+| Feature | Chrome Extension | GUI Automation |
+|---------|------------------|----------------|
+| **Setup Complexity** | Medium (SSH tunnel) | Easy (local Python) |
+| **Browser Compatibility** | Chrome/Chromium only | Any browser |
+| **Remote GPU Access** | ✅ Full support | ✅ Via API |
+| **Debugging** | Browser console | Python prints |
+| **Visual Feedback** | Console + overlay | Screen clicks |
+| **Error Recovery** | Automatic retries | Manual intervention |
+
+**Choose GUI automation if you prefer local Python control and simpler setup!**
 
 ## API Details
 

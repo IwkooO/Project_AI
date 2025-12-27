@@ -1,17 +1,37 @@
+// Configuration - Change this if using different server setup
+const API_ENDPOINT = "http://127.0.0.1:5000/api/v1/predict";
+
 (async () => {
   console.log("🤖 GeoGuessr Bot Started - Classic Mode");
-  console.log("📍 API Endpoint: http://127.0.0.1:5000/api/v1/predict");
+  console.log("📍 API Endpoint:", API_ENDPOINT);
+  console.log("🔗 Page URL:", window.location.href);
   console.log("🎮 Waiting for game to start...");
+
+  // Check if we're on the right page
+  if (!window.location.href.includes('/game/')) {
+    console.log("❌ Not on a game page - extension disabled");
+    return;
+  }
+
+  // Test API connection first
+  console.log("🔌 Testing API connection...");
+  const apiTestResult = await testAPIConnection();
+  if (!apiTestResult) {
+    console.error("❌ Cannot connect to API server. Make sure:");
+    console.error("   1. The API server is running on Snellius (sbatch jobs/bot/api_server.job)");
+    console.error("   2. SSH tunnel is active: ssh -L 5000:localhost:5000 snellius");
+    console.error("   3. Check the API server logs for errors");
+  }
 
   // Add visual indicator
   const botIndicator = document.createElement('div');
   botIndicator.id = 'geoguessr-bot-indicator';
-  botIndicator.innerHTML = '🤖 Bot Active';
+  botIndicator.innerHTML = apiTestResult ? '🤖 Bot Active' : '🤖 Bot (No API)';
   botIndicator.style.cssText = `
     position: fixed;
     top: 10px;
     right: 10px;
-    background: rgba(0, 123, 255, 0.9);
+    background: ${apiTestResult ? 'rgba(0, 123, 255, 0.9)' : 'rgba(255, 100, 100, 0.9)'};
     color: white;
     padding: 5px 10px;
     border-radius: 5px;
@@ -24,14 +44,23 @@
 
   let currentRoundNumber = 1;
 
+  // Multiple possible selectors for guess button (GeoGuessr changes UI frequently)
+  const guessButtonSelectors = [
+    ".guess-map__guess-button",
+    "[data-qa='perform-guess']",
+    "button[class*='guess-button']",
+    "[class*='guess-map'] button",
+    "button[class*='perform-guess']"
+  ];
+
   while (true) {
     console.log(`🔄 Round ${currentRoundNumber}: Waiting for guess button...`);
-    await waitTillAppears(".guess-map__guess-button");
+    await waitTillAppearsMultiple(guessButtonSelectors);
     console.log(`✅ Round ${currentRoundNumber}: Guess button found, starting prediction...`);
-    await wait(1000);
+    await wait(1500); // Wait for panorama to fully load
 
     console.log("📸 Hiding GUI and capturing screenshot...");
-    hideGUI(true);
+  hideGUI(true);
     const response = await screenshot();
     const image = response.image;
     console.log("📸 Screenshot captured, showing GUI...");
@@ -41,27 +70,43 @@
     // Call API for prediction
     console.log("🔮 Sending image to ML model...");
     const startTime = Date.now();
-    const apiResp = await fetch("http://127.0.0.1:5000/api/v1/predict", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        image: image,
-      }),
-    });
+    
+    let apiResp;
+    let guess;
+    try {
+      apiResp = await fetch(API_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          image: image,
+        }),
+      });
 
-    if (!apiResp.ok) {
-      console.error("❌ API Error:", apiResp.status, apiResp.statusText);
-      await wait(5000); // Wait before retrying
+      if (!apiResp.ok) {
+        console.error("❌ API Error:", apiResp.status, apiResp.statusText);
+        const errorText = await apiResp.text();
+        console.error("❌ Error details:", errorText);
+        updateBotStatus("API Error", "red");
+        await wait(5000); // Wait before retrying
+        continue;
+      }
+
+      guess = await apiResp.json();
+    } catch (fetchError) {
+      console.error("❌ Failed to reach API server:", fetchError.message);
+      console.error("   Make sure SSH tunnel is running: ssh -L 5000:localhost:5000 snellius");
+      updateBotStatus("Connection Failed", "red");
+      await wait(5000);
       continue;
     }
-
-    const guess = await apiResp.json();
+    
     const predictionTime = Date.now() - startTime;
 
     console.log(`🎯 Round ${currentRoundNumber}: Prediction received in ${predictionTime}ms`);
     console.log(`📍 Predicted Location: ${guess.results.lat.toFixed(4)}, ${guess.results.lng.toFixed(4)}`);
+    updateBotStatus(`Round ${currentRoundNumber}: ${guess.results.lat.toFixed(2)}, ${guess.results.lng.toFixed(2)}`, "green");
     console.log("📤 Submitting guess to GeoGuessr...");
 
     let result;
@@ -100,11 +145,11 @@
 function screenshot() {
   console.log("📸 Requesting screenshot from background script...");
   return new Promise((resolve) => {
-    chrome.runtime.sendMessage(
-      {
-        action: "screenshot",
-      },
-      (response) => {
+  chrome.runtime.sendMessage(
+    {
+      action: "screenshot",
+    },
+    (response) => {
         console.log("📸 Screenshot received from background script");
         resolve(response);
       }
@@ -174,6 +219,58 @@ async function waitTillAppears(selector) {
     }
   }
   console.log(`✅ Element found: ${selector}`);
+}
+
+async function waitTillAppearsMultiple(selectors) {
+  console.log(`⏳ Waiting for any of: ${selectors.join(', ')}`);
+  let attempts = 0;
+  while (true) {
+    for (const selector of selectors) {
+      if (document.querySelector(selector)) {
+        console.log(`✅ Element found: ${selector}`);
+        return selector;
+      }
+    }
+    await new Promise((r) => setTimeout(r, 100));
+    attempts++;
+    if (attempts % 50 === 0) {
+      console.log(`⏳ Still waiting for guess button (${attempts * 0.1}s)`);
+      checkPanoramaStatus();
+    }
+  }
+}
+
+async function testAPIConnection() {
+  try {
+    // Simple health check - send a minimal request
+    const response = await fetch(API_ENDPOINT.replace('/predict', '/health'), {
+      method: 'GET',
+      signal: AbortSignal.timeout(5000)
+    });
+    return response.ok;
+  } catch (e) {
+    // Try the predict endpoint with a test (it will fail but confirms connection)
+    try {
+      await fetch(API_ENDPOINT, {
+        method: 'OPTIONS',
+        signal: AbortSignal.timeout(3000)
+      });
+      return true;
+    } catch (e2) {
+      console.error("API connection test failed:", e2.message);
+      return false;
+    }
+  }
+}
+
+function updateBotStatus(message, color) {
+  const indicator = document.getElementById('geoguessr-bot-indicator');
+  if (indicator) {
+    indicator.innerHTML = `🤖 ${message}`;
+    indicator.style.background = color === 'green' ? 'rgba(0, 180, 100, 0.9)' :
+                                 color === 'red' ? 'rgba(255, 100, 100, 0.9)' :
+                                 'rgba(0, 123, 255, 0.9)';
+  }
 }
 
 function checkPanoramaStatus() {

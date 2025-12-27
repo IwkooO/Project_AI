@@ -169,22 +169,28 @@ def predict_single_image(image_data: str) -> Dict:
     }
 
 
+@app.route('/api/v1/health', methods=['GET'])
+def health():
+    """Health check endpoint."""
+    return jsonify({
+        "status": "ok",
+        "model_loaded": model is not None,
+        "device": str(device) if device else "not initialized"
+    })
+
+
 @app.route('/api/v1/predict', methods=['POST'])
 def predict():
     """API endpoint for geolocation prediction."""
-    try:
-        data = request.get_json()
-        if not data or 'image' not in data:
-            return jsonify({"error": "Missing 'image' field in request"}), 400
+    data = request.get_json()
+    if not data or 'image' not in data:
+        return jsonify({"error": "Missing 'image' field in request"}), 400
 
-        image_data = data['image']
-        result = predict_single_image(image_data)
+    image_data = data['image']
+    result = predict_single_image(image_data)
+    logger.info(f"Prediction: lat={result['results']['lat']:.4f}, lng={result['results']['lng']:.4f}")
 
-        return jsonify(result)
-
-    except Exception as e:
-        logger.error(f"Error during prediction: {e}")
-        return jsonify({"error": "Internal server error"}), 500
+    return jsonify(result)
 
 
 def main():
