@@ -27,6 +27,7 @@ INFO:scripts.training.train_stage2_cross_attention:Loading Stage0 encoder weight
 INFO:scripts.training.train_stage2_cross_attention:Loaded Stage0 encoder weights into Stage2 image_encoder (missing=0, unexpected=0)
 INFO:scripts.training.train_stage2_cross_attention:Loading Stage 1 checkpoint from /scratch-shared/pnair/Project_AI/results/stage1-prototype/geolocal_StreetCLIP/2025-12-24_19-10-45/checkpoints/best_model_stage1.pt
 INFO:scripts.training.train_stage2_cross_attention:Loaded Stage 1 model with 2105 concepts, 236 parents
+INFO:__main__:📊 Logging session started: /scratch-shared/pnair/Project_AI/results/geoguessr_game_logs/2025-12-27_10-00-46
 INFO:__main__:Model loaded successfully. Starting Flask server...
  * Serving Flask app 'api_server'
  * Debug mode: off
@@ -35,35 +36,77 @@ INFO:werkzeug:[31m[1mWARNING: This is a development server. Do not use it in a
  * Running on http://127.0.0.1:5000
  * Running on http://145.136.62.117:5000
 INFO:werkzeug:[33mPress CTRL+C to quit[0m
-INFO:__main__:Prediction: lat=45.0898, lng=4.3648
-INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:01:47] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:01:50] "GET /api/v1/health HTTP/1.1" 200 -
-INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:02:12] "GET /api/v1/health HTTP/1.1" 200 -
-INFO:__main__:Prediction: lat=-45.8566, lng=168.6624
-INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:02:18] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:Prediction: lat=-36.8200, lng=-71.7791
-INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:02:29] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:Prediction: lat=-44.0287, lng=170.9909
-INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:02:40] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:Prediction: lat=-43.9924, lng=171.0533
-INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:02:51] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:Prediction: lat=-43.9686, lng=170.8979
-INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:03:01] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:05:50] "GET /api/v1/health HTTP/1.1" 200 -
-INFO:__main__:Prediction: lat=33.0791, lng=-84.4017
-INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:05:57] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:Prediction: lat=32.9170, lng=-83.9147
-INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:06:09] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:Prediction: lat=32.9587, lng=-84.4130
-INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:06:20] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:14:47] "GET /api/v1/health HTTP/1.1" 200 -
-INFO:__main__:Prediction: lat=31.6302, lng=75.1563
-INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:14:54] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:Prediction: lat=8.1109, lng=6.4716
-INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:15:03] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:Prediction: lat=34.2664, lng=135.6925
-INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:15:15] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:Prediction: lat=40.6174, lng=-104.6506
-INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:15:26] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:Prediction: lat=49.2287, lng=2.3196
-INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:15:38] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:Prediction #1: lat=8.5489, lng=80.5339
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 10:00:53] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:📊 Logged round 1 to 2025-12-27_10-00-46/
+INFO:__main__:Prediction #2: lat=44.9655, lng=4.2751
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 10:00:58] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:📊 Logged round 2 to 2025-12-27_10-00-46/
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 10:03:34] "GET /api/v1/health HTTP/1.1" 200 -
+INFO:__main__:Prediction #3: lat=42.9234, lng=-72.2575
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 10:03:53] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:📊 Logged round 3 to 2025-12-27_10-00-46/
+INFO:__main__:Prediction #4: lat=49.4048, lng=7.0973
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 10:04:05] "POST /api/v1/predict HTTP/1.1" 200 -
+/gpfs/scratch1/shared/pnair/Project_AI/bot/api_server.py:345: UserWarning: Glyph 159 (\x9f) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/gpfs/scratch1/shared/pnair/Project_AI/bot/api_server.py:349: UserWarning: Glyph 159 (\x9f) missing from font(s) DejaVu Sans.
+  plt.savefig(output_path, dpi=150, bbox_inches="tight")
+INFO:__main__:📊 Logged round 4 to 2025-12-27_10-00-46/
+INFO:__main__:Prediction #5: lat=47.2618, lng=-120.3227
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 10:04:16] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:📊 Logged round 5 to 2025-12-27_10-00-46/
+INFO:__main__:Prediction #6: lat=59.6826, lng=10.3487
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 10:04:27] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:📊 Logged round 6 to 2025-12-27_10-00-46/
+INFO:__main__:Prediction #7: lat=-16.2791, lng=-71.7811
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 10:04:39] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:📊 Logged round 7 to 2025-12-27_10-00-46/
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 10:07:25] "GET /api/v1/health HTTP/1.1" 200 -
+INFO:__main__:Prediction #8: lat=32.1422, lng=34.5132
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 10:07:31] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:📊 Logged round 8 to 2025-12-27_10-00-46/
+INFO:__main__:Prediction #9: lat=33.9728, lng=-84.9725
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 10:07:43] "POST /api/v1/predict HTTP/1.1" 200 -
+/gpfs/scratch1/shared/pnair/Project_AI/bot/api_server.py:345: UserWarning: Glyph 151 (\x97) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/gpfs/scratch1/shared/pnair/Project_AI/bot/api_server.py:345: UserWarning: Glyph 135 (\x87) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/gpfs/scratch1/shared/pnair/Project_AI/bot/api_server.py:349: UserWarning: Glyph 151 (\x97) missing from font(s) DejaVu Sans.
+  plt.savefig(output_path, dpi=150, bbox_inches="tight")
+/gpfs/scratch1/shared/pnair/Project_AI/bot/api_server.py:349: UserWarning: Glyph 135 (\x87) missing from font(s) DejaVu Sans.
+  plt.savefig(output_path, dpi=150, bbox_inches="tight")
+INFO:__main__:📊 Logged round 9 to 2025-12-27_10-00-46/
+INFO:__main__:Prediction #10: lat=49.3502, lng=1.9798
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 10:07:54] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:📊 Logged round 10 to 2025-12-27_10-00-46/
+INFO:__main__:Prediction #11: lat=32.3021, lng=-112.8549
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 10:08:05] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:📊 Logged round 11 to 2025-12-27_10-00-46/
+INFO:__main__:Prediction #12: lat=35.0822, lng=135.4539
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 10:08:17] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:📊 Logged round 12 to 2025-12-27_10-00-46/
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 10:09:10] "GET /api/v1/health HTTP/1.1" 200 -
+INFO:__main__:Prediction #13: lat=18.2034, lng=-69.8836
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 10:09:31] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:📊 Logged round 13 to 2025-12-27_10-00-46/
+INFO:__main__:Prediction #14: lat=50.0631, lng=-97.5950
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 10:09:42] "POST /api/v1/predict HTTP/1.1" 200 -
+/gpfs/scratch1/shared/pnair/Project_AI/bot/api_server.py:345: UserWarning: Glyph 142 (\x8e) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/gpfs/scratch1/shared/pnair/Project_AI/bot/api_server.py:349: UserWarning: Glyph 142 (\x8e) missing from font(s) DejaVu Sans.
+  plt.savefig(output_path, dpi=150, bbox_inches="tight")
+INFO:__main__:📊 Logged round 14 to 2025-12-27_10-00-46/
+INFO:__main__:Prediction #15: lat=61.2426, lng=6.1477
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 10:09:54] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:📊 Logged round 15 to 2025-12-27_10-00-46/
+INFO:__main__:Prediction #16: lat=-41.6813, lng=174.0545
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 10:10:05] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:📊 Logged round 16 to 2025-12-27_10-00-46/
+INFO:__main__:Prediction #17: lat=9.4170, lng=76.6696
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 10:10:16] "POST /api/v1/predict HTTP/1.1" 200 -
+/gpfs/scratch1/shared/pnair/Project_AI/bot/api_server.py:345: UserWarning: Glyph 142 (\x8e) missing from font(s) DejaVu Sans.
+  plt.tight_layout()
+/gpfs/scratch1/shared/pnair/Project_AI/bot/api_server.py:349: UserWarning: Glyph 142 (\x8e) missing from font(s) DejaVu Sans.
+  plt.savefig(output_path, dpi=150, bbox_inches="tight")
+INFO:__main__:📊 Logged round 17 to 2025-12-27_10-00-46/

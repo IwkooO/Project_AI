@@ -2,6 +2,7 @@
 GeoGuessr Bot using PyAutoGUI and Stage 2 ML model API.
 
 Takes screenshots, sends to API server, clicks on predicted location on minimap.
+Concept logging happens server-side automatically.
 """
 
 import base64
@@ -23,7 +24,7 @@ class GeoBot:
         self, 
         screen_regions: dict, 
         player: int = 1,
-        api_url: str = "http://127.0.0.1:5000/api/v1/predict"
+        api_url: str = "http://127.0.0.1:5000/api/v1/predict",
     ):
         self.player = player
         self.screen_regions = screen_regions
@@ -80,11 +81,7 @@ class GeoBot:
         return lat, lng
 
     def lat_lon_to_screen_coords(self, lat: float, lng: float) -> Tuple[int, int]:
-        """
-        Convert latitude and longitude to pixel coordinates on the minimap.
-        Uses Web Mercator projection - maps world to minimap bounds.
-        """
-        # Clamp latitude to valid Mercator range
+        """Convert latitude and longitude to pixel coordinates on the minimap."""
         lat = max(-85, min(85, lat))
         
         # X: Linear mapping of longitude (-180 to 180) to minimap width
@@ -92,30 +89,31 @@ class GeoBot:
         x = self.map_x + int(x_ratio * self.map_w)
         
         # Y: Mercator projection for latitude
-        # Convert lat to radians
         lat_rad = math.radians(lat)
-        # Mercator Y formula (normalized to 0-1 range)
         mercator_y = (1 - (math.log(math.tan(lat_rad) + 1/math.cos(lat_rad)) / math.pi)) / 2
         y = self.map_y + int(mercator_y * self.map_h)
         
-        print(f"   Conversion: ({lat:.2f}, {lng:.2f}) -> ratio ({x_ratio:.3f}, {mercator_y:.3f}) -> pixel ({x}, {y})")
+        print(f"   Conversion: ({lat:.2f}, {lng:.2f}) -> pixel ({x}, {y})")
         
         return x, y
 
     def clamp_to_minimap(self, x: int, y: int) -> Tuple[int, int]:
         """Clamp coordinates to be within the minimap bounds."""
         margin = 10
-        x = max(self.map_x + margin, min(self.map_x + self.map_w - margin, x))
-        y = max(self.map_y + margin, min(self.map_y + self.map_h - margin, y))
-        return x, y
+        x_clamped = max(self.map_x + margin, min(self.map_x + self.map_w - margin, x))
+        y_clamped = max(self.map_y + margin, min(self.map_y + self.map_h - margin, y))
+        
+        if x != x_clamped or y != y_clamped:
+            print(f"   ⚠️ Clamped from ({x}, {y}) to ({x_clamped}, {y_clamped})")
+        
+        return x_clamped, y_clamped
 
     def expand_minimap(self):
         """Hover over minimap to expand it."""
-        # Move to bottom-right corner of minimap to trigger expansion
         hover_x = self.map_x + self.map_w - 20
         hover_y = self.map_y + self.map_h - 20
         pyautogui.moveTo(hover_x, hover_y, duration=0.3)
-        sleep(0.8)  # Wait for expansion animation
+        sleep(0.8)
 
     def click_on_map(self, x: int, y: int):
         """Click on the minimap at the specified pixel location."""
@@ -129,23 +127,18 @@ class GeoBot:
 
     def next_round(self):
         """Advance to the next round."""
-        sleep(2)  # Wait for results to show
+        sleep(2)
         
         if self.next_round_button:
             pyautogui.click(self.next_round_button)
         else:
-            # Press space to continue
             pyautogui.press("space")
         
-        sleep(2)  # Wait for next round to load
+        sleep(2)
 
 
 def play_round(bot: GeoBot, round_num: int, save_screenshots: bool = True) -> bool:
-    """
-    Play a single round of GeoGuessr.
-    
-    Returns True if successful, False otherwise.
-    """
+    """Play a single round of GeoGuessr."""
     print(f"\n{'='*50}")
     print(f"🎮 ROUND {round_num}")
     print(f"{'='*50}")
@@ -154,22 +147,21 @@ def play_round(bot: GeoBot, round_num: int, save_screenshots: bool = True) -> bo
     print("⏳ Waiting for panorama to load...")
     sleep(2)
     
-    # Take screenshot of panorama
+    # Take screenshot
     print("📸 Taking screenshot...")
-    screenshot = pyautogui.screenshot(region=bot.screen_xywh)
+    image = pyautogui.screenshot(region=bot.screen_xywh)
     
     if save_screenshots:
         os.makedirs("screenshots", exist_ok=True)
-        screenshot.save(f"screenshots/round_{round_num}.png")
+        image.save(f"screenshots/round_{round_num}.png")
         print(f"   Saved to screenshots/round_{round_num}.png")
     
-    # Get prediction from ML model
+    # Get prediction from ML model (server also logs concepts)
     print("🔮 Getting ML model prediction...")
-    result = bot.predict_location(screenshot)
+    result = bot.predict_location(image)
     
     if result is None:
         print("❌ Failed to get prediction!")
-        # Fallback: click center of map
         x = bot.map_x + bot.map_w // 2
         y = bot.map_y + bot.map_h // 2
         print(f"   Using fallback: center of map ({x}, {y})")
@@ -179,11 +171,9 @@ def play_round(bot: GeoBot, round_num: int, save_screenshots: bool = True) -> bo
         
         # Convert to screen coordinates
         x, y = bot.lat_lon_to_screen_coords(lat, lng)
-        print(f"🖱️  Screen coords: ({x}, {y})")
         
         # Clamp to minimap bounds
         x, y = bot.clamp_to_minimap(x, y)
-        print(f"   Clamped to: ({x}, {y})")
     
     # Expand minimap
     print("🗺️  Expanding minimap...")

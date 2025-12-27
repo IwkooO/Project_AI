@@ -1,10 +1,17 @@
 # Requirements for running the GeoGuessr bot on your LOCAL machine
 # Install with: pip install -r requirements_local.txt
 
+# Core requirements
 pyautogui>=0.9.54
 pynput>=1.7.6
 Pillow>=9.0.0
 requests>=2.28.0
 PyYAML>=6.0
 matplotlib>=3.5.0
+numpy>=1.21.0
 
+# Optional: For panorama extraction (extracting actual Street View images)
+# selenium>=4.0.0
+
+# Optional: For concept logging (requires torch, but runs on CPU)
+# torch>=2.0.0  # Only if running concept logging locally
