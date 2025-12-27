@@ -33,10 +33,37 @@ INFO:__main__:Model loaded successfully. Starting Flask server...
 INFO:werkzeug:[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on all addresses (0.0.0.0)
  * Running on http://127.0.0.1:5000
- * Running on http://145.136.62.95:5000
+ * Running on http://145.136.62.117:5000
 INFO:werkzeug:[33mPress CTRL+C to quit[0m
-INFO:werkzeug:127.0.0.1 - - [26/Dec/2025 13:40:18] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:werkzeug:127.0.0.1 - - [26/Dec/2025 13:44:24] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:werkzeug:172.18.63.192 - - [26/Dec/2025 13:45:06] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:werkzeug:172.18.63.192 - - [26/Dec/2025 13:48:53] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:werkzeug:172.18.63.192 - - [26/Dec/2025 14:02:44] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:Prediction: lat=45.0898, lng=4.3648
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:01:47] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:01:50] "GET /api/v1/health HTTP/1.1" 200 -
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:02:12] "GET /api/v1/health HTTP/1.1" 200 -
+INFO:__main__:Prediction: lat=-45.8566, lng=168.6624
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:02:18] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:Prediction: lat=-36.8200, lng=-71.7791
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:02:29] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:Prediction: lat=-44.0287, lng=170.9909
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:02:40] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:Prediction: lat=-43.9924, lng=171.0533
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:02:51] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:Prediction: lat=-43.9686, lng=170.8979
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:03:01] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:05:50] "GET /api/v1/health HTTP/1.1" 200 -
+INFO:__main__:Prediction: lat=33.0791, lng=-84.4017
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:05:57] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:Prediction: lat=32.9170, lng=-83.9147
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:06:09] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:Prediction: lat=32.9587, lng=-84.4130
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:06:20] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:14:47] "GET /api/v1/health HTTP/1.1" 200 -
+INFO:__main__:Prediction: lat=31.6302, lng=75.1563
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:14:54] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:Prediction: lat=8.1109, lng=6.4716
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:15:03] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:Prediction: lat=34.2664, lng=135.6925
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:15:15] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:Prediction: lat=40.6174, lng=-104.6506
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:15:26] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:Prediction: lat=49.2287, lng=2.3196
+INFO:werkzeug:172.18.63.192 - - [27/Dec/2025 09:15:38] "POST /api/v1/predict HTTP/1.1" 200 -

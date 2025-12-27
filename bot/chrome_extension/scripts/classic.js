@@ -1,375 +1,390 @@
-// Configuration - Change this if using different server setup
+// GeoGuessr Bot - Classic Mode
+// Uses direct API submission (most reliable method)
 const API_ENDPOINT = "http://127.0.0.1:5000/api/v1/predict";
 
 (async () => {
-  console.log("🤖 GeoGuessr Bot Started - Classic Mode");
-  console.log("📍 API Endpoint:", API_ENDPOINT);
-  console.log("🔗 Page URL:", window.location.href);
-  console.log("🎮 Waiting for game to start...");
-
-  // Check if we're on the right page
+  console.log("🤖 GeoGuessr Bot v4 - Classic Mode");
+  
   if (!window.location.href.includes('/game/')) {
-    console.log("❌ Not on a game page - extension disabled");
+    console.log("❌ Not on a game page");
     return;
   }
 
-  // Test API connection first
-  console.log("🔌 Testing API connection...");
-  const apiTestResult = await testAPIConnection();
-  if (!apiTestResult) {
-    console.error("❌ Cannot connect to API server. Make sure:");
-    console.error("   1. The API server is running on Snellius (sbatch jobs/bot/api_server.job)");
-    console.error("   2. SSH tunnel is active: ssh -L 5000:localhost:5000 snellius");
-    console.error("   3. Check the API server logs for errors");
-  }
-
-  // Add visual indicator
-  const botIndicator = document.createElement('div');
-  botIndicator.id = 'geoguessr-bot-indicator';
-  botIndicator.innerHTML = apiTestResult ? '🤖 Bot Active' : '🤖 Bot (No API)';
-  botIndicator.style.cssText = `
-    position: fixed;
-    top: 10px;
-    right: 10px;
-    background: ${apiTestResult ? 'rgba(0, 123, 255, 0.9)' : 'rgba(255, 100, 100, 0.9)'};
-    color: white;
-    padding: 5px 10px;
-    border-radius: 5px;
-    font-size: 12px;
-    font-weight: bold;
-    z-index: 10000;
-    pointer-events: none;
-  `;
-  document.body.appendChild(botIndicator);
-
-  let currentRoundNumber = 1;
-
-  // Multiple possible selectors for guess button (GeoGuessr changes UI frequently)
-  const guessButtonSelectors = [
-    ".guess-map__guess-button",
-    "[data-qa='perform-guess']",
-    "button[class*='guess-button']",
-    "[class*='guess-map'] button",
-    "button[class*='perform-guess']"
-  ];
-
+  // Add status overlay
+  addStatusOverlay();
+  
+  // Get game state from the page
+  let gameState = await getGameState();
+  console.log("📊 Initial game state:", gameState);
+  
+  // Main loop
   while (true) {
-    console.log(`🔄 Round ${currentRoundNumber}: Waiting for guess button...`);
-    await waitTillAppearsMultiple(guessButtonSelectors);
-    console.log(`✅ Round ${currentRoundNumber}: Guess button found, starting prediction...`);
-    await wait(1500); // Wait for panorama to fully load
-
-    console.log("📸 Hiding GUI and capturing screenshot...");
-  hideGUI(true);
-    const response = await screenshot();
-    const image = response.image;
-    console.log("📸 Screenshot captured, showing GUI...");
-    hideGUI(false);
-    await wait(250);
-
-    // Call API for prediction
-    console.log("🔮 Sending image to ML model...");
-    const startTime = Date.now();
+    const round = gameState?.currentRound || 1;
+    setStatus(`Round ${round}: Starting...`, 'blue');
     
-    let apiResp;
-    let guess;
-    try {
-      apiResp = await fetch(API_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          image: image,
-        }),
-      });
-
-      if (!apiResp.ok) {
-        console.error("❌ API Error:", apiResp.status, apiResp.statusText);
-        const errorText = await apiResp.text();
-        console.error("❌ Error details:", errorText);
-        updateBotStatus("API Error", "red");
-        await wait(5000); // Wait before retrying
-        continue;
-      }
-
-      guess = await apiResp.json();
-    } catch (fetchError) {
-      console.error("❌ Failed to reach API server:", fetchError.message);
-      console.error("   Make sure SSH tunnel is running: ssh -L 5000:localhost:5000 snellius");
-      updateBotStatus("Connection Failed", "red");
-      await wait(5000);
+    // Step 1: Wait for round to be playable
+    console.log(`\n===== ROUND ${round} =====`);
+    const ready = await waitForPlayableRound();
+    if (!ready) {
+      console.log("⚠️ Could not detect playable round, retrying...");
+      await sleep(2000);
       continue;
     }
     
-    const predictionTime = Date.now() - startTime;
-
-    console.log(`🎯 Round ${currentRoundNumber}: Prediction received in ${predictionTime}ms`);
-    console.log(`📍 Predicted Location: ${guess.results.lat.toFixed(4)}, ${guess.results.lng.toFixed(4)}`);
-    updateBotStatus(`Round ${currentRoundNumber}: ${guess.results.lat.toFixed(2)}, ${guess.results.lng.toFixed(2)}`, "green");
-    console.log("📤 Submitting guess to GeoGuessr...");
-
-    let result;
-    let retryCount = 0;
-    do {
-      result = await submitGuessClassic(guess.results.lat, guess.results.lng, currentRoundNumber);
-      console.log(`📊 Round ${currentRoundNumber}: Guess submitted - Status: ${result.resp.status}`);
-
-      if (result.resp.status == 400) {
-        retryCount++;
-        console.log(`⚠️  Round ${currentRoundNumber}: Submission failed (attempt ${retryCount}), retrying...`);
-        await wait(1000);
-      } else {
-        console.log(`✅ Round ${currentRoundNumber}: Guess accepted!`);
-      }
-
-      if (!result.body.currentRoundNumber) {
-        currentRoundNumber += 1;
-        console.log(`🔄 Moving to Round ${currentRoundNumber}`);
-      } else {
-        currentRoundNumber = result.body.currentRoundNumber + 1;
-        console.log(`🔄 Server indicates Round ${currentRoundNumber}`);
-      }
-    } while (result.resp.status == 400 && retryCount < 3);
-
-    if (result.resp.status == 400) {
-      console.error(`❌ Round ${currentRoundNumber}: Failed to submit guess after 3 attempts`);
+    // Step 2: Wait for panorama to load
+    setStatus(`Round ${round}: Loading panorama...`, 'blue');
+    await sleep(2500);
+    
+    // Step 3: Take screenshot
+    setStatus(`Round ${round}: Capturing...`, 'blue');
+    console.log("📸 Taking screenshot...");
+    hideOverlays(true);
+    await sleep(400);
+    const imageData = await takeScreenshot();
+    hideOverlays(false);
+    
+    if (!imageData) {
+      console.error("❌ Screenshot failed");
+      await sleep(2000);
+      continue;
     }
-
-    console.log(`⏳ Round ${currentRoundNumber}: Waiting for next round...`);
-    await waitTillDisappears(".guess-map__guess-button");
-    console.log(`🎮 Round ${currentRoundNumber}: Round complete, waiting for next round...`);
+    
+    // Step 4: Get ML prediction
+    setStatus(`Round ${round}: Getting prediction...`, 'blue');
+    console.log("🔮 Sending to ML model...");
+    
+    let lat, lng;
+    try {
+      const response = await fetch(API_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: imageData }),
+      });
+      
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      
+      const result = await response.json();
+      lat = result.results.lat;
+      lng = result.results.lng;
+      console.log(`🎯 Prediction: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+    } catch (e) {
+      console.error("❌ ML API error:", e);
+      setStatus("API Error!", 'red');
+      await sleep(3000);
+      continue;
+    }
+    
+    setStatus(`Round ${round}: ${lat.toFixed(2)}, ${lng.toFixed(2)}`, 'green');
+    
+    // Step 5: Submit guess via GeoGuessr API
+    console.log("📤 Submitting guess...");
+    const submitResult = await submitGuess(lat, lng, round);
+    
+    if (submitResult.success) {
+      console.log("✅ Guess submitted successfully!");
+      console.log("📊 Score:", submitResult.data?.roundScore?.amount || 'N/A');
+      console.log("📏 Distance:", submitResult.data?.roundScore?.distance || 'N/A');
+      
+      // Update game state from response
+      if (submitResult.data) {
+        gameState = {
+          currentRound: (submitResult.data.currentRoundNumber || round) + 1,
+          totalRounds: submitResult.data.bounds?.max || 5,
+        };
+      }
+    } else {
+      console.log("⚠️ Guess submission issue:", submitResult.error);
+    }
+    
+    // Step 6: Wait for round to end and progress
+    setStatus(`Round ${round}: Waiting for next round...`, 'blue');
+    await waitForRoundTransition();
+    
+    console.log("➡️ Moving to next round...");
+    await sleep(1000);
   }
 })();
 
-function screenshot() {
-  console.log("📸 Requesting screenshot from background script...");
+// ================== FUNCTIONS ==================
+
+function addStatusOverlay() {
+  const overlay = document.createElement('div');
+  overlay.id = 'geobot-overlay';
+  overlay.innerHTML = `
+    <div id="geobot-status" style="
+      position: fixed; top: 15px; right: 15px; z-index: 999999;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white; padding: 12px 18px; border-radius: 10px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px; font-weight: 600;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      transition: all 0.3s ease;
+    ">🤖 Bot Active</div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function setStatus(text, color = 'blue') {
+  const el = document.getElementById('geobot-status');
+  if (!el) return;
+  
+  el.textContent = `🤖 ${text}`;
+  
+  const gradients = {
+    blue: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    green: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+    red: 'linear-gradient(135deg, #eb3349 0%, #f45c43 100%)',
+    orange: 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)',
+  };
+  el.style.background = gradients[color] || gradients.blue;
+}
+
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+function takeScreenshot() {
   return new Promise((resolve) => {
-  chrome.runtime.sendMessage(
-    {
-      action: "screenshot",
-    },
-    (response) => {
-        console.log("📸 Screenshot received from background script");
-        resolve(response);
-      }
-    );
-  });
-}
-
-function getGameID() {
-  const urlSplit = window.location.href.split("/");
-  const gameID = urlSplit[urlSplit.length - 1];
-  return gameID;
-}
-
-async function submitGuessClassic(lat, lng, roundNumber) {
-  const gameID = getGameID();
-  const apiURL = "https://game-server.geoguessr.com/api/game/" + gameID + "/guess";
-
-  console.log(`📤 Round ${roundNumber}: Submitting guess to ${apiURL}`);
-  console.log(`📍 Coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
-
-  const payload = {
-    lat: lat,
-    lng: lng,
-    roundNumber: roundNumber,
-  };
-
-  const headers = {
-    origin: "https://www.geoguessr.com",
-    referer: apiURL,
-    "accept-language": "en-GB,en-US;q=0.9,en;q=0.8",
-    "sec-ch-ua":
-      '"Chromium";v="106", "Google Chrome";v="106", "Not;A=Brand";v="99"',
-    "sec-ch-ua-mobile": "?0",
-    "sec-ch-ua-platform": "macOS",
-    "user-agent":
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36",
-    "x-client": "web",
-    "Content-Type": "application/json",
-  };
-
-  const resp = await fetch(apiURL, {
-    method: "POST",
-    credentials: "include",
-    headers: headers,
-    body: JSON.stringify(payload),
-  });
-
-  const body = await resp.json();
-  console.log(`📊 Round ${roundNumber}: GeoGuessr response:`, body);
-
-  return { resp, body };
-}
-
-async function wait(millis) {
-  await new Promise((r) => setTimeout(r, millis));
-}
-
-async function waitTillAppears(selector) {
-  console.log(`⏳ Waiting for element: ${selector}`);
-  let attempts = 0;
-  while (!document.querySelector(selector)) {
-    await new Promise((r) => setTimeout(r, 100));
-    attempts++;
-    if (attempts % 50 === 0) { // Log every 5 seconds
-      console.log(`⏳ Still waiting for: ${selector} (${attempts * 0.1}s)`);
-      checkPanoramaStatus();
-    }
-  }
-  console.log(`✅ Element found: ${selector}`);
-}
-
-async function waitTillAppearsMultiple(selectors) {
-  console.log(`⏳ Waiting for any of: ${selectors.join(', ')}`);
-  let attempts = 0;
-  while (true) {
-    for (const selector of selectors) {
-      if (document.querySelector(selector)) {
-        console.log(`✅ Element found: ${selector}`);
-        return selector;
-      }
-    }
-    await new Promise((r) => setTimeout(r, 100));
-    attempts++;
-    if (attempts % 50 === 0) {
-      console.log(`⏳ Still waiting for guess button (${attempts * 0.1}s)`);
-      checkPanoramaStatus();
-    }
-  }
-}
-
-async function testAPIConnection() {
-  try {
-    // Simple health check - send a minimal request
-    const response = await fetch(API_ENDPOINT.replace('/predict', '/health'), {
-      method: 'GET',
-      signal: AbortSignal.timeout(5000)
+    chrome.runtime.sendMessage({ action: "screenshot" }, (response) => {
+      resolve(response?.image || null);
     });
-    return response.ok;
+  });
+}
+
+async function getGameState() {
+  // Try to get game state from URL or page
+  const gameId = getGameId();
+  if (!gameId) return null;
+  
+  try {
+    const response = await fetch(`https://www.geoguessr.com/api/v3/games/${gameId}`, {
+      credentials: 'include'
+    });
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        currentRound: data.round || 1,
+        totalRounds: data.roundCount || 5,
+        token: data.token,
+      };
+    }
   } catch (e) {
-    // Try the predict endpoint with a test (it will fail but confirms connection)
+    console.log("Could not fetch game state:", e);
+  }
+  
+  return { currentRound: 1, totalRounds: 5 };
+}
+
+function getGameId() {
+  const match = window.location.href.match(/\/game\/([A-Za-z0-9]+)/);
+  return match ? match[1] : null;
+}
+
+async function submitGuess(lat, lng, roundNumber) {
+  const gameId = getGameId();
+  if (!gameId) {
+    return { success: false, error: "No game ID" };
+  }
+  
+  const url = `https://game-server.geoguessr.com/api/game/${gameId}/guess`;
+  
+  console.log(`📡 POST ${url}`);
+  console.log(`📍 Payload: { lat: ${lat}, lng: ${lng}, roundNumber: ${roundNumber} }`);
+  
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "x-client": "web",
+        "Origin": "https://www.geoguessr.com",
+        "Referer": `https://www.geoguessr.com/game/${gameId}`,
+      },
+      body: JSON.stringify({
+        lat: lat,
+        lng: lng,
+        roundNumber: roundNumber,
+      }),
+    });
+    
+    console.log(`📊 Response status: ${response.status}`);
+    console.log(`📊 Response headers:`, Object.fromEntries(response.headers.entries()));
+    
+    const responseText = await response.text();
+    console.log(`📊 Response body (raw):`, responseText);
+    
+    let data;
     try {
-      await fetch(API_ENDPOINT, {
-        method: 'OPTIONS',
-        signal: AbortSignal.timeout(3000)
-      });
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.log("⚠️ Response is not JSON");
+      data = { raw: responseText };
+    }
+    
+    if (response.ok && data.roundScore) {
+      console.log("✅ GUESS ACCEPTED!");
+      console.log(`   Score: ${data.roundScore.amount} points`);
+      console.log(`   Distance: ${data.roundScore.distance} meters`);
+      return { success: true, data: data };
+    } else if (response.ok) {
+      console.log("⚠️ Response OK but no roundScore - guess may not have registered");
+      return { success: true, data: data };
+    } else {
+      console.log(`❌ GUESS REJECTED: ${response.status}`);
+      return { success: false, error: data.message || `HTTP ${response.status}`, data: data };
+    }
+  } catch (e) {
+    console.error("❌ Submit error:", e);
+    return { success: false, error: e.message };
+  }
+}
+
+async function waitForPlayableRound(timeout = 30000) {
+  const start = Date.now();
+  
+  while (Date.now() - start < timeout) {
+    // Check for panorama (indicates round is active)
+    const hasPanorama = document.querySelector('[class*="panorama"]') || 
+                        document.querySelector('.gmnoprint') ||
+                        document.querySelector('[data-qa="panorama"]');
+    
+    // Check for guess button
+    const hasGuessButton = document.querySelector('[data-qa="perform-guess"]') ||
+                           document.querySelector('.guess-map__guess-button') ||
+                           document.querySelector('button[class*="guess"]');
+    
+    // Check we're not on results screen
+    const onResults = document.querySelector('[class*="round-result"]') ||
+                      document.querySelector('[data-qa="round-result"]');
+    
+    if (hasPanorama && hasGuessButton && !onResults) {
+      console.log("✅ Round is playable");
       return true;
-    } catch (e2) {
-      console.error("API connection test failed:", e2.message);
-      return false;
+    }
+    
+    // If on results, try to click through
+    if (onResults) {
+      console.log("📊 On results screen, clicking through...");
+      await clickThroughResults();
+    }
+    
+    await sleep(300);
+  }
+  
+  console.log("⚠️ Timeout waiting for playable round");
+  return false;
+}
+
+async function waitForRoundTransition(timeout = 15000) {
+  const start = Date.now();
+  
+  // First wait for the results screen to appear
+  while (Date.now() - start < timeout) {
+    const resultsVisible = document.querySelector('[class*="round-result"]') ||
+                           document.querySelector('[data-qa="round-result"]') ||
+                           document.querySelector('[class*="result-layout"]');
+    
+    // Or check if guess button disappeared
+    const guessButton = document.querySelector('[data-qa="perform-guess"]');
+    
+    if (resultsVisible || !guessButton) {
+      console.log("📊 Results screen detected");
+      await sleep(1500); // Let animations play
+      await clickThroughResults();
+      return;
+    }
+    
+    await sleep(200);
+  }
+  
+  console.log("⚠️ Timeout waiting for round transition, trying to continue anyway...");
+  await clickThroughResults();
+}
+
+async function clickThroughResults() {
+  // Try various continue buttons
+  const buttonSelectors = [
+    '[data-qa="close-round-result"]',
+    '[data-qa="play-next-round"]',
+    'button[class*="next"]',
+    'button[class*="continue"]',
+    '[class*="result"] button',
+    '[class*="round-result"] button',
+    'button[class*="close"]',
+  ];
+  
+  for (const selector of buttonSelectors) {
+    const btn = document.querySelector(selector);
+    if (btn && isVisible(btn)) {
+      console.log(`🖱️ Clicking: ${selector}`);
+      btn.click();
+      await sleep(500);
+      
+      // Check if we need to click again
+      const stillVisible = document.querySelector(selector);
+      if (stillVisible && isVisible(stillVisible)) {
+        stillVisible.click();
+      }
+      
+      return;
     }
   }
+  
+  // Fallback: press Space bar (works on GeoGuessr results screen)
+  console.log("⌨️ Pressing Space");
+  const event = new KeyboardEvent('keydown', {
+    key: ' ',
+    code: 'Space',
+    keyCode: 32,
+    which: 32,
+    bubbles: true,
+    cancelable: true,
+  });
+  document.dispatchEvent(event);
+  document.body.dispatchEvent(event);
+  
+  await sleep(300);
+  
+  // Also try clicking the page body
+  document.body.click();
 }
 
-function updateBotStatus(message, color) {
-  const indicator = document.getElementById('geoguessr-bot-indicator');
-  if (indicator) {
-    indicator.innerHTML = `🤖 ${message}`;
-    indicator.style.background = color === 'green' ? 'rgba(0, 180, 100, 0.9)' :
-                                 color === 'red' ? 'rgba(255, 100, 100, 0.9)' :
-                                 'rgba(0, 123, 255, 0.9)';
-  }
+function isVisible(el) {
+  if (!el) return false;
+  const style = window.getComputedStyle(el);
+  return style.display !== 'none' && 
+         style.visibility !== 'hidden' && 
+         style.opacity !== '0' &&
+         el.offsetParent !== null;
 }
 
-function checkPanoramaStatus() {
-  // Check if panorama container exists
-  const panoramaContainer = document.querySelector('[data-qa="panorama"]') ||
-                           document.querySelector('.panorama-container') ||
-                           document.querySelector('[class*="panorama"]');
-
-  if (!panoramaContainer) {
-    console.log(`⚠️  No panorama container found - page might not be fully loaded`);
-    return;
-  }
-
-  // Check for loading indicators
-  const loadingElements = document.querySelectorAll('[class*="loading"], [class*="spinner"], [class*="progress"]');
-  if (loadingElements.length > 0) {
-    console.log(`⏳ Panorama still loading (${loadingElements.length} loading indicators found)`);
-  } else {
-    console.log(`✅ Panorama container found, appears loaded`);
-  }
-
-  // Check for Street View tiles in network (this is harder to detect from DOM)
-  console.log(`💡 Tip: If bot doesn't start, try refreshing the page to reload panorama tiles`);
-}
-
-async function waitTillDisappears(selector) {
-  console.log(`⏳ Waiting for element to disappear: ${selector}`);
-  while (document.querySelector(selector)) {
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  console.log(`✅ Element disappeared: ${selector}`);
-}
-
-function log(content) {
-  console.log("🤖 GeoGuessr Bot:", content);
-  chrome.runtime.sendMessage(
-    { action: "log", content: content },
-    function (response) {}
-  );
-}
-
-function hideGUI(hide) {
-  const view = hide ? "none" : "";
-  let paths = document.getElementsByTagName("path");
-  for (let i = 0; i < paths.length; i++) {
-    paths[i].style.display = view;
-  }
-
-  let mentions = document.getElementsByClassName("gmnoprint");
-  for (let i = 0; i < mentions.length; i++) {
-    mentions[i].style.display = view;
-  }
-
-  let controls = document.querySelectorAll("[class^=game-panorama_controls]");
-  for (let i = 0; i < controls.length; i++) {
-    controls[i].style.display = view;
-  }
-
-  let o_controls = document.querySelectorAll("[class^=game_controls]");
-  for (let i = 0; i < o_controls.length; i++) {
-    o_controls[i].style.display = view;
-  }
-
-  let o_map = document.querySelectorAll("[class^=game_guess]");
-  for (let i = 0; i < o_map.length; i++) {
-    o_map[i].style.display = view;
-  }
-
-  let guessMap = document.querySelectorAll("[class^=game-map]");
-  for (let i = 0; i < guessMap.length; i++) {
-    guessMap[i].style.display = view;
-  }
-
-  let chat = document.querySelectorAll("[class^=chat-input]");
-  for (let i = 0; i < chat.length; i++) {
-    chat[i].style.display = view;
-  }
-
-  let msg = document.querySelectorAll("[class^=chat-message]");
-  for (let i = 0; i < msg.length; i++) {
-    msg[i].style.display = view;
-  }
-
-  let hud = document.querySelectorAll("[class^=game_hud]");
-  for (let i = 0; i < hud.length; i++) {
-    hud[i].style.display = view;
-  }
-
-  let consent = document.getElementById("adconsent-usp-link");
-  if (consent) {
-    consent.style.display = view;
-  }
-}
-
-function debugBase64(base64URL) {
-  let win = window.open();
-  win.document.write(
-    '<iframe src="' +
-      base64URL +
-      '" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>'
-  );
+function hideOverlays(hide) {
+  const display = hide ? 'none' : '';
+  
+  // Hide bot overlay
+  const botOverlay = document.getElementById('geobot-overlay');
+  if (botOverlay) botOverlay.style.display = display;
+  
+  // Hide game UI elements for clean screenshot
+  const selectors = [
+    '.gmnoprint',
+    '[class^="game-panorama_controls"]',
+    '[class^="game_controls"]', 
+    '[class^="game_guess"]',
+    '[class^="game-map"]',
+    '[class^="game_hud"]',
+    '[class*="compass"]',
+    '[class*="ad-"]',
+  ];
+  
+  selectors.forEach(sel => {
+    document.querySelectorAll(sel).forEach(el => {
+      el.style.display = display;
+    });
+  });
+  
+  // Also hide SVG paths (Google Maps UI)
+  document.querySelectorAll('path').forEach(p => p.style.display = display);
 }

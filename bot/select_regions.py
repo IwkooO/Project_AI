@@ -10,8 +10,8 @@ import pyautogui
 from pynput import mouse
 
 
-def get_click_position(prompt: str) -> tuple:
-    """Wait for user to click and return the position."""
+def get_click_position(prompt: str) -> list:
+    """Wait for user to click and return the position as [x, y] list."""
     print(f"\n👆 {prompt}")
     print("   Click on the location...")
     
@@ -19,7 +19,7 @@ def get_click_position(prompt: str) -> tuple:
     
     def on_click(x, y, button, pressed):
         if pressed:
-            position[0] = (x, y)
+            position[0] = [x, y]  # Use list instead of tuple for YAML compatibility
             return False  # Stop listener
     
     with mouse.Listener(on_click=on_click) as listener:
@@ -58,31 +58,19 @@ def get_coords(players: int = 1) -> dict:
     for player in range(1, players + 1):
         player_str = f" (Player {player})" if players > 1 else ""
         
-        # Minimap region
+        # Minimap region - IMPORTANT: calibrate the EXPANDED map
         print(f"\n🗺️ MINIMAP REGION{player_str}")
         print("-" * 40)
-        regions[f"map_top_left_{player}"] = get_click_position(f"Click TOP-LEFT corner of the minimap{player_str}")
-        regions[f"map_bot_right_{player}"] = get_click_position(f"Click BOTTOM-RIGHT corner of the minimap{player_str}")
+        print("   ⚠️  IMPORTANT: First HOVER over the minimap to EXPAND it!")
+        print("   Then click on the corners of the EXPANDED map.")
+        input("   Press Enter when map is expanded...")
+        regions[f"map_top_left_{player}"] = get_click_position(f"Click TOP-LEFT corner of the EXPANDED minimap{player_str}")
+        regions[f"map_bot_right_{player}"] = get_click_position(f"Click BOTTOM-RIGHT corner of the EXPANDED minimap{player_str}")
         
         # Confirm button
         print(f"\n✅ CONFIRM BUTTON{player_str}")
         print("-" * 40)
         regions[f"confirm_button_{player}"] = get_click_position(f"Click the CONFIRM/GUESS button{player_str}")
-        
-        # Reference points for coordinate calibration
-        print(f"\n📍 REFERENCE POINTS{player_str}")
-        print("-" * 40)
-        print("   We need two reference points on the minimap to calibrate coordinates.")
-        print("   Hover over the minimap to expand it, then click on these cities:")
-        print()
-        print("   🔵 Kodiak, Alaska (approximately 57.79°N, 152.41°W)")
-        print("      - On the south coast of Alaska, on Kodiak Island")
-        regions[f"kodiak_{player}"] = get_click_position(f"Click on KODIAK, ALASKA on the expanded minimap{player_str}")
-        
-        print()
-        print("   🔴 Hobart, Tasmania (approximately 42.88°S, 147.34°E)")  
-        print("      - On the southeast tip of Australia/Tasmania island")
-        regions[f"hobart_{player}"] = get_click_position(f"Click on HOBART, TASMANIA on the expanded minimap{player_str}")
     
     # Next round button (for player 1 only in single player)
     if players == 1:
