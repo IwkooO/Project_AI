@@ -72,12 +72,19 @@ class PanoramaExtractor:
     def get_panorama_id(self) -> Optional[str]:
         """
         Extract the current panorama ID from the GeoGuessr page.
-        
+
         Returns:
             The panorama ID string, or None if not found
         """
         if self.driver is None:
-            print("❌ Not connected to Chrome")
+            print("❌ Not connected to browser")
+            return None
+
+        # Check if driver is still connected
+        try:
+            self.driver.current_url  # Simple check
+        except Exception:
+            print("❌ Browser connection lost")
             return None
         
         # Try multiple methods to extract pano ID
@@ -96,6 +103,7 @@ class PanoramaExtractor:
                         break
         except Exception as e:
             print(f"Method 1 failed: {e}")
+            return None
         
         # Method 2: Execute JavaScript to get pano ID from Google Maps API
         if pano_id is None:
@@ -103,7 +111,7 @@ class PanoramaExtractor:
                 # Try to access the Street View panorama object
                 js_code = """
                 // Try to find panorama ID from various sources
-                
+
                 // Method A: From google.maps.StreetViewPanorama
                 if (typeof google !== 'undefined' && google.maps) {
                     var svContainers = document.querySelectorAll('[class*="panorama"]');
@@ -115,7 +123,7 @@ class PanoramaExtractor:
                         }
                     }
                 }
-                
+
                 // Method B: From network requests (look for cbk URLs)
                 var performance = window.performance || {};
                 var entries = performance.getEntriesByType ? performance.getEntriesByType('resource') : [];
@@ -126,7 +134,7 @@ class PanoramaExtractor:
                         if (match) return match[1];
                     }
                 }
-                
+
                 // Method C: From page source
                 var scripts = document.querySelectorAll('script');
                 for (var i = 0; i < scripts.length; i++) {
@@ -134,26 +142,27 @@ class PanoramaExtractor:
                     var match = text.match(/"panoId":"([^"]+)"/);
                     if (match) return match[1];
                 }
-                
+
                 return null;
                 """
                 pano_id = self.driver.execute_script(js_code)
             except Exception as e:
                 print(f"Method 2 failed: {e}")
+                return None
         
         # Method 3: Look in page source for pano ID pattern
         if pano_id is None:
             try:
                 page_source = self.driver.page_source
                 import re
-                
+
                 # Look for pano ID patterns
                 patterns = [
                     r'"panoId":"([A-Za-z0-9_-]+)"',
                     r'panoid=([A-Za-z0-9_-]+)',
                     r'"pano":"([A-Za-z0-9_-]+)"',
                 ]
-                
+
                 for pattern in patterns:
                     matches = re.findall(pattern, page_source)
                     if matches:
@@ -162,6 +171,7 @@ class PanoramaExtractor:
                         break
             except Exception as e:
                 print(f"Method 3 failed: {e}")
+                return None
         
         if pano_id:
             print(f"📍 Found panorama ID: {pano_id}")

@@ -10,8 +10,5 @@ PyYAML>=6.0
 matplotlib>=3.5.0
 numpy>=1.21.0
 
-# Optional: For panorama extraction (extracting actual Street View images)
-# selenium>=4.0.0
-
-# Optional: For concept logging (requires torch, but runs on CPU)
-# torch>=2.0.0  # Only if running concept logging locally
+# For results tracking (captures true locations/scores from Chrome)
+selenium>=4.0.0

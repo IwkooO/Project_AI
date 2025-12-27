@@ -392,6 +392,37 @@ def new_session():
     })
 
 
+# Storage for true locations from Tampermonkey
+true_location_store = {}
+
+@app.route('/api/v1/true_location', methods=['POST', 'GET'])
+def true_location():
+    """
+    Receive true location from Tampermonkey script (POST)
+    or retrieve latest true location (GET).
+    """
+    global true_location_store
+
+    if request.method == 'POST':
+        data = request.get_json()
+        if data and 'true_lat' in data and 'true_lng' in data:
+            true_location_store = {
+                'true_lat': data['true_lat'],
+                'true_lng': data['true_lng'],
+                'timestamp': data.get('timestamp', datetime.now().timestamp() * 1000)
+            }
+            logger.info(f"📍 Received true location: ({data['true_lat']:.6f}, {data['true_lng']:.6f})")
+            return jsonify({"status": "ok", "received": true_location_store})
+        return jsonify({"status": "error", "message": "Missing lat/lng"}), 400
+
+    else:  # GET
+        if true_location_store:
+            result = true_location_store.copy()
+            true_location_store = {}  # Clear after reading
+            return jsonify({"status": "ok", "data": result})
+        return jsonify({"status": "ok", "data": None})
+
+
 def main():
     parser = argparse.ArgumentParser(description="GeoGuessr Bot API Server")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to Stage 2 checkpoint")

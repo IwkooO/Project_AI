@@ -101,6 +101,10 @@ def main():
     parser.add_argument("--calibrate", action="store_true", help="Run screen calibration")
     parser.add_argument("--no-screenshots", action="store_true", help="Don't save screenshots locally")
     parser.add_argument("--new-session", action="store_true", help="Start a new logging session on server")
+    parser.add_argument("--track-results", action="store_true", 
+                       help="Track true locations and scores (requires Chrome with --remote-debugging-port=9222)")
+    parser.add_argument("--results-dir", type=str, default="results",
+                       help="Directory to save results CSV")
     
     args = parser.parse_args()
     
@@ -150,12 +154,16 @@ def main():
     print("📋 INSTRUCTIONS")
     print("-"*60)
     print("1. Make sure GeoGuessr is open in your browser")
+    if args.track_results:
+        print("   ⚠️  Chrome must be started with: google-chrome --remote-debugging-port=9222")
     print("2. Start a Classic game (any map)")
     print("3. Wait for the first panorama to load")
     print("4. Press ENTER here to start the bot")
     print("-"*60)
     print("\n📊 Concept logs are saved on server at:")
     print("   /scratch-shared/pnair/Project_AI/results/geoguessr_game_logs/<timestamp>/")
+    if args.track_results:
+        print(f"\n📈 Results CSV will be saved to: {args.results_dir}/")
     
     input("\n🎮 Press ENTER when ready to start...")
     
@@ -164,6 +172,8 @@ def main():
         bot=bot,
         num_rounds=args.rounds,
         save_screenshots=not args.no_screenshots,
+        track_results=args.track_results,
+        results_output_dir=args.results_dir,
     )
 
 
