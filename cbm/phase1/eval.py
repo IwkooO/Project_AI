@@ -59,13 +59,36 @@ def evaluate(
     total_samples = 0
     
     # Dataset/collate yields:
-    # (patches, concept_label, coords, cell_label, country_label, cache_idx)
-    for patches, c_labels, coords, cell_labels, country_labels, offsets in tqdm(dataloader, desc="Evaluating"):
+    # (patches, concept_label, coords, cell_label, country_label, cache_idx, pooled_emb)
+    for patches, c_labels, coords, cell_labels, country_labels, offsets, pooled_emb in tqdm(dataloader, desc="Evaluating"):
         patches = patches.to(device)
         c_labels = c_labels.to(device)
         
-        # Forward (patch-only)
-        c_logits, c_hidden, attn_w, _ = model(patches)
+        # Validate pooled_emb if global head is enabled
+        if hasattr(model, 'concept_head') and hasattr(model.concept_head, 'use_global_head'):
+            if model.concept_head.use_global_head:
+                if pooled_emb is None:
+                    raise ValueError(
+                        f"Evaluation: model.use_global_head=True but pooled_emb is None. "
+                        f"Make sure dataset.load_pooled_embeddings=True."
+                    )
+                pooled_emb = pooled_emb.to(device)
+                # Validate shape
+                if pooled_emb.dim() != 2:
+                    raise ValueError(
+                        f"Evaluation: pooled_emb must be [B, D], got shape={tuple(pooled_emb.shape)}"
+                    )
+                if pooled_emb.size(0) != patches.size(0):
+                    raise ValueError(
+                        f"Evaluation: batch size mismatch. patches.shape[0]={patches.size(0)}, "
+                        f"pooled_emb.shape[0]={pooled_emb.size(0)}"
+                    )
+        elif pooled_emb is not None:
+            # Global head disabled but pooled_emb provided - warn but allow (might be for future use)
+            pooled_emb = pooled_emb.to(device)
+        
+        # Forward (patch-only, with optional pooled embeddings for global head)
+        c_logits, c_hidden, attn_w, _ = model(patches, pooled_emb=pooled_emb)
         
         # CE loss
         ce_loss = criterion(c_logits, c_labels)
@@ -95,9 +118,16 @@ def main():
     # Required paths
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to model checkpoint")
     parser.add_argument("--test-csv", type=str, required=True, help="Path to test CSV")
-    parser.add_argument("--cached-dir", type=str, required=True, help="Directory with cached patch tokens")
+    parser.add_argument("--cached-dir", type=str, default=None, help="Directory with cached patch tokens")
+    parser.add_argument("--image-dir", type=str, default=None, help="Directory with raw images (required if model has trainable backbone)")
     parser.add_argument("--concept-data-dir", type=str, required=True, help="Directory with concept vocab and S2 cells")
     parser.add_argument("--output-dir", type=str, required=True, help="Output directory for results")
+    parser.add_argument(
+        "--vision-model-name",
+        type=str,
+        default="geolocal/StreetCLIP",
+        help="HuggingFace model ID for vision encoder (required if model has trainable backbone)",
+    )
     
     # Model config (should match training)
     parser.add_argument("--concept-dim", type=int, default=256, help="Concept dimension")
@@ -137,6 +167,24 @@ def main():
         type=int,
         default=576,
         help="Maximum number of patches for positional encoding (must match training checkpoint)",
+    )
+    parser.add_argument(
+        "--use-per-concept-tau",
+        action="store_true",
+        default=False,
+        help="Use per-concept adaptive temperature (must match training checkpoint, disabled by default for backward compatibility)",
+    )
+    parser.add_argument(
+        "--use-global-head",
+        action="store_true",
+        default=False,
+        help="Use global head with CLS token (must match training checkpoint, disabled by default for backward compatibility)",
+    )
+    parser.add_argument(
+        "--pooled-dim",
+        type=int,
+        default=768,
+        help="Dimension of pooled embeddings (must match training checkpoint, default: 768 for StreetCLIP)",
     )
     parser.add_argument(
         "--head-type",
@@ -196,7 +244,44 @@ def main():
     concept_vocab = Path(args.concept_data_dir) / "concept_vocab.json"
     s2_vocab = Path(args.concept_data_dir) / "s2_cells.json"
     
-    # Load test dataset (patch-only)
+    # Check checkpoint first to determine if it has global head, positional encoding, and vision encoder
+    checkpoint_preview = torch.load(args.checkpoint, map_location='cpu', weights_only=False)
+    checkpoint_state = checkpoint_preview['model_state_dict']
+    
+    has_global_head_in_checkpoint = 'concept_head.global_query' in checkpoint_state
+    has_pos_embed_in_checkpoint = 'concept_head.pos_embed' in checkpoint_state
+    has_per_concept_tau_in_checkpoint = 'concept_head.concept_tau_logit' in checkpoint_state
+    has_vision_encoder_in_checkpoint = any(k.startswith('vision_encoder.') for k in checkpoint_state.keys())
+    
+    use_global_head_for_dataset = args.use_global_head or has_global_head_in_checkpoint
+    
+    # Initialize vision encoder if present in checkpoint
+    vision_encoder = None
+    expected_num_patches = None
+    transform = None
+    if has_vision_encoder_in_checkpoint:
+        print(f"Checkpoint contains trainable backbone. Initializing vision encoder from {args.vision_model_name}...")
+        from transformers import CLIPModel, CLIPProcessor
+        clip_model = CLIPModel.from_pretrained(args.vision_model_name)
+        vision_encoder = clip_model.vision_model.to(device)
+        
+        # Get standard CLIP image transforms
+        processor = CLIPProcessor.from_pretrained(args.vision_model_name)
+        def clip_transform(img):
+            return processor(images=img, return_tensors="pt")["pixel_values"].squeeze(0)
+        transform = clip_transform
+        
+        # Detect expected number of patches from config
+        if hasattr(clip_model.config, 'vision_config'):
+            image_size = getattr(clip_model.config.vision_config, 'image_size', 336)
+            patch_size = getattr(clip_model.config.vision_config, 'patch_size', 14)
+        else:
+            image_size = getattr(clip_model.config, 'image_size', 336)
+            patch_size = getattr(clip_model.config, 'patch_size', 14)
+        expected_num_patches = (image_size // patch_size) ** 2
+        print(f"Vision encoder initialized: image_size={image_size}, patch_size={patch_size}, expected_patches={expected_num_patches}")
+
+    # Load test dataset
     print("Loading test dataset...")
     test_ds = ConceptDataset(
         args.test_csv,
@@ -204,7 +289,10 @@ def main():
         concept_vocab,
         str(s2_vocab),
         split="test",
+        image_dir=args.image_dir,
+        transform=transform,
         allow_unsafe_index_fallback=False,
+        load_pooled_embeddings=use_global_head_for_dataset,
     )
     
     print(f"Test samples: {len(test_ds)}")
@@ -219,10 +307,37 @@ def main():
     )
     
     # Detect patch dimension
-    patch_dim = test_ds.patch_tokens.shape[2]
+    if vision_encoder is not None:
+        patch_dim = vision_encoder.config.hidden_size
+    else:
+        patch_dim = test_ds.patch_tokens.shape[2]
     print(f"Patch dimension: {patch_dim}")
     
-    # Initialize model (patch-only)
+    # Override use_pos_encoding based on checkpoint if not explicitly set
+    if has_pos_embed_in_checkpoint:
+        print("Checkpoint contains positional encoding - using it.")
+        use_pos_encoding = args.use_pos_encoding  # Use user's setting if provided
+    else:
+        print("Checkpoint does NOT contain positional encoding - disabling it to match checkpoint.")
+        use_pos_encoding = False  # Force disable to match checkpoint
+    
+    # Override use_per_concept_tau based on checkpoint if not explicitly set
+    if has_per_concept_tau_in_checkpoint:
+        print("Checkpoint contains per-concept temperature - using it.")
+        use_per_concept_tau = args.use_per_concept_tau  # Use user's setting if provided
+    else:
+        print("Checkpoint does NOT contain per-concept temperature - disabling it to match checkpoint.")
+        use_per_concept_tau = False  # Force disable to match checkpoint
+    
+    # Override use_global_head based on checkpoint if not explicitly set
+    if has_global_head_in_checkpoint:
+        print("Checkpoint contains global head - using it.")
+        use_global_head = args.use_global_head  # Use user's setting if provided
+    else:
+        print("Checkpoint does NOT contain global head - disabling it to match checkpoint.")
+        use_global_head = False  # Force disable to match checkpoint
+    
+    # Initialize model
     mix_local_kernel_size = int(args.mix_local_kernel_size)
     if mix_local_kernel_size == 0:
         mix_local_kernel_size = None
@@ -241,6 +356,8 @@ def main():
             attn_temperature=args.xattn_temperature,
             use_topk_attn=use_topk_attn,
             topk=args.xattn_topk if use_topk_attn else 16,
+            vision_encoder=vision_encoder,
+            expected_num_patches=expected_num_patches,
         )
     else:
         print("Initializing model (canonical Phase-1)...")
@@ -256,17 +373,20 @@ def main():
             mix_mlp_ratio=args.mix_mlp_ratio,
             mix_local_kernel_size=mix_local_kernel_size,
             proj_type=args.proj_type,
-            use_pos_encoding=args.use_pos_encoding,
+            use_pos_encoding=use_pos_encoding,
             max_patches=args.max_patches,
+            use_per_concept_tau=use_per_concept_tau,
+            use_global_head=use_global_head,
+            pooled_dim=args.pooled_dim,
+            vision_encoder=vision_encoder,
+            expected_num_patches=expected_num_patches,
         )
     model = model.to(device)
     
-    # Load checkpoint
-    print(f"Loading checkpoint from {args.checkpoint}...")
-    # PyTorch 2.6+ defaults torch.load(weights_only=True), which can fail for our checkpoints
-    # (e.g., when they contain numpy scalars in metadata). We trust our own checkpoints here.
+    # Load checkpoint (already loaded for preview, but reload to device)
+    print(f"Loading checkpoint weights to device...")
     checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=False)
-    model.load_state_dict(checkpoint['model_state_dict'])
+    model.load_state_dict(checkpoint['model_state_dict'], strict=True)
     print(f"Loaded checkpoint from epoch {checkpoint.get('epoch', 'unknown')}")
     if 'val_acc1' in checkpoint:
         print(f"Checkpoint val Acc@1: {checkpoint['val_acc1']:.4f}")

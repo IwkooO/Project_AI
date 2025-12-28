@@ -99,6 +99,7 @@ def load_phase1_checkpoint(
     mix_dropout: float | None = None,
     mix_local_kernel_size: int | None = None,
     proj_type: str = "simple",
+    use_per_concept_tau: bool = False,
 ) -> Phase1CBMTopKMil:
     """Load and freeze Phase1 checkpoint."""
     print(f"Loading Phase1 checkpoint from {checkpoint_path}...")
@@ -117,6 +118,7 @@ def load_phase1_checkpoint(
         mix_dropout=mix_dropout,
         mix_local_kernel_size=mix_local_kernel_size,
         proj_type=proj_type,
+        use_per_concept_tau=use_per_concept_tau,
     )
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
@@ -484,6 +486,7 @@ def main():
     parser.add_argument("--phase1-mix-dropout", type=float, default=None, help="Phase1 mix dropout (must match checkpoint)")
     parser.add_argument("--phase1-mix-local-kernel-size", type=int, default=None, help="Phase1 mix local kernel size (must match checkpoint, 0=None)")
     parser.add_argument("--phase1-proj-type", type=str, default="simple", choices=["simple", "two_stage", "bottleneck"], help="Phase1 projection type (must match checkpoint)")
+    parser.add_argument("--phase1-use-per-concept-tau", action="store_true", help="Use per-concept adaptive tau (must match checkpoint)")
     
     # Other
     parser.add_argument("--wandb", action="store_true", help="Log to Weights & Biases")
@@ -647,6 +650,7 @@ def main():
         mix_dropout=args.phase1_mix_dropout,
         mix_local_kernel_size=mix_local_kernel_size,
         proj_type=args.phase1_proj_type,
+        use_per_concept_tau=args.phase1_use_per_concept_tau,
     )
     
     num_cells_actual = len(centers_xyz)

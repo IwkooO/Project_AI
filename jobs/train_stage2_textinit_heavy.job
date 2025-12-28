@@ -1,0 +1,166 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=stage2_textinit
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=24:00:00
+#SBATCH --output=jobs/outputs/stage2_textinit_%j.out
+
+# Note: this env has activate.d scripts that reference optional env vars.
+# Using `set -u` (nounset) can crash `source activate` on unset vars (e.g. GEOTIFF_CSV).
+set -eo pipefail
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd "$HOME/Project_AI/"
+
+# Activate environment
+export GEOTIFF_CSV="${GEOTIFF_CSV:-}"
+set +u
+source activate streetview
+set -u
+
+wandb_api_key="9073a011764cb23fce5384443a3996ca9c5d9198"
+export WANDB_API_KEY="$wandb_api_key"
+
+# Paths
+SPLITS_DIR="${SPLITS_DIR:-data/6921d7831744c5356b098bf7_balanced/splits}"
+TRAIN_CSV="${TRAIN_CSV:-${SPLITS_DIR}/dataset_train.csv}"
+VAL_CSV="${VAL_CSV:-${SPLITS_DIR}/dataset_val.csv}"
+TEST_CSV="${TEST_CSV:-${SPLITS_DIR}/dataset_test.csv}"
+PHASE1_CHECKPOINT="${PHASE1_CHECKPOINT:-/home/igodzwon/Project_AI/checkpoints/phase1_textinit/reg-cbm_stage_1_textinit_visinit_interpretable_tau0.25_k6_stk0.45_lk5/phase1/best_phase1.pt}"
+
+# Cached embeddings (must already exist)
+CACHED_DIR="${CACHED_DIR:-/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip_v2}"
+
+# Concept vocab/priors (must match Phase1 checkpoint's concept order)
+CONCEPT_DATA="${CONCEPT_DATA:-data/concept_data_v2}"
+
+# Phase1 checkpoint
+PHASE1_CHECKPOINT="${PHASE1_CHECKPOINT:-}"
+if [[ -z "$PHASE1_CHECKPOINT" ]]; then
+  echo "ERROR: PHASE1_CHECKPOINT must be set (best_phase1.pt from your Phase1 run)."
+  exit 1
+fi
+
+# Phase1 config (must match checkpoint)
+PHASE1_TAU="${PHASE1_TAU:-0.25}"
+PHASE1_TOPK="${PHASE1_TOPK:-6}"
+PHASE1_LK="${PHASE1_LK:-5}"
+PHASE1_PROJ_TYPE="${PHASE1_PROJ_TYPE:-simple}"
+PHASE1_DROPOUT="${PHASE1_DROPOUT:-0.3}"
+PHASE1_CONCEPT_DIM="${PHASE1_CONCEPT_DIM:-256}"
+PHASE1_USE_PER_CONCEPT_TAU="${PHASE1_USE_PER_CONCEPT_TAU:-true}"
+
+# Stage2 mode: 'both', 'concept_only', 'image_only', or 'pooled_logits'
+STAGE2_MODE="${STAGE2_MODE:-both}"
+
+# Output directory and WandB naming (can be overridden)
+OUTPUT_DIR="${OUTPUT_DIR:-checkpoints/stage2_textinit_heavy/stage2_${PHASE1_PROJ_TYPE}_tau${PHASE1_TAU}_k${PHASE1_TOPK}_lk${PHASE1_LK}_cdim${PHASE1_CONCEPT_DIM}_${STAGE2_MODE}_$(date +%Y%m%d_%H%M%S)}"
+WANDB_RUN_NAME="${WANDB_RUN_NAME:-stage2_textinit_heavy_${PHASE1_PROJ_TYPE}_tau${PHASE1_TAU}_k${PHASE1_TOPK}_lk${PHASE1_LK}_cdim${PHASE1_CONCEPT_DIM}_${STAGE2_MODE}_$(date +%Y%m%d_%H%M%S)}"
+
+mkdir -p jobs/outputs
+mkdir -p "$OUTPUT_DIR"
+
+# Copy split CSVs into per-run working directory (avoid split drift)
+RUN_ID="${SLURM_JOB_ID:-local_$(date +%Y%m%d_%H%M%S)}"
+RUN_WORKDIR="${OUTPUT_DIR}/run_${RUN_ID}"
+RUN_SPLITS_DIR="${RUN_WORKDIR}/splits"
+mkdir -p "$RUN_SPLITS_DIR"
+
+for split in train val test; do
+  src="${SPLITS_DIR}/dataset_${split}.csv"
+  if [[ -f "${src}.bak" ]]; then
+    cp "${src}.bak" "${RUN_SPLITS_DIR}/dataset_${split}.csv"
+  else
+    cp "${src}" "${RUN_SPLITS_DIR}/dataset_${split}.csv"
+  fi
+done
+
+TRAIN_CSV="${RUN_SPLITS_DIR}/dataset_train.csv"
+VAL_CSV="${RUN_SPLITS_DIR}/dataset_val.csv"
+TEST_CSV="${RUN_SPLITS_DIR}/dataset_test.csv"
+
+echo "============================================================"
+echo "Stage 2 Geolocation Training (TextInit-heavy Phase1)"
+echo "============================================================"
+echo "Phase1 checkpoint: $PHASE1_CHECKPOINT"
+echo "Concept data dir:  $CONCEPT_DATA"
+echo "Mode:             $STAGE2_MODE"
+echo "Output directory: $OUTPUT_DIR"
+echo "============================================================"
+
+if [[ ! -f "$PHASE1_CHECKPOINT" ]]; then
+  echo "ERROR: Phase1 checkpoint not found: $PHASE1_CHECKPOINT"
+  exit 1
+fi
+
+if [[ ! -f "$CACHED_DIR/train_pooled_embeddings.pt" || ! -f "$CACHED_DIR/train_metadata.json" ]]; then
+  echo "ERROR: Missing cached embeddings in $CACHED_DIR"
+  exit 1
+fi
+
+if [[ ! -f "$TEST_CSV" ]]; then
+  echo "WARNING: Test CSV not found: $TEST_CSV (test eval will be skipped)"
+  TEST_CSV=""
+fi
+
+# Modes that require patch tokens
+if [[ "$STAGE2_MODE" == "both" || "$STAGE2_MODE" == "image_only" || "$STAGE2_MODE" == "pooled_logits" ]]; then
+  if [[ ! -f "$CACHED_DIR/train_patch_tokens.pt" ]]; then
+    echo "ERROR: Mode '$STAGE2_MODE' requires patch tokens, but they are not found."
+    exit 1
+  fi
+fi
+
+python -m cbm.phase2.train \
+  --train-csv "$TRAIN_CSV" \
+  --val-csv "$VAL_CSV" \
+  ${TEST_CSV:+--test-csv "$TEST_CSV"} \
+  --cached-dir "$CACHED_DIR" \
+  --phase1-checkpoint "$PHASE1_CHECKPOINT" \
+  --concept-data-dir "$CONCEPT_DATA" \
+  --output-dir "$OUTPUT_DIR" \
+  --num-cells 1000 \
+  --hidden-dim 512 \
+  --num-heads 8 \
+  --num-layers 2 \
+  --dropout 0.1 \
+  --mode "$STAGE2_MODE" \
+  --batch-size 128 \
+  --epochs 100 \
+  --lr 1e-4 \
+  --weight-decay 0.01 \
+  --cell-loss-weight 1.0 \
+  --offset-loss-weight 10.0 \
+  --orthogonality-weight 0.0 \
+  --balance-weight 0.05 \
+  --concept-dim "$PHASE1_CONCEPT_DIM" \
+  --patch-dim 1024 \
+  --phase1-dropout "$PHASE1_DROPOUT" \
+  --phase1-mil-topk "$PHASE1_TOPK" \
+  --phase1-mil-tau "$PHASE1_TAU" \
+  --phase1-mix-depth 1 \
+  --phase1-mix-heads 4 \
+  --phase1-mix-mlp-ratio 2.0 \
+  --phase1-mix-local-kernel-size "$PHASE1_LK" \
+  --phase1-proj-type "$PHASE1_PROJ_TYPE" \
+  $([ "$PHASE1_USE_PER_CONCEPT_TAU" == "true" ] && echo "--phase1-use-per-concept-tau" || true) \
+  --text-model-name "geolocal/StreetCLIP" \
+  --concept-prompt-template "a street view photo containing {}" \
+  --wandb \
+  --wandb-project "cbm_stage2" \
+  --wandb-run-name "$WANDB_RUN_NAME" \
+  --early-stop-patience 10
+
+echo "============================================================"
+echo "Stage 2 training complete!"
+echo "Outputs: $OUTPUT_DIR/phase2/"
+echo "  - Checkpoints: $OUTPUT_DIR/phase2/best_phase2.pt"
+echo "  - Test results: $OUTPUT_DIR/phase2/test_results.json (if enabled)"
+echo "============================================================"
+
+

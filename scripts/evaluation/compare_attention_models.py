@@ -149,10 +149,13 @@ def get_predictions_and_attention(
     model: Phase1CBMTopKMil,
     patches: torch.Tensor,
     device: torch.device,
+    pooled_emb: torch.Tensor | None = None,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Get predictions and attention weights for a batch."""
     patches = patches.to(device)
-    logits, hidden, attn_weights, _ = model(patches)
+    if pooled_emb is not None:
+        pooled_emb = pooled_emb.to(device)
+    logits, hidden, attn_weights, _ = model(patches, pooled_emb=pooled_emb)
     probs = torch.softmax(logits, dim=1)
     return logits, probs, attn_weights
 
@@ -307,17 +310,30 @@ def main():
     
     for sample_idx in tqdm(sample_indices, desc="Processing samples"):
         # Get sample
-        patches, c_label, coords, cell_label, country_label, offset = test_ds[sample_idx]
+        # Dataset returns 7 items: patches, c_label, coords, cell_label, country_label, cache_idx, pooled_emb
+        sample = test_ds[sample_idx]
+        patches = sample[0]
+        c_label = sample[1]
+        coords = sample[2]
+        cell_label = sample[3]
+        country_label = sample[4]
+        offset = sample[5]  # This is actually cache_idx, but we don't use it
+        # sample[6] is pooled_emb, which we don't need here
         patches_batch = patches.unsqueeze(0)
         gt_concept_idx = int(c_label)
         gt_concept_name = test_ds.idx_to_concept[gt_concept_idx]
         image_path = test_ds.df.iloc[sample_idx]["image_path"]
         
         # Get predictions from all models
+        # Check if pooled_emb is available (for global head)
+        pooled_emb_batch = None
+        if len(sample) > 6 and sample[6] is not None:
+            pooled_emb_batch = sample[6].unsqueeze(0)
+        
         model_results = []
         for model, model_name in zip(models, model_names):
             logits, probs, attn_weights = get_predictions_and_attention(
-                model, patches_batch, device
+                model, patches_batch, device, pooled_emb=pooled_emb_batch
             )
             
             # Get top-5 predictions

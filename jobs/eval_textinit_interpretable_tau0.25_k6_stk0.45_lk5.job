@@ -1,0 +1,73 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=eval_textinit_interp
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=2:00:00
+#SBATCH --output=jobs/outputs/eval_textinit_interp_%j.out
+
+set -eo pipefail
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd "$HOME/Project_AI/"
+mkdir -p jobs/outputs
+
+# Activate env
+export GEOTIFF_CSV="${GEOTIFF_CSV:-}"
+set +u
+source activate streetview
+set -u
+
+# Paths
+CHECKPOINT="/home/igodzwon/Project_AI/checkpoints/phase1_textinit/reg-cbm_stage_1_textinit_visinit_interpretable_tau0.25_k6_stk0.45_lk5/phase1/best_phase1.pt"
+TEST_CSV="/home/igodzwon/Project_AI/checkpoints/phase1_textinit/reg-cbm_stage_1_textinit_visinit_interpretable_tau0.25_k6_stk0.45_lk5/run_17917460/splits/dataset_test.csv"
+CACHED_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip_v2"
+CONCEPT_DATA="/home/igodzwon/Project_AI/checkpoints/phase1_textinit/reg-cbm_stage_1_textinit_visinit_interpretable_tau0.25_k6_stk0.45_lk5/run_17917460/concept_data_v2"
+OUTPUT_DIR="/home/igodzwon/Project_AI/checkpoints/phase1_textinit/reg-cbm_stage_1_textinit_visinit_interpretable_tau0.25_k6_stk0.45_lk5/test_evaluation"
+
+# Model config (matching training)
+TAU=0.25
+TOPK=6
+DROPOUT=0.45
+MIX_LOCAL_KERNEL=5
+
+echo "============================================================"
+echo "Evaluating on Test Set with Visualizations"
+echo "============================================================"
+echo "Checkpoint: $CHECKPOINT"
+echo "Test CSV: $TEST_CSV"
+echo "Output: $OUTPUT_DIR"
+echo "============================================================"
+
+mkdir -p "$OUTPUT_DIR"
+
+python -m cbm.phase1.eval \
+  --checkpoint "$CHECKPOINT" \
+  --test-csv "$TEST_CSV" \
+  --cached-dir "$CACHED_DIR" \
+  --concept-data-dir "$CONCEPT_DATA" \
+  --output-dir "$OUTPUT_DIR" \
+  --concept-dim 768 \
+  --dropout "$DROPOUT" \
+  --mil-topk "$TOPK" \
+  --mil-tau "$TAU" \
+  --mix-depth 1 \
+  --mix-heads 4 \
+  --mix-mlp-ratio 2.0 \
+  --mix-local-kernel-size "$MIX_LOCAL_KERNEL" \
+  --batch-size 64 \
+  --num-workers 4 \
+  --generate-visualizations \
+  --num-viz-samples 20 \
+  --device cuda
+
+echo "============================================================"
+echo "Evaluation complete!"
+echo "Results saved to: $OUTPUT_DIR"
+echo "============================================================"
+
+

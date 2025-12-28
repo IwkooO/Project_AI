@@ -1,0 +1,148 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=resume_phase1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=12:00:00
+#SBATCH --output=jobs/outputs/resume_phase1_%j.out
+
+set -eo pipefail
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd "$HOME/Project_AI/"
+mkdir -p jobs/outputs
+
+# Activate environment
+export GEOTIFF_CSV="${GEOTIFF_CSV:-}"
+set +u
+source activate streetview
+set -u
+
+wandb_api_key="9073a011764cb23fce5384443a3996ca9c5d9198"
+export WANDB_API_KEY="$wandb_api_key"
+
+# Paths
+# IMPORTANT: Must match the run that produced CONCEPT_DATA, because ConceptDataset
+# expects the `generalized` label column to align with concept_vocab.json.
+CHECKPOINT_DIR="/home/igodzwon/Project_AI/checkpoints/phase1_joint/joint_adaptive_tau_d1_blr1e-5_last2_pos"
+RUN_SPLITS_DIR="${CHECKPOINT_DIR}/run_17912753/splits"
+TRAIN_CSV="${RUN_SPLITS_DIR}/dataset_train.csv"
+VAL_CSV="${RUN_SPLITS_DIR}/dataset_val.csv"
+
+# Raw images for fine-tuning
+IMAGE_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/panorama_processed"
+
+# Concept vocab/priors (use from the run directory)
+CONCEPT_DATA="${CHECKPOINT_DIR}/run_17912753/concept_data_v2"
+
+# Output directory (same as checkpoint - will resume)
+OUTPUT_DIR="$CHECKPOINT_DIR"
+
+# Resume checkpoint
+RESUME_CHECKPOINT="${CHECKPOINT_DIR}/phase1/latest.pt"
+
+# Training config (inferred from checkpoint name)
+# joint_adaptive_tau_d1_blr1e-5_last2_pos
+# - adaptive_tau: per-concept adaptive temperature
+# - d1: mix-depth 1
+# - blr1e-5: backbone learning rate 1e-5
+# - last2: finetune last 2 layers
+# - pos: positional encoding
+
+# Model config (matching train_cbm_finetune_adaptive_tau.job defaults)
+CONCEPT_DIM=256
+MIX_DEPTH=1
+MIX_HEADS=4
+MIX_MLP_RATIO=2.0
+MIX_LOCAL_KERNEL=0  # Default is 0 (no local kernel)
+MIL_TOPK=6  # Default is 6
+MIL_TAU=0.25
+DROPOUT=0.3
+WEIGHT_DECAY=0.05
+STK_MASK_PROB=0.4
+STK_K_MASK=1
+PROJ_TYPE=simple
+
+# Training settings
+BATCH_SIZE=64
+EPOCHS=25  # Continue for 10 more epochs
+LR=5e-5
+BACKBONE_LR=1e-5
+WARMUP_EPOCHS=5
+FINETUNE_LAST_N_LAYERS=2
+
+# Positional encoding
+USE_POS_ENCODING=true
+MAX_PATCHES=576
+
+# Per-concept adaptive temperature
+USE_PER_CONCEPT_TAU=true
+
+# Vision Model
+VISION_MODEL_NAME="geolocal/StreetCLIP"
+
+# Early stopping
+EARLY_STOP_PATIENCE=10
+
+echo "============================================================"
+echo "Resuming Phase 1 Training for 10 More Epochs"
+echo "============================================================"
+echo "Resume from: $RESUME_CHECKPOINT"
+echo "Output directory: $OUTPUT_DIR"
+echo "Epochs: $EPOCHS"
+echo "Backbone LR: $BACKBONE_LR"
+echo "Head LR: $LR"
+echo "Finetune last N layers: $FINETUNE_LAST_N_LAYERS"
+echo "============================================================"
+
+# Verify checkpoint exists
+if [[ ! -f "$RESUME_CHECKPOINT" ]]; then
+  echo "ERROR: Checkpoint not found at $RESUME_CHECKPOINT"
+  exit 1
+fi
+
+python -m cbm.phase1.train \
+  --train-csv "$TRAIN_CSV" \
+  --val-csv "$VAL_CSV" \
+  --image-dir "$IMAGE_DIR" \
+  --trainable-backbone \
+  --vision-model-name "$VISION_MODEL_NAME" \
+  --concept-data-dir "$CONCEPT_DATA" \
+  --output-dir "$OUTPUT_DIR" \
+  --resume-checkpoint "$RESUME_CHECKPOINT" \
+  --epochs "$EPOCHS" \
+  --batch-size "$BATCH_SIZE" \
+  --lr "$LR" \
+  --backbone-lr "$BACKBONE_LR" \
+  --finetune-last-n-layers "$FINETUNE_LAST_N_LAYERS" \
+  --warmup-epochs "$WARMUP_EPOCHS" \
+  --wandb \
+  --wandb-run-name "resume_phase1_adaptive_tau_$(date +%Y%m%d_%H%M%S)" \
+  --head-type topk_mil \
+  --concept-dim "$CONCEPT_DIM" \
+  --attn-tau "$MIL_TAU" \
+  --mil-topk "$MIL_TOPK" \
+  --mix-depth "$MIX_DEPTH" \
+  --mix-heads "$MIX_HEADS" \
+  --mix-mlp-ratio "$MIX_MLP_RATIO" \
+  --mix-local-kernel-size "$MIX_LOCAL_KERNEL" \
+  --dropout "$DROPOUT" \
+  --weight-decay "$WEIGHT_DECAY" \
+  --selection-metric acc1 \
+  --stk-mask-prob "$STK_MASK_PROB" \
+  --stk-k-mask "$STK_K_MASK" \
+  --proj-type "$PROJ_TYPE" \
+  --early-stop-patience "$EARLY_STOP_PATIENCE" \
+  --max-patches "$MAX_PATCHES" \
+  $([ "$USE_POS_ENCODING" == "true" ] && echo "--use-pos-encoding" || echo "--no-pos-encoding") \
+  $([ "$USE_PER_CONCEPT_TAU" == "true" ] && echo "--use-per-concept-tau" || true)
+
+echo "============================================================"
+echo "Resume training complete!"
+echo "Outputs: $OUTPUT_DIR"
+echo "============================================================"
+

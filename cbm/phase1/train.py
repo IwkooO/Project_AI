@@ -118,7 +118,11 @@ def print_param_counts(model):
     """Print parameter counts."""
     total = sum(p.numel() for p in model.parameters())
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"Params: total={total/1e6:.2f}M, trainable={trainable/1e6:.2f}M")
+    frozen = total - trainable
+    if frozen > 0:
+        print(f"Params: total={total/1e6:.2f}M, trainable={trainable/1e6:.2f}M, frozen={frozen/1e6:.2f}M")
+    else:
+        print(f"Params: total={total/1e6:.2f}M, trainable={trainable/1e6:.2f}M")
 
 
 def check_for_nan(tensor, name="tensor"):
@@ -213,21 +217,40 @@ def train_epoch(
     
     pbar = tqdm(loader, desc=f"Train Epoch {epoch+1}")
     
-    for batch_input, c_labels, coords, cell_labels, country_labels, offsets in pbar:
+    for batch_input, c_labels, coords, cell_labels, country_labels, offsets, pooled_emb in pbar:
         batch_input = batch_input.to(device)
         c_labels = c_labels.to(device)
+        
+        # Validate pooled_emb if global head is enabled
+        if hasattr(model, 'concept_head') and hasattr(model.concept_head, 'use_global_head'):
+            if model.concept_head.use_global_head:
+                if pooled_emb is None:
+                    raise ValueError(
+                        f"Training: model.use_global_head=True but pooled_emb is None. "
+                        f"Make sure dataset.load_pooled_embeddings=True."
+                    )
+                pooled_emb = pooled_emb.to(device)
+                # Validate shape
+                if pooled_emb.dim() != 2:
+                    raise ValueError(
+                        f"Training: pooled_emb must be [B, D], got shape={tuple(pooled_emb.shape)}"
+                    )
+                if pooled_emb.size(0) != batch_input.size(0):
+                    raise ValueError(
+                        f"Training: batch size mismatch. batch_input.shape[0]={batch_input.size(0)}, "
+                        f"pooled_emb.shape[0]={pooled_emb.size(0)}"
+                    )
+        elif pooled_emb is not None:
+            # Global head disabled but pooled_emb provided - warn but allow (might be for future use)
+            pooled_emb = pooled_emb.to(device)
         
         optimizer.zero_grad()
         
         # Forward (handles both cached patches and raw images)
-        c_logits, c_hidden, attn_w, _ = model(batch_input)
+        c_logits, c_hidden, attn_w, _ = model(batch_input, pooled_emb=pooled_emb)
         
-        # Check for NaN
-        try:
-            check_for_nan(c_logits, "c_logits")
-        except ValueError as e:
-            print(f"WARNING: {e} - skipping batch")
-            continue
+        # Check for NaN - raise error immediately, don't silently skip
+        check_for_nan(c_logits, "c_logits")
         
         # CE loss
         ce_loss = criterion(c_logits, c_labels)
@@ -250,10 +273,11 @@ def train_epoch(
                 div_loss = attention_diversity_loss(attn_sel, mode=attn_diversity_mode)
                 loss = loss + float(attn_diversity_weight) * div_loss
         
-        # Check for NaN in loss
-        if torch.isnan(loss) or torch.isinf(loss):
-            print(f"WARNING: NaN/Inf loss detected - skipping batch")
-            continue
+        # Check for NaN/Inf in loss - raise error immediately, don't silently skip
+        if torch.isnan(loss):
+            raise ValueError(f"NaN loss detected at batch. Loss value: {loss.item()}")
+        if torch.isinf(loss):
+            raise ValueError(f"Inf loss detected at batch. Loss value: {loss.item()}")
         
         loss.backward()
         
@@ -315,12 +339,35 @@ def eval_epoch(model, loader, device, criterion):
     pred_counts = {}
     first_batch_debug = True
     
-    for batch_input, c_labels, coords, cell_labels, country_labels, offsets in tqdm(loader, desc="Eval"):
+    for batch_input, c_labels, coords, cell_labels, country_labels, offsets, pooled_emb in tqdm(loader, desc="Eval"):
         batch_input = batch_input.to(device)
         c_labels = c_labels.to(device)
         
+        # Validate pooled_emb if global head is enabled
+        if hasattr(model, 'concept_head') and hasattr(model.concept_head, 'use_global_head'):
+            if model.concept_head.use_global_head:
+                if pooled_emb is None:
+                    raise ValueError(
+                        f"Validation: model.use_global_head=True but pooled_emb is None. "
+                        f"Make sure dataset.load_pooled_embeddings=True."
+                    )
+                pooled_emb = pooled_emb.to(device)
+                # Validate shape
+                if pooled_emb.dim() != 2:
+                    raise ValueError(
+                        f"Validation: pooled_emb must be [B, D], got shape={tuple(pooled_emb.shape)}"
+                    )
+                if pooled_emb.size(0) != batch_input.size(0):
+                    raise ValueError(
+                        f"Validation: batch size mismatch. batch_input.shape[0]={batch_input.size(0)}, "
+                        f"pooled_emb.shape[0]={pooled_emb.size(0)}"
+                    )
+        elif pooled_emb is not None:
+            # Global head disabled but pooled_emb provided - warn but allow (might be for future use)
+            pooled_emb = pooled_emb.to(device)
+        
         # Forward (handles both cached patches and raw images)
-        c_logits, c_hidden, attn_w, _ = model(batch_input)
+        c_logits, c_hidden, attn_w, _ = model(batch_input, pooled_emb=pooled_emb)
         
         # CE loss
         ce_loss = criterion(c_logits, c_labels)
@@ -378,11 +425,12 @@ def main():
     parser.add_argument("--train-csv", required=True, help="Training CSV path")
     parser.add_argument("--val-csv", required=True, help="Validation CSV path")
     parser.add_argument("--cached-dir", default=None, help="Directory with cached patch tokens (required if --trainable-backbone=False)")
+    parser.add_argument("--image-dir", default=None, help="Directory with raw images (required if --trainable-backbone=True)")
     parser.add_argument("--concept-data-dir", required=True, help="Directory with concept vocab and S2 cells")
     parser.add_argument(
         "--trainable-backbone",
         action="store_true",
-        help="Use trainable StreetCLIP vision encoder instead of cached embeddings. Requires --vision-model-name.",
+        help="Use trainable StreetCLIP vision encoder instead of cached embeddings. Requires --vision-model-name and --image-dir.",
     )
     parser.add_argument(
         "--vision-model-name",
@@ -395,6 +443,13 @@ def main():
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--backbone-lr", type=float, default=1e-5, help="Learning rate for trainable backbone (if enabled)")
+    parser.add_argument(
+        "--finetune-last-n-layers",
+        type=int,
+        default=0,
+        help="Fine-tune only last N transformer layers (0 = fine-tune all layers). Recommended: 2-4 for partial fine-tuning.",
+    )
     parser.add_argument("--dropout", type=float, default=DEFAULT_DROPOUT)
     parser.add_argument("--weight-decay", type=float, default=DEFAULT_WEIGHT_DECAY)
     parser.add_argument("--concept-dim", type=int, default=CONCEPT_DIM_DEFAULT, help="Must match StreetCLIP projection_dim when using text init.")
@@ -439,6 +494,24 @@ def main():
         type=int,
         default=576,
         help="Maximum number of patches for positional encoding (default: 576 for 24x24 grid)",
+    )
+    parser.add_argument(
+        "--use-per-concept-tau",
+        action="store_true",
+        default=False,
+        help="Enable per-concept adaptive temperature (each concept learns its own pooling temperature, disabled by default for backward compatibility)",
+    )
+    parser.add_argument(
+        "--use-global-head",
+        action="store_true",
+        default=False,
+        help="Enable global head using CLS token (pooled embeddings), disabled by default for backward compatibility",
+    )
+    parser.add_argument(
+        "--pooled-dim",
+        type=int,
+        default=768,
+        help="Dimension of pooled embeddings (CLS projected to shared space, default: 768 for StreetCLIP)",
     )
     parser.add_argument(
         "--head-type",
@@ -554,7 +627,65 @@ def main():
     concept_vocab = Path(args.concept_data_dir) / "concept_vocab.json"
     s2_vocab = Path(args.concept_data_dir) / "s2_cells.json"
     
-    # Load datasets (patch-only)
+    # Initialize vision encoder and transforms if trainable backbone is enabled
+    vision_encoder = None
+    expected_num_patches = None
+    transform = None
+    if args.trainable_backbone:
+        if args.image_dir is None:
+            raise ValueError("--image-dir is required when --trainable-backbone is enabled")
+        print(f"Initializing trainable StreetCLIP vision encoder from {args.vision_model_name}...")
+        from transformers import CLIPModel, CLIPProcessor
+        clip_model = CLIPModel.from_pretrained(args.vision_model_name)
+        vision_encoder = clip_model.vision_model.to(device)
+        
+        # Option: Freeze early layers, fine-tune only last N layers
+        if args.finetune_last_n_layers > 0:
+            # Get total number of transformer layers
+            if hasattr(vision_encoder.config, 'num_hidden_layers'):
+                num_layers = vision_encoder.config.num_hidden_layers
+            elif hasattr(clip_model.config, 'vision_config') and hasattr(clip_model.config.vision_config, 'num_hidden_layers'):
+                num_layers = clip_model.config.vision_config.num_hidden_layers
+            else:
+                # Fallback: try to count layers
+                num_layers = len(vision_encoder.encoder.layers)
+            
+            freeze_until = max(0, num_layers - args.finetune_last_n_layers)
+            
+            if freeze_until > 0:
+                # Freeze early layers
+                for i, layer in enumerate(vision_encoder.encoder.layers):
+                    if i < freeze_until:
+                        for param in layer.parameters():
+                            param.requires_grad = False
+                print(f"Frozen first {freeze_until} layers, fine-tuning last {args.finetune_last_n_layers} layers (out of {num_layers} total)")
+            else:
+                print(f"Fine-tuning all {num_layers} layers (finetune_last_n_layers={args.finetune_last_n_layers} >= total layers)")
+        else:
+            print(f"Fine-tuning all vision encoder layers")
+        
+        vision_encoder.train()  # Enable training mode
+        
+        # Get standard CLIP image transforms
+        processor = CLIPProcessor.from_pretrained(args.vision_model_name)
+        # processor.image_processor contains the normalization/resizing logic
+        # We'll create a simple transform that uses the processor's logic
+        def clip_transform(img):
+            return processor(images=img, return_tensors="pt")["pixel_values"].squeeze(0)
+        transform = clip_transform
+        
+        # Detect expected number of patches from config
+        if hasattr(clip_model.config, 'vision_config'):
+            image_size = getattr(clip_model.config.vision_config, 'image_size', 336)
+            patch_size = getattr(clip_model.config.vision_config, 'patch_size', 14)
+        else:
+            image_size = getattr(clip_model.config, 'image_size', 336)
+            patch_size = getattr(clip_model.config, 'patch_size', 14)
+        
+        expected_num_patches = (image_size // patch_size) ** 2
+        print(f"Vision encoder initialized: image_size={image_size}, patch_size={patch_size}, expected_patches={expected_num_patches}")
+
+    # Load datasets (patch-only or raw images)
     print("Loading datasets...")
     train_ds = ConceptDataset(
         args.train_csv,
@@ -562,7 +693,10 @@ def main():
         concept_vocab,
         str(s2_vocab),
         split="train",
+        image_dir=args.image_dir,
+        transform=transform,
         allow_unsafe_index_fallback=False,
+        load_pooled_embeddings=args.use_global_head,
     )
     val_ds = ConceptDataset(
         args.val_csv,
@@ -570,7 +704,10 @@ def main():
         concept_vocab,
         str(s2_vocab),
         split="val",
+        image_dir=args.image_dir,
+        transform=transform,
         allow_unsafe_index_fallback=False,
+        load_pooled_embeddings=args.use_global_head,
     )
     
     if wandb_run:
@@ -586,10 +723,13 @@ def main():
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn, num_workers=4)
     
     # Detect patch dimension
-    patch_dim = train_ds.patch_tokens.shape[2]
-    print(f"Detected patch dimension: {patch_dim}")
+    if vision_encoder is not None:
+        patch_dim = vision_encoder.config.hidden_size
+    else:
+        patch_dim = train_ds.patch_tokens.shape[2]
+    print(f"Using patch dimension: {patch_dim}")
 
-    # Initialize model (patch-only)
+    # Initialize model
     mix_local_kernel_size = int(args.mix_local_kernel_size)
     if mix_local_kernel_size == 0:
         mix_local_kernel_size = None
@@ -608,6 +748,8 @@ def main():
             attn_temperature=args.xattn_temperature,
             use_topk_attn=use_topk_attn,
             topk=args.xattn_topk if use_topk_attn else 16,
+            vision_encoder=vision_encoder,
+            expected_num_patches=expected_num_patches,
         )
     else:
         print("Initializing Phase1CBMTopKMil (canonical Phase-1 model)...")
@@ -628,6 +770,11 @@ def main():
             proj_type=args.proj_type,
             use_pos_encoding=args.use_pos_encoding,
             max_patches=args.max_patches,
+            use_per_concept_tau=args.use_per_concept_tau,
+            use_global_head=args.use_global_head,
+            pooled_dim=args.pooled_dim,
+            vision_encoder=vision_encoder,
+            expected_num_patches=expected_num_patches,
         )
     model = model.to(device)
     
@@ -668,38 +815,52 @@ def main():
         
         # Align spaces: initialize patch projection from StreetCLIP visual_projection.weight.
         # This makes patches and text-initialized queries start in the same CLIP projection space.
-        try:
-            if projection_layer is None:
-                patch_proj_init_weight = visual_proj_weight.to(device=device)  # [concept_dim, patch_dim]
-            else:
-                # Compose the same text projection with the CLIP visual projection:
-                #   patches -> (visual_proj) -> projection_dim -> (projection_layer) -> concept_dim
+        # Initialize patch projection from StreetCLIP visual projection - raise errors explicitly
+        if projection_layer is None:
+            patch_proj_init_weight = visual_proj_weight.to(device=device)  # [concept_dim, patch_dim]
+        else:
+            # Compose the same text projection with the CLIP visual projection:
+            #   patches -> (visual_proj) -> projection_dim -> (projection_layer) -> concept_dim
+            try:
                 patch_proj_init_weight = projection_layer.weight @ visual_proj_weight.to(device=device)
+            except Exception as e:
+                raise RuntimeError(
+                    f"Failed to compute patch_proj_init_weight from projection_layer and visual_proj_weight: {e}. "
+                    f"projection_layer.weight.shape={tuple(projection_layer.weight.shape)}, "
+                    f"visual_proj_weight.shape={tuple(visual_proj_weight.shape)}"
+                ) from e
 
-            # Find a Linear inside the concept head patch projection whose weight matches.
-            target_linear = None
-            linear_shapes = []
-            for m in model.concept_head.patch_proj.modules():
-                if isinstance(m, nn.Linear):
-                    linear_shapes.append(tuple(m.weight.shape))
-                    if tuple(m.weight.shape) == tuple(patch_proj_init_weight.shape):
-                        target_linear = m  # if multiple match, last one wins (final projection)
+        # Find a Linear inside the concept head patch projection whose weight matches.
+        target_linear = None
+        linear_shapes = []
+        for m in model.concept_head.patch_proj.modules():
+            if isinstance(m, nn.Linear):
+                linear_shapes.append(tuple(m.weight.shape))
+                if tuple(m.weight.shape) == tuple(patch_proj_init_weight.shape):
+                    target_linear = m  # if multiple match, last one wins (final projection)
 
-            if target_linear is None:
-                print(
-                    "WARNING: Could not initialize patch_proj from StreetCLIP visual projection "
-                    f"(wanted weight shape={tuple(patch_proj_init_weight.shape)}). "
-                    f"Found Linear weights: {linear_shapes}"
-                )
-            else:
-                with torch.no_grad():
-                    target_linear.weight.copy_(patch_proj_init_weight.to(dtype=target_linear.weight.dtype))
-                print(
-                    "Initialized concept_head.patch_proj Linear weights from StreetCLIP visual_projection.weight "
-                    f"(shape={tuple(target_linear.weight.shape)})"
-                )
-        except Exception as e:
-            print(f"WARNING: Failed to init patch projection from StreetCLIP visual projection: {e}")
+        if target_linear is None:
+            raise RuntimeError(
+                f"Could not initialize patch_proj from StreetCLIP visual projection: "
+                f"no Linear layer found with weight shape={tuple(patch_proj_init_weight.shape)}. "
+                f"Found Linear weights: {linear_shapes}. "
+                f"This indicates a model architecture mismatch."
+            )
+        
+        # Validate shape match before copying
+        if target_linear.weight.shape != patch_proj_init_weight.shape:
+            raise RuntimeError(
+                f"Shape mismatch when initializing patch_proj: "
+                f"target_linear.weight.shape={tuple(target_linear.weight.shape)}, "
+                f"patch_proj_init_weight.shape={tuple(patch_proj_init_weight.shape)}"
+            )
+        
+        with torch.no_grad():
+            target_linear.weight.copy_(patch_proj_init_weight.to(dtype=target_linear.weight.dtype))
+        print(
+            "Initialized concept_head.patch_proj Linear weights from StreetCLIP visual_projection.weight "
+            f"(shape={tuple(target_linear.weight.shape)})"
+        )
 
         # Initialize concept query weights with text embeddings
         if text_embeds.shape != (train_ds.num_concepts, args.concept_dim):
@@ -723,20 +884,55 @@ def main():
         print(f"Loading checkpoint from {args.resume_checkpoint}...")
         # weights_only=False needed for PyTorch 2.6+ compatibility with checkpoints containing numpy scalars
         checkpoint = torch.load(args.resume_checkpoint, map_location=device, weights_only=False)
-        model.load_state_dict(checkpoint['model_state_dict'])
-        start_epoch = checkpoint.get('epoch', 0) + 1
-        best_val_metric = checkpoint.get('best_val_metric', 0.0)
-        best_val_acc5 = checkpoint.get('best_val_acc5', checkpoint.get('val_acc5', 0.0))
-        epochs_without_improvement = checkpoint.get('epochs_without_improvement', 0)
-        print(f"Resumed from epoch {start_epoch}, best_val_metric={best_val_metric:.4f}, best_val_acc5={best_val_acc5:.4f}, epochs_without_improvement={epochs_without_improvement}")
+        
+        # Load with strict=False to allow partial loading (old checkpoints don't have vision_encoder)
+        missing_keys, unexpected_keys = model.load_state_dict(checkpoint['model_state_dict'], strict=False)
+        
+        if missing_keys:
+            print(f"Note: {len(missing_keys)} keys not found in checkpoint (likely vision_encoder):")
+            for key in missing_keys[:5]:  # Show first 5
+                print(f"  - {key}")
+            if len(missing_keys) > 5:
+                print(f"  ... and {len(missing_keys) - 5} more")
+        if unexpected_keys:
+            print(f"Note: {len(unexpected_keys)} unexpected keys in checkpoint (will be ignored):")
+            for key in unexpected_keys[:5]:  # Show first 5
+                print(f"  - {key}")
+            if len(unexpected_keys) > 5:
+                print(f"  ... and {len(unexpected_keys) - 5} more")
+        
+        # Only resume training state if checkpoint has vision_encoder (full resume)
+        # Otherwise, just load concept_head weights and start fresh
+        if model.vision_encoder is not None and any('vision_encoder' in k for k in checkpoint['model_state_dict'].keys()):
+            # Full checkpoint with vision_encoder - resume training state
+            start_epoch = checkpoint.get('epoch', 0) + 1
+            best_val_metric = checkpoint.get('best_val_metric', 0.0)
+            best_val_acc5 = checkpoint.get('best_val_acc5', checkpoint.get('val_acc5', 0.0))
+            epochs_without_improvement = checkpoint.get('epochs_without_improvement', 0)
+            print(f"Resumed from epoch {start_epoch}, best_val_metric={best_val_metric:.4f}, best_val_acc5={best_val_acc5:.4f}, epochs_without_improvement={epochs_without_improvement}")
+        else:
+            # Partial checkpoint (concept_head only) - initialize from pre-trained, start fresh
+            print(f"Loaded concept_head weights from checkpoint (epoch {checkpoint.get('epoch', 'unknown')})")
+            print(f"Vision encoder initialized from pre-trained StreetCLIP (not in checkpoint)")
+            print(f"Starting training from epoch 0 with loaded concept_head weights")
     
     # Loss and optimizer
     weights = compute_concept_weights(train_ds, train_ds.num_concepts, device)
     criterion = nn.CrossEntropyLoss(weight=weights, label_smoothing=LABEL_SMOOTHING)
     
+    # Optimizer with optional separate learning rates for backbone and head
+    if args.trainable_backbone and model.vision_encoder is not None:
+        param_groups = [
+            {"params": model.vision_encoder.parameters(), "lr": args.backbone_lr},
+            {"params": model.concept_head.parameters(), "lr": args.lr},
+        ]
+        print(f"Using separate learning rates: backbone={args.backbone_lr}, head={args.lr}")
+    else:
+        param_groups = [{"params": model.parameters(), "lr": args.lr}]
+        print(f"Using single learning rate: {args.lr}")
+    
     optimizer = optim.AdamW(
-        model.parameters(),
-        lr=args.lr,
+        param_groups,
         weight_decay=args.weight_decay,
     )
     

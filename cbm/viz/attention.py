@@ -188,11 +188,24 @@ def visualize_predictions_summary(
         axes = np.expand_dims(axes, axis=0)
 
     for i, idx in enumerate(indices):
-        patches, c_label, coords, cell_label, country_label, offset = dataset[idx]
+        # Dataset returns 7 items: patches, c_label, coords, cell_label, country_label, cache_idx, pooled_emb
+        # We only need the first 6 for visualization (pooled_emb is optional and not used here)
+        sample = dataset[idx]
+        patches = sample[0]
+        c_label = sample[1]
+        coords = sample[2]
+        cell_label = sample[3]
+        country_label = sample[4]
+        offset = sample[5]  # This is actually cache_idx, but we don't use it
+        # sample[6] is pooled_emb, which we don't need for visualization
 
         with torch.no_grad():
             patches_dev = patches.unsqueeze(0).to(device)
-            c_logits, c_hidden, attn_w, _ = model(patches_dev)
+            # Check if model needs pooled_emb (for global head)
+            pooled_emb_dev = None
+            if len(sample) > 6 and sample[6] is not None:
+                pooled_emb_dev = sample[6].unsqueeze(0).to(device)
+            c_logits, c_hidden, attn_w, _ = model(patches_dev, pooled_emb=pooled_emb_dev)
             c_probs = torch.softmax(c_logits, dim=1)
 
         top5_prob, top5_idx = torch.topk(c_probs[0], 5)

@@ -146,6 +146,11 @@ class ConceptHeadTopKMil(nn.Module):
         # --- Positional encoding ---
         use_pos_encoding: bool = True,  # Add learnable 2D positional encoding
         max_patches: int = 576,  # Maximum number of patches (24x24 grid)
+        # --- Per-concept adaptive temperature ---
+        use_per_concept_tau: bool = False,  # Learn per-concept temperature (adaptive pooling, disabled by default for backward compatibility)
+        # --- Global head (CLS-based) ---
+        use_global_head: bool = False,  # Add global head using CLS token (pooled embeddings), disabled by default for backward compatibility
+        pooled_dim: int = 768,  # Dimension of pooled embeddings (CLS projected to shared space)
     ):
         super().__init__()
         if int(mil_topk) <= 0:
@@ -171,6 +176,9 @@ class ConceptHeadTopKMil(nn.Module):
         self.stk_k_mask = int(stk_k_mask)
         self.stk_mask_fill = stk_mask_fill
         self.use_pos_encoding = bool(use_pos_encoding)
+        self.use_per_concept_tau = bool(use_per_concept_tau)
+        self.use_global_head = bool(use_global_head)
+        self.pooled_dim = int(pooled_dim) if use_global_head else None
 
         # Patch projection architecture selection
         if proj_type == "simple":
@@ -225,7 +233,49 @@ class ConceptHeadTopKMil(nn.Module):
         nn.init.xavier_uniform_(self.query)
         self.bias = nn.Parameter(torch.zeros(num_concepts))
 
-    def forward(self, patches: torch.Tensor):
+        # Per-concept adaptive temperature
+        # Each concept learns its own temperature for LogSumExp pooling
+        # Low tau (e.g., 0.1) = sharp focus on top patches (localized concepts)
+        # High tau (e.g., 1.0) = soft attention over many patches (scene-level concepts)
+        if self.use_per_concept_tau:
+            # Initialize to mil_tau, then let each concept learn its optimal value
+            # Use inverse softplus to initialize: softplus^-1(tau) = log(exp(tau) - 1)
+            # For tau=0.25: inverse_softplus ≈ -1.39
+            init_value = math.log(math.exp(mil_tau) - 1.0) if mil_tau > 0 else -1.0
+            self.concept_tau_logit = nn.Parameter(torch.full((num_concepts,), init_value))
+        else:
+            self.register_parameter("concept_tau_logit", None)
+        
+        # Global head using CLS token (pooled embeddings)
+        # CLS is a learned global aggregation, better than mean pooling
+        if self.use_global_head:
+            # Project CLS from pooled space (768-dim) to concept space
+            self.cls_proj = nn.Sequential(
+                nn.Linear(self.pooled_dim, concept_dim),
+                nn.LayerNorm(concept_dim),
+                nn.GELU(),
+                nn.Dropout(dropout),
+            )
+            
+            # Global concept queries (different from local queries)
+            self.global_query = nn.Parameter(torch.empty(num_concepts, concept_dim))
+            nn.init.xavier_uniform_(self.global_query)
+            self.global_bias = nn.Parameter(torch.zeros(num_concepts))
+            
+            # Per-concept fusion weights
+            # fusion_weight[k, 0] = local weight, fusion_weight[k, 1] = global weight
+            self.fusion_weight = nn.Parameter(torch.ones(num_concepts, 2))
+            # Initialize to prefer local head initially (70% local, 30% global)
+            with torch.no_grad():
+                self.fusion_weight[:, 0] = 0.7  # Local
+                self.fusion_weight[:, 1] = 0.3  # Global
+        else:
+            self.register_parameter("cls_proj", None)
+            self.register_parameter("global_query", None)
+            self.register_parameter("global_bias", None)
+            self.register_parameter("fusion_weight", None)
+
+    def forward(self, patches: torch.Tensor, pooled_emb: torch.Tensor | None = None):
         if patches is None:
             raise ValueError(f"{self.__class__.__name__} requires patch tokens (patches).")
         if patches.dim() != 3:
@@ -271,13 +321,81 @@ class ConceptHeadTopKMil(nn.Module):
                 scores = scores.scatter(dim=-1, index=top_mask_idx, src=new_top)
 
         k = min(self.mil_topk, scores.size(-1))
-        topk_vals, topk_idx = scores.topk(k=k, dim=-1)
-        logits = self.mil_tau * torch.logsumexp(topk_vals / self.mil_tau, dim=-1)  # [B, K]
+        topk_vals, topk_idx = scores.topk(k=k, dim=-1)  # [B, K, k]
+        
+        # Per-concept adaptive temperature
+        if self.use_per_concept_tau:
+            # Convert logit to positive temperature: tau = softplus(logit) + epsilon
+            # Ensures tau > 0.01 for numerical stability
+            concept_tau = F.softplus(self.concept_tau_logit) + 0.01  # [K]
+            # LogSumExp with per-concept temperature
+            # topk_vals: [B, K, k], concept_tau: [K] -> need to broadcast
+            tau_expanded = concept_tau.view(1, -1, 1)  # [1, K, 1]
+            logits = concept_tau.view(1, -1) * torch.logsumexp(topk_vals / tau_expanded, dim=-1)  # [B, K]
+            
+            # Attention map also uses per-concept temperature
+            attn_logits = torch.full_like(scores, float("-inf"))
+            attn_logits.scatter_(dim=-1, index=topk_idx, src=scores.gather(dim=-1, index=topk_idx))
+            # Softmax with per-concept temperature: [B, K, P] / [1, K, 1]
+            attn = F.softmax(attn_logits / tau_expanded, dim=-1)  # [B, K, P]
+        else:
+            # Fixed temperature (backward compatibility)
+            logits = self.mil_tau * torch.logsumexp(topk_vals / self.mil_tau, dim=-1)  # [B, K]
 
         attn_logits = torch.full_like(scores, float("-inf"))
         attn_logits.scatter_(dim=-1, index=topk_idx, src=scores.gather(dim=-1, index=topk_idx))
         attn = F.softmax(attn_logits / self.mil_tau, dim=-1)  # [B, K, P]
 
+        # Store local logits and attention for potential fusion
+        local_logits = logits
+        attn_local = attn
+        
+        # ===== GLOBAL HEAD (CLS-based) =====
+        if self.use_global_head:
+            if pooled_emb is None:
+                raise ValueError(
+                    f"{self.__class__.__name__}.forward() requires pooled_emb when use_global_head=True. "
+                    f"pooled_emb should be [B, {self.pooled_dim}] (CLS token projected to shared space). "
+                    f"Make sure dataset.load_pooled_embeddings=True and collate_fn returns pooled_emb."
+                )
+            if pooled_emb.dim() != 2:
+                raise ValueError(
+                    f"{self.__class__.__name__}.forward(): pooled_emb must be [B, D], "
+                    f"got {tuple(pooled_emb.shape)} (dim={pooled_emb.dim()})"
+                )
+            if pooled_emb.size(0) != patches.size(0):
+                raise ValueError(
+                    f"{self.__class__.__name__}.forward(): batch size mismatch between patches and pooled_emb. "
+                    f"patches.shape[0]={patches.size(0)}, pooled_emb.shape[0]={pooled_emb.size(0)}"
+                )
+            if pooled_emb.size(1) != self.pooled_dim:
+                raise ValueError(
+                    f"{self.__class__.__name__}.forward(): pooled_emb dimension mismatch. "
+                    f"Expected dim={self.pooled_dim}, got {pooled_emb.size(1)}. "
+                    f"pooled_emb.shape={tuple(pooled_emb.shape)}"
+                )
+            
+            # Project CLS to concept space
+            cls_emb = self.cls_proj(pooled_emb)  # [B, pooled_dim] → [B, concept_dim]
+            
+            # Direct logits from CLS (no pooling needed - CLS is already global aggregation)
+            global_logits = (cls_emb @ self.global_query.T) + self.global_bias  # [B, K]
+            
+            # Fuse local + global with per-concept weights
+            fusion = F.softmax(self.fusion_weight, dim=-1)  # [K, 2]
+            # Extract weights and broadcast: [K] -> [1, K] -> broadcasts to [B, K]
+            local_weight = fusion[:, 0].unsqueeze(0)  # [1, K]
+            global_weight = fusion[:, 1].unsqueeze(0)  # [1, K]
+            # Weighted combination: [1, K] * [B, K] + [1, K] * [B, K] = [B, K]
+            logits = local_weight * local_logits + global_weight * global_logits  # [B, K]
+            
+            # Attention map: use local attention only (CLS has no spatial structure)
+            attn = attn_local  # [B, K, P]
+        else:
+            # No global head - use local only
+            logits = local_logits
+            attn = attn_local
+        
         hidden = x.mean(dim=1)  # [B, concept_dim]
         return logits, hidden, attn, None
 
@@ -435,6 +553,7 @@ class Phase1CBMTopKMil(nn.Module):
     Supports:
     - cached mode: forward(patches) where patches are [B, P, patch_dim]
     - trainable backbone mode (optional): forward(images) if vision_encoder is provided
+    - global head: forward(patches, pooled_emb) when use_global_head=True
     """
 
     def __init__(
@@ -457,6 +576,9 @@ class Phase1CBMTopKMil(nn.Module):
         proj_type: str = "simple",
         use_pos_encoding: bool = True,
         max_patches: int = 576,
+        use_per_concept_tau: bool = False,  # Per-concept adaptive temperature (disabled by default for backward compatibility)
+        use_global_head: bool = False,  # Global head using CLS token (disabled by default for backward compatibility)
+        pooled_dim: int = 768,  # Dimension of pooled embeddings (CLS projected to shared space)
         vision_encoder: nn.Module | None = None,
         expected_num_patches: int | None = None,
     ):
@@ -483,9 +605,12 @@ class Phase1CBMTopKMil(nn.Module):
             proj_type=proj_type,
             use_pos_encoding=use_pos_encoding,
             max_patches=max_patches,
+            use_per_concept_tau=use_per_concept_tau,
+            use_global_head=use_global_head,
+            pooled_dim=pooled_dim,
         )
 
-    def forward(self, patches_or_images: torch.Tensor):
+    def forward(self, patches_or_images: torch.Tensor, pooled_emb: torch.Tensor | None = None):
         if self.use_trainable_backbone:
             if self.vision_encoder is None:
                 raise RuntimeError("vision_encoder is None but use_trainable_backbone=True")
@@ -494,7 +619,7 @@ class Phase1CBMTopKMil(nn.Module):
         else:
             patches = patches_or_images
 
-        return self.concept_head(patches)
+        return self.concept_head(patches, pooled_emb=pooled_emb)
 
 
 class Phase1CBMCrossAttention(nn.Module):

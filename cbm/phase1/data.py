@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
+from PIL import Image
 
 
 @dataclass(frozen=True)
@@ -32,20 +33,26 @@ class CacheIndex:
 
 class ConceptDataset(Dataset):
     """
-    Dataset for Phase 1 concept prediction (and Stage 2 geo) using cached patch tokens.
+    Dataset for Phase 1 concept prediction (and Stage 2 geo).
+    
+    Supports:
+    1. Cached mode: uses cached patch tokens.
+    2. Raw image mode: loads images from disk for fine-tuning.
 
     Yields tuples compatible with training code:
-      (patch_tokens, concept_label, coords(lat,lng), cell_label, country_label, cache_idx)
+      (patch_tokens_or_image, concept_label, coords(lat,lng), cell_label, country_label, cache_idx, pooled_emb)
     """
 
     def __init__(
         self,
         csv_path: str | Path,
-        cached_dir: str | Path,
+        cached_dir: str | Path | None,
         concept_vocab_path: str | Path,
         s2_vocab_path: str | Path,
         *,
         split: str,
+        image_dir: str | Path | None = None,
+        transform: Any = None,
         allow_unsafe_index_fallback: bool = False,
         require_cell_labels: bool = False,
         cell_token_col: str = "s2_token",
@@ -53,8 +60,10 @@ class ConceptDataset(Dataset):
         load_pooled_embeddings: bool = False,
     ):
         self.csv_path = Path(csv_path)
-        self.cached_dir = Path(cached_dir)
+        self.cached_dir = Path(cached_dir) if cached_dir is not None else None
         self.split = str(split)
+        self.image_dir = Path(image_dir) if image_dir is not None else None
+        self.transform = transform
         self.allow_unsafe_index_fallback = bool(allow_unsafe_index_fallback)
         self.require_cell_labels = bool(require_cell_labels)
         self.cell_token_col = str(cell_token_col)
@@ -63,8 +72,16 @@ class ConceptDataset(Dataset):
 
         if not self.csv_path.exists():
             raise FileNotFoundError(self.csv_path)
-        if not self.cached_dir.exists():
+        
+        # At least one source of vision data must be provided
+        if self.cached_dir is None and self.image_dir is None:
+            raise ValueError("Either cached_dir or image_dir must be provided.")
+
+        if self.cached_dir is not None and not self.cached_dir.exists():
             raise FileNotFoundError(self.cached_dir)
+        
+        if self.image_dir is not None and not self.image_dir.exists():
+            raise FileNotFoundError(self.image_dir)
 
         df = pd.read_csv(self.csv_path)
         if "generalized" not in df.columns:
@@ -90,41 +107,46 @@ class ConceptDataset(Dataset):
         self.idx_to_cell: Dict[int, str] = {int(k): str(v) for k, v in s2_vocab["idx_to_cell"].items()}
         self.num_cells = int(s2_vocab["num_cells"])
 
-        patch_path = self.cached_dir / f"{self.split}_patch_tokens.pt"
-        pooled_path = self.cached_dir / f"{self.split}_pooled_embeddings.pt"
-        meta_path = self.cached_dir / f"{self.split}_metadata.json"
-        if not patch_path.exists():
-            raise FileNotFoundError(f"Missing cached patch tokens: {patch_path}")
-        if not meta_path.exists():
-            raise FileNotFoundError(f"Missing cache metadata: {meta_path}")
-
-        self.patch_tokens: torch.Tensor = torch.load(patch_path, map_location="cpu")
-        if self.patch_tokens.dim() != 3:
-            raise ValueError(f"Expected patch_tokens [N,P,D], got {tuple(self.patch_tokens.shape)}")
-
-        cache_index = CacheIndex.from_metadata_json(meta_path)
-        self._pano_to_cache_idx = cache_index.pano_to_cache_idx
-
-        if int(self.patch_tokens.shape[0]) != len(cache_index.pano_ids):
-            raise ValueError(
-                f"Cache mismatch: patch_tokens N={int(self.patch_tokens.shape[0])} "
-                f"!= len(metadata.pano_ids)={len(cache_index.pano_ids)}"
-            )
-
-        # Optional pooled embeddings (aligned with patch_tokens via cache metadata ordering)
+        self.patch_tokens: torch.Tensor | None = None
         self.pooled_embeddings: torch.Tensor | None = None
-        if self.load_pooled_embeddings:
-            if not pooled_path.exists():
-                raise FileNotFoundError(f"Missing pooled embeddings: {pooled_path}")
-            pooled = torch.load(pooled_path, map_location="cpu")
-            if pooled.dim() != 2:
-                raise ValueError(f"Expected pooled_embeddings [N,D], got {tuple(pooled.shape)}")
-            if int(pooled.shape[0]) != int(self.patch_tokens.shape[0]):
+        self._pano_to_cache_idx: Dict[str, int] = {}
+
+        if self.cached_dir is not None:
+            patch_path = self.cached_dir / f"{self.split}_patch_tokens.pt"
+            pooled_path = self.cached_dir / f"{self.split}_pooled_embeddings.pt"
+            meta_path = self.cached_dir / f"{self.split}_metadata.json"
+            
+            if not patch_path.exists():
+                raise FileNotFoundError(f"Missing cached patch tokens: {patch_path}")
+            if not meta_path.exists():
+                raise FileNotFoundError(f"Missing cache metadata: {meta_path}")
+
+            self.patch_tokens = torch.load(patch_path, map_location="cpu")
+            if self.patch_tokens.dim() != 3:
+                raise ValueError(f"Expected patch_tokens [N,P,D], got {tuple(self.patch_tokens.shape)}")
+
+            cache_index = CacheIndex.from_metadata_json(meta_path)
+            self._pano_to_cache_idx = cache_index.pano_to_cache_idx
+
+            if int(self.patch_tokens.shape[0]) != len(cache_index.pano_ids):
                 raise ValueError(
-                    f"Cache mismatch: pooled_embeddings N={int(pooled.shape[0])} "
-                    f"!= patch_tokens N={int(self.patch_tokens.shape[0])}"
+                    f"Cache mismatch: patch_tokens N={int(self.patch_tokens.shape[0])} "
+                    f"!= len(metadata.pano_ids)={len(cache_index.pano_ids)}"
                 )
-            self.pooled_embeddings = pooled.contiguous()
+
+            # Optional pooled embeddings (aligned with patch_tokens via cache metadata ordering)
+            if self.load_pooled_embeddings:
+                if not pooled_path.exists():
+                    raise FileNotFoundError(f"Missing pooled embeddings: {pooled_path}")
+                pooled = torch.load(pooled_path, map_location="cpu")
+                if pooled.dim() != 2:
+                    raise ValueError(f"Expected pooled_embeddings [N,D], got {tuple(pooled.shape)}")
+                if int(pooled.shape[0]) != int(self.patch_tokens.shape[0]):
+                    raise ValueError(
+                        f"Cache mismatch: pooled_embeddings N={int(pooled.shape[0])} "
+                        f"!= patch_tokens N={int(self.patch_tokens.shape[0])}"
+                    )
+                self.pooled_embeddings = pooled.contiguous()
 
         # Optional country vocab
         self.country_to_idx: Dict[str, int] = {}
@@ -143,11 +165,13 @@ class ConceptDataset(Dataset):
         cell_labels: List[int] = []
         country_labels: List[int] = []
         cache_idxs: List[int] = []
+        pano_ids: List[str] = []
 
         missing_in_cache = 0
         missing_in_vocab = 0
         missing_in_cells = 0
         missing_in_countries = 0
+        missing_images = 0
 
         for _, row in self.df.iterrows():
             pano_id = str(row["pano_id"])
@@ -179,24 +203,35 @@ class ConceptDataset(Dataset):
                     continue
                 cell_idx = -1
 
-            if pano_id in self._pano_to_cache_idx:
-                cache_idx = int(self._pano_to_cache_idx[pano_id])
-            elif self.allow_unsafe_index_fallback:
-                cache_idx = int(len(cache_idxs))
-            else:
-                missing_in_cache += 1
-                continue
+            cache_idx = -1
+            if self.cached_dir is not None:
+                if pano_id in self._pano_to_cache_idx:
+                    cache_idx = int(self._pano_to_cache_idx[pano_id])
+                elif self.allow_unsafe_index_fallback:
+                    cache_idx = int(len(cache_idxs))
+                else:
+                    missing_in_cache += 1
+                    continue
+            
+            if self.image_dir is not None:
+                # Check if image exists
+                img_path = self.image_dir / f"image_{pano_id}.jpg"
+                if not img_path.exists():
+                    missing_images += 1
+                    continue
 
             labels.append(c_idx)
             coords.append((lat, lng))
             cell_labels.append(cell_idx)
             country_labels.append(country_label)
             cache_idxs.append(cache_idx)
+            pano_ids.append(pano_id)
 
         if not labels:
             raise RuntimeError(
                 "No usable samples after filtering. "
-                f"missing_in_cache={missing_in_cache}, missing_in_vocab={missing_in_vocab}"
+                f"missing_in_cache={missing_in_cache}, missing_in_vocab={missing_in_vocab}, "
+                f"missing_images={missing_images}"
             )
 
         self._labels = torch.tensor(labels, dtype=torch.long)
@@ -204,18 +239,36 @@ class ConceptDataset(Dataset):
         self._cell_labels = torch.tensor(cell_labels, dtype=torch.long)
         self._country_labels = torch.tensor(country_labels, dtype=torch.long)
         self._cache_idxs = torch.tensor(cache_idxs, dtype=torch.long)
+        self._pano_ids = pano_ids
 
     def __len__(self) -> int:
         return int(self._labels.shape[0])
 
     def __getitem__(self, idx: int):
-        cache_idx = int(self._cache_idxs[idx].item())
-        patches = self.patch_tokens[cache_idx]  # [P, D]
+        pano_id = self._pano_ids[idx]
+        
+        # Load vision data
+        if self.image_dir is not None:
+            img_path = self.image_dir / f"image_{pano_id}.jpg"
+            vision_input = Image.open(img_path).convert("RGB")
+            if self.transform is not None:
+                vision_input = self.transform(vision_input)
+        else:
+            cache_idx = int(self._cache_idxs[idx].item())
+            vision_input = self.patch_tokens[cache_idx]  # [P, D]
+
         c_label = self._labels[idx]
         coords = self._coords[idx]
         cell_label = self._cell_labels[idx]
         country_label = self._country_labels[idx]
-        return patches, c_label, coords, cell_label, country_label, cache_idx
+        cache_idx = int(self._cache_idxs[idx].item())
+
+        # Include pooled embeddings if available (for global head)
+        pooled_emb = None
+        if self.pooled_embeddings is not None:
+            pooled_emb = self.pooled_embeddings[cache_idx]  # [D]
+        
+        return vision_input, c_label, coords, cell_label, country_label, cache_idx, pooled_emb
 
 
 def collate_fn(batch: List[Any]):
@@ -225,6 +278,19 @@ def collate_fn(batch: List[Any]):
     cell_labels = torch.stack([b[3] for b in batch], dim=0)  # [B]
     country_labels = torch.stack([b[4] for b in batch], dim=0)  # [B]
     offsets = torch.tensor([b[5] for b in batch], dtype=torch.long)  # [B]
-    return patches, c_labels, coords, cell_labels, country_labels, offsets
+    # Handle pooled embeddings
+    pooled_embs = [b[6] for b in batch]
+    if all(pe is not None for pe in pooled_embs):
+        pooled_emb = torch.stack(pooled_embs, dim=0)  # [B, D]
+    elif any(pe is not None for pe in pooled_embs):
+        # Mixed None/not-None is an error - either all or none should be present
+        raise ValueError(
+            f"collate_fn: Inconsistent pooled_embeddings in batch. "
+            f"Some samples have pooled_emb, others don't. "
+            f"This indicates a dataset loading error."
+        )
+    else:
+        pooled_emb = None
+    return patches, c_labels, coords, cell_labels, country_labels, offsets, pooled_emb
 
 
