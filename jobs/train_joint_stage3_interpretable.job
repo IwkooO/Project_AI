@@ -1,0 +1,187 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=joint_scratch_stage2
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=24:00:00
+#SBATCH --output=jobs/outputs/joint_scratch_stage2_%j.out
+
+set -eo pipefail
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd "$HOME/Project_AI/"
+
+# Activate environment
+export GEOTIFF_CSV="${GEOTIFF_CSV:-}"
+set +u
+source activate streetview
+set -u
+
+wandb_api_key="9073a011764cb23fce5384443a3996ca9c5d9198"
+export WANDB_API_KEY="$wandb_api_key"
+
+# ============================================================
+# JOINT TRAINING CONFIG (Stage 3 - Scratch Geo Head)
+# ============================================================
+# Matching "Interpretable" Phase 1 Hyperparameters
+TAU=0.25
+TOPK=6
+MIX_LOCAL_KERNEL=0    # Phase 1 script default was 0. Change to 5 if you overrode it during training.
+CONCEPT_DIM=256       # Changed from 768 to 256 to match Phase 1
+MIX_HEADS=4           # Changed to match Phase 1
+MIX_DEPTH=1
+PROJ_TYPE=simple
+MAX_PATCHES=576
+
+# Regularization
+DROPOUT=0.45
+PHASE1_DROPOUT=0.45   # Keep high dropout for concept head
+STAGE2_DROPOUT=0.1    # Standard dropout for the new geo head
+
+# Learning rates
+LR=1e-4
+PHASE1_LR=1e-5        # Low LR to preserve interpretable concepts
+
+# Mode: 'both' (Concepts + CLS)
+MODE="image_only"
+
+RUN_TAG="stage3_joint_${MODE}_scratchgeo_dim${CONCEPT_DIM}_pos_imageonly"
+OUTPUT_DIR="checkpoints/stage3_joint/${RUN_TAG}"
+
+# Paths
+SPLITS_DIR="data/6921d7831744c5356b098bf7_balanced/splits"
+CACHED_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip_v2"
+
+# ------------------------------------------------------------
+# 1. Define Phase 1 Checkpoint & Data Source
+# ------------------------------------------------------------
+PHASE1_RUN_DIR="checkpoints/phase1_adaptive_tau/adaptive_tau_d1_h4_dim256_pos"
+PHASE1_CHECKPOINT="${PHASE1_RUN_DIR}/phase1/best_phase1.pt"
+PHASE1_CONCEPT_DATA="${PHASE1_RUN_DIR}/run_*/concept_data_v2" 
+
+# Handle dynamic run directory finding for concept data if needed
+# (If concept_data_v2 is directly in PHASE1_RUN_DIR, use that instead)
+if [[ -d "${PHASE1_RUN_DIR}/concept_data_v2" ]]; then
+    PHASE1_CONCEPT_DATA="${PHASE1_RUN_DIR}/concept_data_v2"
+else
+    # Try to find it in a subdirectory if created by a sweep
+    PHASE1_CONCEPT_DATA=$(find "$PHASE1_RUN_DIR" -type d -name "concept_data_v2" | head -n 1)
+fi
+
+if [[ -z "$PHASE1_CONCEPT_DATA" ]]; then
+    echo "ERROR: Could not find concept_data_v2 in $PHASE1_RUN_DIR"
+    exit 1
+fi
+
+# Use splits from Phase 1 run (these match the concept vocabulary)
+# Find the most recent run directory with splits
+PHASE1_SPLITS_DIR=""
+for run_dir in $(find "$PHASE1_RUN_DIR" -type d -name "run_*" -path "*/run_*/splits" 2>/dev/null | xargs dirname | sort -r); do
+    splits_dir="${run_dir}/splits"
+    if [[ -d "$splits_dir" ]] && [[ -f "${splits_dir}/dataset_train.csv" ]]; then
+        PHASE1_SPLITS_DIR="$splits_dir"
+        break
+    fi
+done
+
+# Fallback to specific run if available
+if [[ -z "$PHASE1_SPLITS_DIR" ]] && [[ -d "${PHASE1_RUN_DIR}/run_17929069/splits" ]]; then
+    PHASE1_SPLITS_DIR="${PHASE1_RUN_DIR}/run_17929069/splits"
+fi
+
+# Final fallback to default splits
+if [[ -z "$PHASE1_SPLITS_DIR" ]] || [[ ! -d "$PHASE1_SPLITS_DIR" ]]; then
+    echo "WARNING: Could not find Phase 1 splits, using default splits"
+    echo "This may cause concept vocabulary mismatches!"
+    PHASE1_SPLITS_DIR="data/6921d7831744c5356b098bf7_balanced/splits"
+else
+    echo "Using Phase 1 splits from: $PHASE1_SPLITS_DIR"
+fi
+
+TRAIN_CSV="${PHASE1_SPLITS_DIR}/dataset_train.csv"
+VAL_CSV="${PHASE1_SPLITS_DIR}/dataset_val.csv"
+TEST_CSV="${PHASE1_SPLITS_DIR}/dataset_test.csv"
+
+# Verify CSV files exist
+for csv_file in "$TRAIN_CSV" "$VAL_CSV"; do
+    if [[ ! -f "$csv_file" ]]; then
+        echo "ERROR: CSV file not found: $csv_file"
+        exit 1
+    fi
+done
+
+# Verify concept vocabulary exists
+CONCEPT_VOCAB="${PHASE1_CONCEPT_DATA}/concept_vocab.json"
+if [[ ! -f "$CONCEPT_VOCAB" ]]; then
+    echo "ERROR: Concept vocabulary not found: $CONCEPT_VOCAB"
+    exit 1
+fi
+echo "Using concept vocabulary: $CONCEPT_VOCAB"
+
+# ------------------------------------------------------------
+# 2. Setup Output
+# ------------------------------------------------------------
+mkdir -p "$OUTPUT_DIR"
+
+echo "============================================================"
+echo "STAGE 3: JOINT TRAINING (Scratch Geo Head)"
+echo "============================================================"
+echo "Mode: $MODE"
+echo "Phase 1 Checkpoint: $PHASE1_CHECKPOINT"
+echo "Concept Dim: $CONCEPT_DIM"
+echo "Mix Local Kernel: $MIX_LOCAL_KERNEL"
+echo "Positional Encoding: YES"
+echo "Stage 2 Init: NONE (Training from scratch)"
+echo "============================================================"
+
+# ------------------------------------------------------------
+# 3. Run Training
+# ------------------------------------------------------------
+# Note: --stage2-checkpoint is OMITTED to train from scratch
+python -m cbm.joint.train \
+  --train-csv "$TRAIN_CSV" \
+  --val-csv "$VAL_CSV" \
+  --test-csv "$TEST_CSV" \
+  --cached-dir "$CACHED_DIR" \
+  --concept-data-dir "$PHASE1_CONCEPT_DATA" \
+  --output-dir "$OUTPUT_DIR" \
+  --phase1-checkpoint "$PHASE1_CHECKPOINT" \
+  --mode "$MODE" \
+  --num-cells 1000 \
+  --hidden-dim 512 \
+  --num-heads 8 \
+  --num-layers 2 \
+  --dropout "$STAGE2_DROPOUT" \
+  --phase1-dropout "$PHASE1_DROPOUT" \
+  --concept-dim "$CONCEPT_DIM" \
+  --patch-dim 1024 \
+  --mil-topk "$TOPK" \
+  --mil-tau "$TAU" \
+  --mix-depth "$MIX_DEPTH" \
+  --mix-heads "$MIX_HEADS" \
+  --mix-mlp-ratio 2.0 \
+  --mix-local-kernel-size "$MIX_LOCAL_KERNEL" \
+  --proj-type "$PROJ_TYPE" \
+  --use-per-concept-tau \
+  --batch-size 64 \
+  --num-workers 4 \
+  --epochs 50 \
+  --lr "$LR" \
+  --phase1-lr "$PHASE1_LR" \
+  --weight-decay 0.01 \
+  --concept-loss-weight 1.0 \
+  --cell-loss-weight 1.0 \
+  --offset-loss-weight 10.0 \
+  --wandb \
+  --wandb-project "cbm_stage3_joint" \
+  --wandb-run-name "$RUN_TAG" \
+  --concept-temperature 5.0 \
+  --early-stop-patience 10
+
+echo "============================================================"
+echo "JOINT TRAINING COMPLETE!"
+echo "============================================================"

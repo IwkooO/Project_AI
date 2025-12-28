@@ -37,7 +37,7 @@ USE_PER_CONCEPT_TAU=true
 DROPOUT=0.45
 WEIGHT_DECAY=0.1
 
-RUN_TAG="tau${TAU}_k${TOPK}_stk${STK_MASK_PROB}_lk${MIX_LOCAL_KERNEL}_cdim${CONCEPT_DIM}_adaptivetau_concept_only"
+RUN_TAG="tau${TAU}_k${TOPK}_stk${STK_MASK_PROB}_lk${MIX_LOCAL_KERNEL}_cdim${CONCEPT_DIM}_adaptivetau_concept_only_adapter"
 PHASE1_CHECKPOINT="checkpoints/phase1_textinit_adaptive/reg-cbm_stage_1_textinit_visinit_interpretable_tau0.25_k6_stk0.45_lk5_cdim768_adaptivetau/phase1/best_phase1.pt"
 
 # Paths

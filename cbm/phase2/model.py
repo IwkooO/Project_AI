@@ -21,7 +21,7 @@ class ConceptEmbeddingAdapter(nn.Module):
     def __init__(
         self,
         concept_vectors: torch.Tensor,  # [K, D]
-        temperature: float = 1.0,
+        temperature: float = 3.0,
     ):
         super().__init__()
         self.register_buffer("concept_vectors", concept_vectors)  # [K, D]
@@ -260,11 +260,11 @@ class Stage2CrossAttentionGeoHead(nn.Module):
             
             # Fusion MLP: combines concatenated image and concept features
             self.fusion_mlp = nn.Sequential(
-                nn.Linear(hidden_dim * 2, hidden_dim),
+                    nn.Linear(hidden_dim * 2, hidden_dim),
                 nn.LayerNorm(hidden_dim),
-                nn.GELU(),
-                nn.Dropout(dropout),
-            )
+                    nn.GELU(),
+                    nn.Dropout(dropout),
+                )
             
             # Adaptive per-sample gating (optional, can be used to weight contributions)
             self.fusion_gate = nn.Sequential(

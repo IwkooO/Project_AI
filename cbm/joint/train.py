@@ -38,10 +38,10 @@ class JointDataset(ConceptDataset):
             cell_labels: Assigned geocell labels [N]
             offsets: Computed offsets [N, 3]
         """
-        # Copy all attributes from base dataset
-        for attr in dir(base_dataset):
-            if not attr.startswith('_') or attr in ['_labels', '_coords', '_cell_labels', '_country_labels', '_cache_idxs']:
-                setattr(self, attr, getattr(base_dataset, attr))
+        # Copy all instance attributes from base dataset
+        # This includes all private attributes like _pano_ids, _pano_to_cache_idx, etc.
+        if hasattr(base_dataset, '__dict__'):
+            self.__dict__.update(base_dataset.__dict__)
         
         # Store assigned labels and offsets
         self._assigned_cell_labels = torch.tensor(cell_labels, dtype=torch.long)
@@ -49,11 +49,11 @@ class JointDataset(ConceptDataset):
     
     def __getitem__(self, idx: int):
         """Return data with assigned cell labels and offsets."""
-        patches, c_label, coords, _, country_label, cache_idx = super().__getitem__(idx)
+        patches, c_label, coords, _, country_label, cache_idx, pooled_emb = super().__getitem__(idx)
         # Replace with assigned cell label and add offset
         cell_label = self._assigned_cell_labels[idx]
         offset = self._assigned_offsets[idx]
-        return patches, c_label, coords, cell_label, country_label, cache_idx, offset
+        return patches, c_label, coords, cell_label, country_label, cache_idx, pooled_emb, offset
 
 try:
     import wandb
@@ -125,7 +125,7 @@ def build_concept_vectors(
 
 def collate_fn_joint(batch, pooled_embeddings):
     """Collate function for joint training that includes pooled embeddings."""
-    # batch is a list of tuples: (patches, c_label, coords, cell_label, country_label, cache_idx, offset)
+    # batch is a list of tuples: (patches, c_label, coords, cell_label, country_label, cache_idx, pooled_emb, offset)
     patches = torch.stack([b[0] for b in batch], dim=0)  # [B,P,D]
     c_labels = torch.stack([b[1] for b in batch], dim=0)  # [B]
     # Handle coords - could be tensor or numpy array
@@ -142,21 +142,21 @@ def collate_fn_joint(batch, pooled_embeddings):
     country_labels = torch.stack([b[4] if isinstance(b[4], torch.Tensor) else torch.tensor(b[4], dtype=torch.long) for b in batch], dim=0)  # [B]
     cache_idxs = torch.tensor([b[5] for b in batch], dtype=torch.long)  # [B]
     
-    # Get pooled embeddings using cache indices
+    # Get pooled embeddings using cache indices (we ignore b[6] since we get it from the tensor)
     pooled_emb = pooled_embeddings[cache_idxs]  # [B, D]
     
-    # Get offsets (7th element) - should always be present now
+    # Get offsets (8th element, index 7) - should always be present now
     offsets_list = []
     for b in batch:
-        if len(b) >= 7:
-            offset_val = b[6]
+        if len(b) >= 8:
+            offset_val = b[7]
             if isinstance(offset_val, torch.Tensor):
                 offsets_list.append(offset_val)
             else:
                 offsets_list.append(torch.tensor(offset_val, dtype=torch.float32))
         else:
             # This shouldn't happen with JointDataset, but handle gracefully
-            print(f"WARNING: Batch element has {len(b)} elements, expected 7. Using zero offset.")
+            print(f"WARNING: Batch element has {len(b)} elements, expected 8. Using zero offset.")
             offsets_list.append(torch.zeros(3, dtype=torch.float32))
     offsets = torch.stack(offsets_list, dim=0)  # [B, 3]
     
@@ -188,8 +188,8 @@ class VisualizationDataset:
         return len(self.joint_dataset)
     
     def __getitem__(self, idx):
-        patches, c_label, coords, cell_label, country_label, cache_idx, offset = self.joint_dataset[idx]
-        # Return 6 values as expected by visualization function (drop cache_idx)
+        patches, c_label, coords, cell_label, country_label, cache_idx, pooled_emb, offset = self.joint_dataset[idx]
+        # Return 6 values as expected by visualization function (drop cache_idx and pooled_emb)
         return patches, c_label, coords, cell_label, country_label, offset
 
 
@@ -262,7 +262,7 @@ def train_epoch(
         optimizer.zero_grad()
         
         # Forward through Phase1
-        c_logits, c_hidden, attn_w, _ = phase1_model(patches)
+        c_logits, c_hidden, attn_w, _ = phase1_model(patches, pooled_emb=pooled_emb)
         
         # Concept loss
         concept_loss = concept_criterion(c_logits, c_labels)
@@ -271,7 +271,13 @@ def train_epoch(
         concept_emb = concept_adapter(c_logits)
         
         # Forward through Stage2
-        cell_logits, offset_pred, gate = stage2_model(concept_emb, patches, pooled_emb)
+        forward_output = stage2_model(concept_emb, patches, pooled_emb)
+        
+        # Handle different return signatures based on mode
+        if stage2_model.mode == "both":
+            cell_logits, offset_pred, gate, _, _ = forward_output
+        else:
+            cell_logits, offset_pred, gate = forward_output
         
         # Geo losses
         cell_loss = cell_criterion(cell_logits, cell_labels)
@@ -381,7 +387,13 @@ def eval_epoch(
         concept_emb = concept_adapter(c_logits)
         
         # Forward through Stage2
-        cell_logits, offset_pred, gate = stage2_model(concept_emb, patches, pooled_emb)
+        forward_output = stage2_model(concept_emb, patches, pooled_emb)
+        
+        # Handle different return signatures based on mode
+        if stage2_model.mode == "both":
+            cell_logits, offset_pred, gate, _, _ = forward_output
+        else:
+            cell_logits, offset_pred, gate = forward_output
         
         cell_loss = cell_criterion(cell_logits, cell_labels)
         offset_loss = offset_criterion(offset_pred, offset_targets)
@@ -481,6 +493,9 @@ def main():
     parser.add_argument("--mix-heads", type=int, default=4, help="Mix heads")
     parser.add_argument("--mix-mlp-ratio", type=float, default=4.0, help="Mix MLP ratio")
     parser.add_argument("--mix-local-kernel-size", type=int, default=5, help="Mix local kernel size (0=None)")
+    parser.add_argument("--proj-type", type=str, default="simple", choices=["simple", "two_stage", "bottleneck"], help="Phase1 projection type")
+    parser.add_argument("--use-per-concept-tau", action="store_true", help="Use per-concept adaptive tau")
+    parser.add_argument("--use-global-head", action="store_true", help="Use global head in Phase1")
     
     # Training args
     parser.add_argument("--batch-size", type=int, default=32, help="Batch size (reduced default for joint training to avoid OOM)")
@@ -506,6 +521,12 @@ def main():
     parser.add_argument("--wandb-entity", type=str, default=None)
     parser.add_argument("--wandb-run-name", type=str, default=None)
     parser.add_argument("--early-stop-patience", type=int, default=10, help="Early stopping patience")
+    parser.add_argument(
+        "--concept-temperature",
+        type=float,
+        default=1.0,
+        help="Temperature for softmax in ConceptEmbeddingAdapter (higher = softer distribution, uses more top-k concepts). Default: 1.0",
+    )
     
     args = parser.parse_args()
     
@@ -648,8 +669,8 @@ def main():
     
     # Verify the wrapper works
     test_sample = train_ds[0]
-    if len(test_sample) != 7:
-        raise RuntimeError(f"Expected 7 elements from __getitem__, got {len(test_sample)}")
+    if len(test_sample) != 8:
+        raise RuntimeError(f"Expected 8 elements from __getitem__, got {len(test_sample)}")
     print(f"Verified JointDataset returns {len(test_sample)} elements")
     
     # Save geocell info
@@ -675,31 +696,62 @@ def main():
         mix_heads=args.mix_heads,
         mix_mlp_ratio=args.mix_mlp_ratio,
         mix_local_kernel_size=mix_local_kernel_size,
-    ).to(device)
-    
-    # Build concept vectors
-    concept_vectors = build_concept_vectors(
-        phase1_model,
-        concept_names,
-        device,
-        args.text_model_name,
-        args.concept_prompt_template,
-    ).to(device)
-    
-    concept_adapter = ConceptEmbeddingAdapter(concept_vectors, temperature=1.0).to(device)
-    
-    num_cells_actual = len(centers_xyz)
-    stage2_model = Stage2CrossAttentionGeoHead(
-        concept_dim=args.concept_dim,
-        patch_dim=patch_dim,
-        num_cells=num_cells_actual,
-        hidden_dim=args.hidden_dim,
-        num_heads=args.num_heads,
-        num_layers=args.num_layers,
-        dropout=args.dropout,
-        mode=args.mode,
+        proj_type=args.proj_type,
+        use_per_concept_tau=args.use_per_concept_tau,
+        use_global_head=args.use_global_head,
         pooled_dim=detected_pooled_dim,
     ).to(device)
+    
+    # Create Stage2 model
+    if args.mode == "concept_only":
+        # Use ConceptEmbeddingAdapter (same as both mode) for richer embeddings
+        # This gives concept_only the same semantic richness as both mode
+        # The softmax-weighted concept vectors are more informative than raw logits
+        concept_vectors = build_concept_vectors(
+            phase1_model,
+            concept_names,
+            device,
+            args.text_model_name,
+            args.concept_prompt_template,
+        ).to(device)
+        
+        concept_adapter = ConceptEmbeddingAdapter(concept_vectors, temperature=args.concept_temperature).to(device)
+        
+        stage2_model = Stage2CrossAttentionGeoHead(
+            concept_dim=args.concept_dim,  # Use concept_dim (768) instead of num_concepts (186)
+            patch_dim=patch_dim,
+            num_cells=num_cells_actual,
+            hidden_dim=args.hidden_dim,
+            num_heads=args.num_heads,
+            num_layers=args.num_layers,
+            dropout=args.dropout,
+            mode=args.mode,
+            pooled_dim=detected_pooled_dim,
+        ).to(device)
+    else:
+        # both or image_only (though image_only doesn't use concepts)
+        # Build concept vectors
+        concept_vectors = build_concept_vectors(
+            phase1_model,
+            concept_names,
+            device,
+            args.text_model_name,
+            args.concept_prompt_template,
+        ).to(device)
+        
+        concept_adapter = ConceptEmbeddingAdapter(concept_vectors, temperature=args.concept_temperature).to(device)
+        
+        stage2_model = Stage2CrossAttentionGeoHead(
+            concept_dim=args.concept_dim,
+            patch_dim=patch_dim,
+            num_cells=num_cells_actual,
+            hidden_dim=args.hidden_dim,
+            num_heads=args.num_heads,
+            num_layers=args.num_layers,
+            dropout=args.dropout,
+            mode=args.mode,
+            pooled_dim=detected_pooled_dim,
+        ).to(device)
     
     print(f"Phase1 params: {sum(p.numel() for p in phase1_model.parameters())/1e6:.2f}M")
     print(f"Stage2 params: {sum(p.numel() for p in stage2_model.parameters())/1e6:.2f}M")
@@ -709,6 +761,7 @@ def main():
     best_val_concept_acc1 = 0.0
     best_val_error = float('inf')
     best_val_loss = float('inf')
+    best_joint_val_loss = float('inf')  # Track best joint checkpoint separately
     epochs_without_improvement = 0
     
     # Handle resume from joint checkpoint directory
@@ -738,7 +791,7 @@ def main():
             args.text_model_name,
             args.concept_prompt_template,
         ).to(device)
-        concept_adapter = ConceptEmbeddingAdapter(concept_vectors, temperature=1.0).to(device)
+        concept_adapter = ConceptEmbeddingAdapter(concept_vectors, temperature=args.concept_temperature).to(device)
         
         # Only extract training state if resuming from joint checkpoint (not when loading separate checkpoints)
         # When loading separate checkpoints, we only use weights as initialization
@@ -755,9 +808,52 @@ def main():
     if args.phase2_checkpoint:
         print(f"Loading Phase2 checkpoint from {args.phase2_checkpoint}...")
         checkpoint = torch.load(args.phase2_checkpoint, map_location=device, weights_only=False)
-        stage2_model.load_state_dict(checkpoint['stage2_model_state_dict'])
+        
+        # Infer checkpoint mode from state_dict keys
+        checkpoint_state_dict = checkpoint['stage2_model_state_dict']
+        
+        # More robust key checking (handles Sequential vs Linear, etc.)
+        keys = checkpoint_state_dict.keys()
+        has_image_adapter = any(k.startswith('image_adapter') for k in keys)
+        has_concept_adapter = any(k.startswith('concept_adapter') for k in keys)
+        has_fusion_mlp = any(k.startswith('fusion_mlp') for k in keys)
+        has_fusion_gate = any(k.startswith('fusion_gate') for k in keys)
+        
+        # If both adapters are present, it's 'both' mode
+        if has_image_adapter and has_concept_adapter:
+            checkpoint_mode = "both"
+        elif has_concept_adapter:
+            checkpoint_mode = "concept_only"
+        elif has_image_adapter:
+            checkpoint_mode = "image_only"
+        else:
+            # Print keys for debugging if inference fails
+            print("State dict keys (first 10):", list(keys)[:10])
+            raise ValueError(
+                f"Cannot infer checkpoint mode from state_dict keys. "
+                f"image_adapter={has_image_adapter}, concept_adapter={has_concept_adapter}, "
+                f"fusion_mlp={has_fusion_mlp}, fusion_gate={has_fusion_gate}"
+            )
+        
+        # Verify mode matches - crash if it doesn't
+        if checkpoint_mode != args.mode:
+            raise ValueError(
+                f"Mode mismatch! Checkpoint was trained with mode='{checkpoint_mode}', "
+                f"but current training mode is '{args.mode}'. "
+                f"Please use a checkpoint trained with mode='{args.mode}' or change --mode to '{checkpoint_mode}'."
+            )
+        
+        print(f"Checkpoint mode verified: {checkpoint_mode} (matches current mode: {args.mode})")
+        
+        # Load with strict=True - will crash if there are any mismatches
+        stage2_model.load_state_dict(checkpoint_state_dict, strict=True)
+        
+        # Load concept adapter if present
         if 'concept_adapter_state_dict' in checkpoint:
-            concept_adapter.load_state_dict(checkpoint['concept_adapter_state_dict'])
+            concept_adapter.load_state_dict(checkpoint['concept_adapter_state_dict'], strict=True)
+            print("Concept adapter loaded from checkpoint.")
+        else:
+            print("Warning: No concept_adapter_state_dict in checkpoint, using initialized adapter.")
         
         # Only extract training state if resuming from joint checkpoint (not when loading separate checkpoints)
         # When loading separate checkpoints, we only use weights as initialization
@@ -949,6 +1045,12 @@ def main():
                 print(f"\n*** Early stopping triggered! ***")
                 break
         
+        # Track best joint validation loss (for joint checkpoint saving)
+        # Check if this is the best joint checkpoint before updating
+        is_best_joint = val_loss < best_joint_val_loss
+        if is_best_joint:
+            best_joint_val_loss = val_loss
+        
         # Save Phase1 checkpoint
         phase1_checkpoint = {
             'epoch': epoch,
@@ -1037,11 +1139,137 @@ def main():
                     val_preds['distances_km'],
                     vis_dir / "predictions.txt",
                 )
+        
+        # Save combined joint checkpoint (both models together)
+        joint_checkpoint = {
+            'epoch': epoch,
+            # Phase 1 model
+            'phase1_model_state_dict': phase1_model.state_dict(),
+            # Phase 2 model
+            'stage2_model_state_dict': stage2_model.state_dict(),
+            'concept_adapter_state_dict': concept_adapter.state_dict(),
+            # Training state
+            'optimizer_state_dict': optimizer.state_dict(),
+            'scheduler_state_dict': scheduler.state_dict(),
+            # Metrics
+            'best_val_concept_acc1': best_val_concept_acc1,
+            'best_val_error': best_val_error,
+            'best_val_loss': best_val_loss if early_stop_enabled else None,
+            'val_concept_acc1': val_concept_acc1,
+            'val_concept_acc5': val_concept_acc5,
+            'val_mean_error': val_mean_error,
+            'val_median_error': val_median_error,
+            'val_cell_acc': val_cell_acc,
+            'val_loss': val_loss,
+            'val_concept_loss': val_concept_loss,
+            'val_cell_loss': val_cell_loss,
+            'val_offset_loss': val_offset_loss,
+            'geocell_info': geocell_info,
+            'epochs_without_improvement': epochs_without_improvement if early_stop_enabled else 0,
+        }
+        
+        # Save latest joint checkpoint
+        torch.save(joint_checkpoint, output_dir / "latest_joint.pt")
+        
+        # Save best joint checkpoint based on combined validation loss
+        # (since both models are trained jointly with the combined loss)
+        if is_best_joint:
+            torch.save(joint_checkpoint, output_dir / "best_joint.pt")
+            print(f"  *** Saved best joint checkpoint (epoch {epoch+1}, val_loss={val_loss:.4f}) ***")
     
     print(f"\nTraining complete!")
     print(f"Best val concept Acc1: {best_val_concept_acc1:.4f}")
     print(f"Best val geo error: {best_val_error:.2f}km")
+    print(f"Best val loss: {best_val_loss:.4f}")
     print(f"Checkpoints saved to: {output_dir}")
+    print(f"  - Individual: phase1/best_phase1.pt, phase2/best_phase2.pt")
+    print(f"  - Combined: best_joint.pt (both models together)")
+    
+    # Test set evaluation
+    if test_loader is not None:
+        print(f"\n{'='*60}")
+        print("TEST SET EVALUATION")
+        print(f"{'='*60}")
+        
+        # Load best joint checkpoint for evaluation
+        best_joint_path = output_dir / "best_joint.pt"
+        if best_joint_path.exists():
+            print(f"Loading best joint checkpoint from: {best_joint_path}")
+            checkpoint = torch.load(best_joint_path, map_location=device, weights_only=False)
+            phase1_model.load_state_dict(checkpoint['phase1_model_state_dict'])
+            stage2_model.load_state_dict(checkpoint['stage2_model_state_dict'])
+            concept_adapter.load_state_dict(checkpoint['concept_adapter_state_dict'])
+            print(f"Loaded checkpoint from epoch {checkpoint.get('epoch', 'unknown')}")
+        else:
+            print(f"Warning: best_joint.pt not found, using current model state")
+        
+        # Evaluate on test set
+        test_loss, test_concept_loss, test_cell_loss, test_offset_loss, \
+        test_concept_acc1, test_concept_acc5, test_cell_acc, \
+        test_mean_error, test_median_error, test_threshold_accs, test_preds = eval_epoch(
+            phase1_model,
+            stage2_model,
+            concept_adapter,
+            test_loader,
+            device,
+            concept_criterion,
+            cell_criterion,
+            offset_criterion,
+            centers_xyz,
+            args.concept_loss_weight,
+            args.cell_loss_weight,
+            args.offset_loss_weight,
+        )
+        
+        print(f"\nTest Set Results:")
+        print(f"  Loss: {test_loss:.4f} (Concept: {test_concept_loss:.4f}, Cell: {test_cell_loss:.4f}, Offset: {test_offset_loss:.4f})")
+        print(f"  Concept Accuracy - Top-1: {test_concept_acc1:.4f} ({test_concept_acc1*100:.2f}%)")
+        print(f"  Concept Accuracy - Top-5: {test_concept_acc5:.4f} ({test_concept_acc5*100:.2f}%)")
+        print(f"  Cell Accuracy: {test_cell_acc:.4f} ({test_cell_acc*100:.2f}%)")
+        print(f"  Geolocation Error:")
+        print(f"    Mean: {test_mean_error:.2f} km")
+        print(f"    Median: {test_median_error:.2f} km")
+        print(f"  Threshold Accuracies:")
+        for threshold, acc in test_threshold_accs.items():
+            print(f"    {threshold}: {acc:.4f} ({acc*100:.2f}%)")
+        
+        # Save test results to file
+        test_results_path = output_dir / "test_results.json"
+        test_results = {
+            'epoch': checkpoint.get('epoch', 'unknown') if best_joint_path.exists() else 'current',
+            'loss': float(test_loss),
+            'concept_loss': float(test_concept_loss),
+            'cell_loss': float(test_cell_loss),
+            'offset_loss': float(test_offset_loss),
+            'concept_acc1': float(test_concept_acc1),
+            'concept_acc5': float(test_concept_acc5),
+            'cell_acc': float(test_cell_acc),
+            'mean_error_km': float(test_mean_error),
+            'median_error_km': float(test_median_error),
+            'threshold_accuracies': {k: float(v) for k, v in test_threshold_accs.items()},
+        }
+        with open(test_results_path, 'w') as f:
+            json.dump(test_results, f, indent=2)
+        print(f"\nTest results saved to: {test_results_path}")
+        
+        # Log to wandb if enabled
+        if wandb_run:
+            wandb_run.log({
+                "test/loss": test_loss,
+                "test/concept_loss": test_concept_loss,
+                "test/cell_loss": test_cell_loss,
+                "test/offset_loss": test_offset_loss,
+                "test/concept_acc1": test_concept_acc1,
+                "test/concept_acc5": test_concept_acc5,
+                "test/cell_acc": test_cell_acc,
+                "test/mean_error_km": test_mean_error,
+                "test/median_error_km": test_median_error,
+            })
+            wandb_run.log({f"test/{k}": v for k, v in test_threshold_accs.items()})
+        
+        print(f"{'='*60}")
+    else:
+        print(f"\nNo test set provided, skipping test evaluation.")
 
 
 if __name__ == "__main__":

@@ -459,6 +459,12 @@ def main():
         default=1.0,
         help="Temperature scaling for Phase1 logits when used as features (pooled_logits mode).",
     )
+    parser.add_argument(
+        "--concept-temperature",
+        type=float,
+        default=1.0,
+        help="Temperature for softmax in ConceptEmbeddingAdapter (higher = softer distribution, uses more top-k concepts). Default: 1.0",
+    )
     
     # Training args
     parser.add_argument("--batch-size", type=int, default=64)
@@ -677,7 +683,7 @@ def main():
         concept_vectors = concept_vectors.to(device)
 
         # Create concept adapter
-        concept_adapter = ConceptEmbeddingAdapter(concept_vectors, temperature=1.0).to(device)
+        concept_adapter = ConceptEmbeddingAdapter(concept_vectors, temperature=args.concept_temperature).to(device)
 
         # Create Stage2 model
         stage2_model = Stage2CrossAttentionGeoHead(
