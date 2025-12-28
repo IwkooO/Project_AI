@@ -70,11 +70,16 @@ def cell_accuracy(
 
 def xyz_to_latlng(xyz: np.ndarray | torch.Tensor) -> tuple[np.ndarray | torch.Tensor, np.ndarray | torch.Tensor]:
     if isinstance(xyz, torch.Tensor):
+        # Normalize to unit sphere to ensure arcsin is valid and accurate
+        xyz = F.normalize(xyz, p=2, dim=-1)
         x, y, z = xyz[:, 0], xyz[:, 1], xyz[:, 2]
         lat = torch.rad2deg(torch.arcsin(torch.clamp(z, -1.0, 1.0)))
         lng = torch.rad2deg(torch.atan2(y, x))
         return lat, lng
 
+    # For numpy
+    norm = np.linalg.norm(xyz, axis=1, keepdims=True)
+    xyz = xyz / (norm + 1e-8)
     x, y, z = xyz[:, 0], xyz[:, 1], xyz[:, 2]
     lat = np.rad2deg(np.arcsin(np.clip(z, -1.0, 1.0)))
     lng = np.rad2deg(np.arctan2(y, x))

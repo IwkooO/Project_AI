@@ -258,140 +258,38 @@ class Stage2CrossAttentionGeoHead(nn.Module):
                 nn.Dropout(dropout),
             )
             
-            # Patch token projection for cross-attention
-            self.patch_proj = nn.Linear(patch_dim, hidden_dim)
+            # Fusion MLP: combines concatenated image and concept features
+            self.fusion_mlp = nn.Sequential(
+                nn.Linear(hidden_dim * 2, hidden_dim),
+                nn.LayerNorm(hidden_dim),
+                nn.GELU(),
+                nn.Dropout(dropout),
+            )
             
-            # Bidirectional cross-attention layers
-            # 1. Concept-to-Image: concept queries attend to image patches
-            self.concept_to_image_attn = nn.ModuleList([
-                nn.MultiheadAttention(
-                    embed_dim=hidden_dim,
-                    num_heads=num_heads,
-                    dropout=dropout,
-                    batch_first=True,
-                )
-                for _ in range(num_layers)
-            ])
-            self.concept_to_image_norms = nn.ModuleList([
-                nn.LayerNorm(hidden_dim) for _ in range(num_layers)
-            ])
-            self.concept_to_image_ffns = nn.ModuleList([
-                nn.Sequential(
-                    nn.Linear(hidden_dim, hidden_dim * 2),
-                    nn.GELU(),
-                    nn.Dropout(dropout),
-                    nn.Linear(hidden_dim * 2, hidden_dim),
-                    nn.Dropout(dropout),
-                )
-                for _ in range(num_layers)
-            ])
-            self.concept_to_image_ffn_norms = nn.ModuleList([
-                nn.LayerNorm(hidden_dim) for _ in range(num_layers)
-            ])
-            
-            # 2. Image-to-Concept: image patches attend to concept features
-            self.image_to_concept_attn = nn.ModuleList([
-                nn.MultiheadAttention(
-                    embed_dim=hidden_dim,
-                    num_heads=num_heads,
-                    dropout=dropout,
-                    batch_first=True,
-                )
-                for _ in range(num_layers)
-            ])
-            self.image_to_concept_norms = nn.ModuleList([
-                nn.LayerNorm(hidden_dim) for _ in range(num_layers)
-            ])
-            self.image_to_concept_ffns = nn.ModuleList([
-                nn.Sequential(
-                    nn.Linear(hidden_dim, hidden_dim * 2),
-                    nn.GELU(),
-                    nn.Dropout(dropout),
-                    nn.Linear(hidden_dim * 2, hidden_dim),
-                    nn.Dropout(dropout),
-                )
-                for _ in range(num_layers)
-            ])
-            self.image_to_concept_ffn_norms = nn.ModuleList([
-                nn.LayerNorm(hidden_dim) for _ in range(num_layers)
-            ])
-            
-            # Adaptive per-sample gating: MLP that predicts fusion weights based on features
-            # Input: concatenated image and concept features [B, 2*hidden_dim]
-            # Output: per-sample weights [B, 2] (softmax over modalities)
+            # Adaptive per-sample gating (optional, can be used to weight contributions)
             self.fusion_gate = nn.Sequential(
                 nn.Linear(hidden_dim * 2, hidden_dim),
                 nn.GELU(),
                 nn.Dropout(dropout),
                 nn.Linear(hidden_dim, 2),
-                nn.Softmax(dim=-1),  # [B, 2] -> [img_weight, concept_weight]
-            )
-            
-            # Separate prediction heads for late fusion
-            # Image-specific heads
-            self.image_cell_head = nn.Sequential(
-                nn.LayerNorm(hidden_dim),
-                nn.Linear(hidden_dim, hidden_dim),
-                nn.GELU(),
-                nn.Dropout(dropout),
-                nn.Linear(hidden_dim, num_cells),
-            )
-            self.image_offset_head = nn.Sequential(
-                nn.LayerNorm(hidden_dim),
-                nn.Linear(hidden_dim, hidden_dim),
-                nn.GELU(),
-                nn.Dropout(dropout),
-                nn.Linear(hidden_dim, 3),
-            )
-            
-            # Concept-specific heads
-            self.concept_cell_head = nn.Sequential(
-                nn.LayerNorm(hidden_dim),
-                nn.Linear(hidden_dim, hidden_dim),
-                nn.GELU(),
-                nn.Dropout(dropout),
-                nn.Linear(hidden_dim, num_cells),
-            )
-            self.concept_offset_head = nn.Sequential(
-                nn.LayerNorm(hidden_dim),
-                nn.Linear(hidden_dim, hidden_dim),
-                nn.GELU(),
-                nn.Dropout(dropout),
-                nn.Linear(hidden_dim, 3),
-            )
-            
-            # Fusion heads: combine predictions from both modalities
-            self.fusion_cell_head = nn.Sequential(
-                nn.Linear(num_cells * 2, hidden_dim),
-                nn.GELU(),
-                nn.Dropout(dropout),
-                nn.Linear(hidden_dim, num_cells),
-            )
-            self.fusion_offset_head = nn.Sequential(
-                nn.Linear(3 * 2, hidden_dim),
-                nn.GELU(),
-                nn.Dropout(dropout),
-                nn.Linear(hidden_dim, 3),
+                nn.Softmax(dim=-1),
             )
         elif mode == "concept_only":
-            self.concept_mlp = nn.Sequential(
-                nn.Linear(hidden_dim, hidden_dim * 2),
+            self.concept_adapter = nn.Sequential(
+                nn.LayerNorm(hidden_dim),
+                nn.Linear(hidden_dim, hidden_dim),
                 nn.GELU(),
                 nn.Dropout(dropout),
-                nn.Linear(hidden_dim * 2, hidden_dim),
             )
         else:  # image_only
-            self.pooled_mlp = nn.Sequential(
+            self.image_adapter = nn.Sequential(
                 nn.LayerNorm(hidden_dim),
-                nn.Linear(hidden_dim, hidden_dim * 2),
+                nn.Linear(hidden_dim, hidden_dim),
                 nn.GELU(),
-                nn.Dropout(dropout),
-                nn.Linear(hidden_dim * 2, hidden_dim),
-                nn.LayerNorm(hidden_dim),
                 nn.Dropout(dropout),
             )
 
-        # Shared heads for concept_only and image_only modes
+        # Unified heads for all modes
         self.cell_head = nn.Sequential(
             nn.LayerNorm(hidden_dim),
             nn.Linear(hidden_dim, hidden_dim),
@@ -418,10 +316,8 @@ class Stage2CrossAttentionGeoHead(nn.Module):
         if self.mode == "both":
             if pooled_emb is None:
                 raise ValueError("pooled_emb required for mode='both'")
-            if patch_tokens is None:
-                raise ValueError("patch_tokens required for mode='both' (for cross-attention)")
 
-            # Process image features (pooled global representation)
+            # Process image features (pooled global representation - CLS)
             img_h = self.pooled_proj(pooled_emb)  # [B, hidden_dim]
             img_h = self.image_adapter(img_h)  # [B, hidden_dim]
             
@@ -429,97 +325,38 @@ class Stage2CrossAttentionGeoHead(nn.Module):
             concept_h = self.concept_proj(concept_emb)  # [B, hidden_dim]
             concept_h = self.concept_adapter(concept_h)  # [B, hidden_dim]
             
-            # Project patch tokens for cross-attention
-            patch_h = self.patch_proj(patch_tokens)  # [B, P, hidden_dim]
-            
-            # Store original features for orthogonality regularization
+            # Store features for potentially returning (e.g. for orthogonality)
             img_h_orig = img_h.clone()
             concept_h_orig = concept_h.clone()
             
-            # Bidirectional cross-attention
-            # 1. Concept-to-Image: concept queries attend to image patches
-            for attn, norm, ffn, ffn_norm in zip(
-                self.concept_to_image_attn,
-                self.concept_to_image_norms,
-                self.concept_to_image_ffns,
-                self.concept_to_image_ffn_norms,
-            ):
-                concept_query = concept_h.unsqueeze(1)  # [B, 1, hidden_dim]
-                
-                # Cross-attention: concept queries attend to image patches
-                concept_attended, _ = attn(
-                    query=concept_query,
-                    key=patch_h,
-                    value=patch_h,
-                )  # [B, 1, hidden_dim]
-                
-                # Residual connection
-                concept_h = norm(concept_h + concept_attended.squeeze(1))  # [B, hidden_dim]
-                concept_h = ffn_norm(concept_h + ffn(concept_h))  # [B, hidden_dim]
+            # Simple but robust fusion: concatenation + MLP
+            # This uses the CLS global feature in combination with concepts
+            combined = torch.cat([img_h, concept_h], dim=-1)  # [B, 2*hidden_dim]
+            fused_h = self.fusion_mlp(combined)  # [B, hidden_dim]
             
-            # 2. Image-to-Concept: image patches attend to concept features
-            concept_h_expanded = concept_h.unsqueeze(1)  # [B, 1, hidden_dim] - use concept as key/value
-            for attn, norm, ffn, ffn_norm in zip(
-                self.image_to_concept_attn,
-                self.image_to_concept_norms,
-                self.image_to_concept_ffns,
-                self.image_to_concept_ffn_norms,
-            ):
-                # Cross-attention: image patches attend to concept features
-                patch_attended, _ = attn(
-                    query=patch_h,  # [B, P, hidden_dim]
-                    key=concept_h_expanded,  # [B, 1, hidden_dim]
-                    value=concept_h_expanded,  # [B, 1, hidden_dim]
-                )  # [B, P, hidden_dim]
-                
-                # Pool attended patches (mean pooling)
-                patch_attended_pooled = patch_attended.mean(dim=1)  # [B, hidden_dim]
-                
-                # Residual connection to image features
-                img_h = norm(img_h + patch_attended_pooled)  # [B, hidden_dim]
-                img_h = ffn_norm(img_h + ffn(img_h))  # [B, hidden_dim]
+            # Optional gate for monitoring/weighting
+            fusion_weights = self.fusion_gate(combined)  # [B, 2]
+            gate = fusion_weights[:, 1:2].expand(-1, self.hidden_dim)  # [B, hidden_dim]
             
-            # Adaptive per-sample gating: predict fusion weights based on features
-            # Concatenate features to predict weights
-            concat_features = torch.cat([img_h, concept_h], dim=-1)  # [B, 2*hidden_dim]
-            fusion_weights = self.fusion_gate(concat_features)  # [B, 2] -> [img_weight, concept_weight]
-            img_weight = fusion_weights[:, 0:1]  # [B, 1]
-            concept_weight = fusion_weights[:, 1:2]  # [B, 1]
+            # Final predictions from fused representation
+            cell_logits = self.cell_head(fused_h)
+            offset_pred = self.offset_head(fused_h)
             
-            # Store gate values for monitoring (concept weight, expanded to match hidden_dim)
-            gate = concept_weight.expand(-1, self.hidden_dim)  # [B, hidden_dim]
-            
-            # Late fusion: separate predictions from each modality
-            # Image-specific predictions
-            img_cell_logits = self.image_cell_head(img_h)  # [B, num_cells]
-            img_offset_pred = self.image_offset_head(img_h)  # [B, 3]
-            
-            # Concept-specific predictions
-            concept_cell_logits = self.concept_cell_head(concept_h)  # [B, num_cells]
-            concept_offset_pred = self.concept_offset_head(concept_h)  # [B, 3]
-
-            # Use the learned gate to fuse predictions.
-            # This makes 'both' safely fall back to image-only when concept branch is unhelpful.
-            cell_logits = img_weight * img_cell_logits + concept_weight * concept_cell_logits  # [B, num_cells]
-            offset_pred = img_weight * img_offset_pred + concept_weight * concept_offset_pred  # [B, 3]
-            
-            # Also return original features for orthogonality regularization
-            # (will be used in training loss)
             return cell_logits, offset_pred, gate, img_h_orig, concept_h_orig
             
         elif self.mode == "concept_only":
             concept_h = self.concept_proj(concept_emb)
-            hidden = self.concept_mlp(concept_h)
-            cell_logits = self.cell_head(hidden)
-            offset_pred = self.offset_head(hidden)
+            concept_h = self.concept_adapter(concept_h)
+            cell_logits = self.cell_head(concept_h)
+            offset_pred = self.offset_head(concept_h)
             return cell_logits, offset_pred, gate
         else:  # image_only
             if pooled_emb is None:
                 raise ValueError("pooled_emb required for mode='image_only'")
-            pooled_h = self.pooled_proj(pooled_emb)
-            hidden = self.pooled_mlp(pooled_h)
-            cell_logits = self.cell_head(hidden)
-            offset_pred = self.offset_head(hidden)
+            img_h = self.pooled_proj(pooled_emb)
+            img_h = self.image_adapter(img_h)
+            cell_logits = self.cell_head(img_h)
+            offset_pred = self.offset_head(img_h)
             return cell_logits, offset_pred, gate
 
 
