@@ -35,6 +35,7 @@ from scripts.training.train_stage2_cross_attention import (
     is_missing_or_none_path,
     compute_predicted_coords,
 )
+from bot.streetclip_inference import StreetCLIPInference
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -51,6 +52,8 @@ concept_info = None
 ckpt = None
 device = None
 transform = None
+streetclip_inference = None  # For vanilla HuggingFace StreetCLIP
+use_streetclip = False  # Flag to use StreetCLIP instead of stage2
 
 # Logging state
 log_dir = None
@@ -130,6 +133,7 @@ def load_stage2_checkpoint(checkpoint_path: Path, device: torch.device) -> tuple
 def predict_single_image(image_data: str, save_image: bool = True) -> Dict:
     """Predict location for a single base64-encoded image."""
     global model, image_encoder, stage1_model, cell_centers, ckpt, device, transform
+    global streetclip_inference, use_streetclip
     global log_dir, prediction_count
 
     # Decode base64 image
@@ -140,6 +144,32 @@ def predict_single_image(image_data: str, save_image: bool = True) -> Dict:
         image_bytes = base64.b64decode(image_data)
 
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    
+    # Use StreetCLIP if enabled
+    if use_streetclip and streetclip_inference is not None:
+        pred_lat, pred_lng = streetclip_inference.predict(image)
+        
+        # Log prediction (no concepts for vanilla StreetCLIP)
+        prediction_count += 1
+        if log_dir is not None:
+            try:
+                threading.Thread(
+                    target=log_prediction_async,
+                    args=(image.copy(), pred_lat, pred_lng, prediction_count, 
+                          None, None, None),  # No concepts for vanilla StreetCLIP
+                    daemon=True
+                ).start()
+            except Exception as e:
+                logger.warning(f"Failed to start logging thread: {e}")
+        
+        return {
+            "results": {
+                "lat": pred_lat,
+                "lng": pred_lng
+            }
+        }
+    
+    # Original stage2 prediction code
     image_tensor = transform(image).unsqueeze(0).to(device)
 
     ablation_mode = ckpt.get("ablation_mode", "both")
@@ -435,7 +465,7 @@ def get_checkpoints():
 
     checkpoint_info = {
         "stage1_checkpoint": str(ckpt.get("stage1_checkpoint", "")),
-        "stage2_checkpoint": str(ckpt.get("checkpoint_path", ""))  # The path passed to load_stage2_checkpoint
+        "stage2_checkpoint": str(ckpt.get("checkpoint_path", ckpt.get("stage2_checkpoint", "")))
     }
 
     return jsonify(checkpoint_info)
@@ -443,14 +473,18 @@ def get_checkpoints():
 
 def main():
     parser = argparse.ArgumentParser(description="GeoGuessr Bot API Server")
-    parser.add_argument("--checkpoint", type=str, required=True, help="Path to Stage 2 checkpoint")
+    parser.add_argument("--checkpoint", type=str, help="Path to Stage 2 checkpoint")
+    parser.add_argument("--default-streetclip", action="store_true", 
+                       help="Use vanilla HuggingFace StreetCLIP instead of stage2 checkpoint")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind to")
     parser.add_argument("--port", type=int, default=5000, help="Port to bind to")
     parser.add_argument("--device", type=str, default=None, help="Device (cuda/cpu)")
+    parser.add_argument("--grid-step", type=float, default=5.0, 
+                       help="Grid step size in degrees for StreetCLIP (default: 5.0)")
 
     args = parser.parse_args()
 
-    global device
+    global device, use_streetclip, streetclip_inference
     if args.device:
         device = torch.device(args.device)
     else:
@@ -458,15 +492,34 @@ def main():
     logger.info(f"Using device: {device}")
 
     global model, image_encoder, stage1_model, cell_centers, concept_info, ckpt, transform
-    checkpoint_path = Path(args.checkpoint)
-    if not checkpoint_path.exists():
-        raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+    
+    if args.default_streetclip:
+        # Use vanilla HuggingFace StreetCLIP
+        logger.info("Loading vanilla HuggingFace StreetCLIP...")
+        use_streetclip = True
+        streetclip_inference = StreetCLIPInference(device=device, grid_step=args.grid_step)
+        
+        # Set checkpoint info for logging
+        ckpt = streetclip_inference.get_checkpoint_info()
+        
+        # No transform needed for StreetCLIP (uses processor internally)
+        transform = None
+        
+    else:
+        # Use stage2 checkpoint
+        if not args.checkpoint:
+            raise ValueError("Must provide --checkpoint unless using --default-streetclip")
+        
+        use_streetclip = False
+        checkpoint_path = Path(args.checkpoint)
+        if not checkpoint_path.exists():
+            raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
 
-    model, image_encoder, stage1_model, cell_centers, concept_info, ckpt = load_stage2_checkpoint(
-        checkpoint_path, device
-    )
+        model, image_encoder, stage1_model, cell_centers, concept_info, ckpt = load_stage2_checkpoint(
+            checkpoint_path, device
+        )
 
-    transform = get_transforms_from_processor(image_encoder.image_processor)
+        transform = get_transforms_from_processor(image_encoder.image_processor)
 
     # Initialize logging session
     init_logging_session()
