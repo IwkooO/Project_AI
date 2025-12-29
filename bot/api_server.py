@@ -189,16 +189,47 @@ def predict_single_image(image_data: str, save_image: bool = True) -> Dict:
         else:
             concept_embs = stage1_model.concept_bottleneck(img_features.float())
 
-    # Stage 2 forward pass
-    outputs = model(concept_embs, patch_tokens, return_attention=False, return_gate=False)
+    # Stage 2 forward pass - ENABLE attention and gate for diagnostics
+    outputs = model(concept_embs, patch_tokens, return_attention=True, return_gate=True)
     cell_logits = outputs["cell_logits"]
     pred_offsets = outputs["pred_offsets"]
+    attn_weights = outputs.get("attn_weights")  # [1, 1, 576] or None
+    gate = outputs.get("gate")  # [1, 512] or None
 
     pred_cells = cell_logits.argmax(dim=1)
     pred_coords = compute_predicted_coords(pred_cells, pred_offsets, cell_centers, coord_output_dim, device)
 
     pred_lat = pred_coords[0, 0].item()
     pred_lng = pred_coords[0, 1].item()
+
+    # Compute cell prediction confidence
+    cell_probs = F.softmax(cell_logits, dim=1)
+    cell_confidence = cell_probs.max().item()
+    top3_cell_probs, top3_cell_idx = cell_probs.topk(3, dim=1)
+
+    # Compute gate statistics (if available) - shows concept vs image contribution
+    gate_stats = None
+    if gate is not None:
+        gate_flat = gate.squeeze()
+        gate_stats = {
+            "mean": gate_flat.mean().item(),
+            "std": gate_flat.std().item(),
+            "min": gate_flat.min().item(),
+            "max": gate_flat.max().item(),
+        }
+
+    # Compute attention statistics (if available)
+    attn_stats = None
+    if attn_weights is not None:
+        attn_flat = attn_weights.squeeze()  # [576]
+        attn_entropy = -(attn_flat * torch.log(attn_flat + 1e-10)).sum().item()
+        attn_max_idx = attn_flat.argmax().item()
+        attn_max_val = attn_flat.max().item()
+        attn_stats = {
+            "entropy": attn_entropy,
+            "max_patch_idx": attn_max_idx,
+            "max_attention": attn_max_val,
+        }
 
     # Get Stage 1 concept predictions for logging
     meta_probs, parent_probs = None, None
@@ -213,6 +244,11 @@ def predict_single_image(image_data: str, save_image: bool = True) -> Dict:
     except Exception as e:
         logger.warning(f"Could not get concept predictions: {e}")
 
+    # Log gate statistics to console for quick debugging
+    if gate_stats is not None:
+        logger.info(f"🔬 Gate stats: mean={gate_stats['mean']:.4f}, std={gate_stats['std']:.4f} "
+                   f"(gate>0.5 = concept-heavy, gate<0.5 = image-heavy)")
+
     # Log prediction in background
     prediction_count += 1
     if log_dir is not None:
@@ -220,7 +256,9 @@ def predict_single_image(image_data: str, save_image: bool = True) -> Dict:
             threading.Thread(
                 target=log_prediction_async,
                 args=(image.copy(), pred_lat, pred_lng, prediction_count, 
-                      meta_probs, parent_probs, concept_info),
+                      meta_probs, parent_probs, concept_info,
+                      gate_stats, attn_stats, cell_confidence, 
+                      top3_cell_idx[0].cpu().tolist(), top3_cell_probs[0].cpu().tolist()),
                 daemon=True
             ).start()
         except Exception as e:
@@ -242,8 +280,13 @@ def log_prediction_async(
     meta_probs: Optional[torch.Tensor],
     parent_probs: Optional[torch.Tensor],
     concept_info: Optional[Dict],
+    gate_stats: Optional[Dict] = None,
+    attn_stats: Optional[Dict] = None,
+    cell_confidence: Optional[float] = None,
+    top3_cell_idx: Optional[List[int]] = None,
+    top3_cell_probs: Optional[List[float]] = None,
 ):
-    """Log prediction with concept visualization (runs in background thread)."""
+    """Log prediction with concept visualization and diagnostics (runs in background thread)."""
     global log_dir
     
     try:
@@ -269,6 +312,9 @@ def log_prediction_async(
                     timestamp=timestamp,
                     concept_info=concept_info,
                     output_dir=log_dir,
+                    gate_stats=gate_stats,
+                    attn_stats=attn_stats,
+                    cell_confidence=cell_confidence,
                 )
             except Exception as e:
                 logger.warning(f"Failed to create visualization: {e}")
@@ -281,14 +327,58 @@ def log_prediction_async(
             f.write(f"Prediction: ({lat:.6f}, {lng:.6f})\n")
             f.write(f"Google Maps: https://www.google.com/maps?q={lat},{lng}\n")
             
+            # Gate statistics (concept vs image contribution)
+            if gate_stats is not None:
+                f.write(f"\n════════════════════════════════════════\n")
+                f.write(f"  CONCEPT vs IMAGE CONTRIBUTION (Gate)\n")
+                f.write(f"════════════════════════════════════════\n")
+                f.write(f"Gate Mean:  {gate_stats['mean']:.4f}\n")
+                f.write(f"Gate Std:   {gate_stats['std']:.4f}\n")
+                f.write(f"Gate Range: [{gate_stats['min']:.4f}, {gate_stats['max']:.4f}]\n")
+                f.write(f"\nInterpretation:\n")
+                f.write(f"  - gate > 0.5 = CONCEPT-heavy (relies on semantic concepts)\n")
+                f.write(f"  - gate < 0.5 = IMAGE-heavy (relies on raw visual patches)\n")
+                if gate_stats['mean'] > 0.6:
+                    f.write(f"\n⚠️  Model is HEAVILY using CONCEPTS (gate mean > 0.6)\n")
+                elif gate_stats['mean'] < 0.4:
+                    f.write(f"\n⚠️  Model is HEAVILY using IMAGE PATCHES (gate mean < 0.4)\n")
+                else:
+                    f.write(f"\n✓ Model is using BALANCED mix of concepts and patches\n")
+            
+            # Attention statistics
+            if attn_stats is not None:
+                f.write(f"\n════════════════════════════════════════\n")
+                f.write(f"  ATTENTION STATISTICS\n")
+                f.write(f"════════════════════════════════════════\n")
+                f.write(f"Attention Entropy:    {attn_stats['entropy']:.4f}\n")
+                f.write(f"Max Attention Patch:  {attn_stats['max_patch_idx']} (value: {attn_stats['max_attention']:.4f})\n")
+                f.write(f"\nInterpretation:\n")
+                f.write(f"  - High entropy = diffuse attention (looking at many patches)\n")
+                f.write(f"  - Low entropy = focused attention (looking at few patches)\n")
+            
+            # Cell prediction confidence
+            if cell_confidence is not None:
+                f.write(f"\n════════════════════════════════════════\n")
+                f.write(f"  GEOCELL PREDICTION CONFIDENCE\n")
+                f.write(f"════════════════════════════════════════\n")
+                f.write(f"Top Cell Confidence: {cell_confidence:.4f}\n")
+                if top3_cell_idx is not None and top3_cell_probs is not None:
+                    f.write(f"Top 3 Cells: {top3_cell_idx}\n")
+                    f.write(f"Top 3 Probs: [{', '.join([f'{p:.4f}' for p in top3_cell_probs])}]\n")
+            
+            # Concept predictions
             if meta_probs is not None and concept_info is not None:
                 idx_to_concept = concept_info.get("idx_to_concept", {})
                 idx_to_parent = concept_info.get("idx_to_parent", {})
                 
+                f.write(f"\n════════════════════════════════════════\n")
+                f.write(f"  CONCEPT PREDICTIONS\n")
+                f.write(f"════════════════════════════════════════\n")
+                
                 # Top 5 concepts
                 probs = meta_probs[0].cpu() if meta_probs.dim() > 1 else meta_probs.cpu()
                 top5_probs, top5_idx = torch.topk(probs, k=min(5, len(probs)))
-                f.write(f"\nTop 5 Concepts:\n")
+                f.write(f"\nTop 5 Child Concepts:\n")
                 for prob, idx in zip(top5_probs, top5_idx):
                     concept_name = idx_to_concept.get(idx.item(), f"concept_{idx.item()}")
                     f.write(f"  {prob:.4f} - {concept_name}\n")
@@ -317,8 +407,11 @@ def create_concept_visualization(
     timestamp: str,
     concept_info: Dict,
     output_dir: Path,
+    gate_stats: Optional[Dict] = None,
+    attn_stats: Optional[Dict] = None,
+    cell_confidence: Optional[float] = None,
 ):
-    """Create and save concept prediction visualization."""
+    """Create and save concept prediction visualization with contribution diagnostics."""
     idx_to_concept = concept_info.get("idx_to_concept", {})
     idx_to_parent = concept_info.get("idx_to_parent", {})
     
@@ -335,44 +428,121 @@ def create_concept_visualization(
         top3_parents = [idx_to_parent.get(idx.item(), f"parent_{idx.item()}") for idx in top3_parent_indices]
         top3_parent_probs_np = top3_parent_probs.numpy()
     
-    # Create figure
-    n_cols = 3 if parent_probs is not None else 2
-    fig = plt.figure(figsize=(6 * n_cols, 6))
+    # Create figure with 2 rows: top row for diagnostics, bottom row for concepts
+    fig = plt.figure(figsize=(18, 10))
     
-    # Subplot 1: Input image
-    ax1 = fig.add_subplot(1, n_cols, 1)
+    # ========== TOP ROW: Image + Gate Contribution ==========
+    # Subplot 1: Input image with prediction
+    ax1 = fig.add_subplot(2, 4, 1)
     ax1.imshow(np.array(image))
     ax1.axis("off")
-    ax1.set_title(f"Round {round_num}\nPrediction: ({lat:.4f}, {lng:.4f})", fontsize=10)
+    title_text = f"Round {round_num}\n({lat:.4f}, {lng:.4f})"
+    if cell_confidence is not None:
+        title_text += f"\nConf: {cell_confidence:.2f}"
+    ax1.set_title(title_text, fontsize=10)
     
-    # Subplot 2: Top-5 meta concepts
-    ax2 = fig.add_subplot(1, n_cols, 2)
+    # Subplot 2: Gate contribution gauge (Concept vs Image)
+    ax2 = fig.add_subplot(2, 4, 2)
+    if gate_stats is not None:
+        gate_mean = gate_stats['mean']
+        # Create a horizontal bar showing concept vs image contribution
+        ax2.barh([0], [gate_mean], color='#2196F3', height=0.5, label='Concept')
+        ax2.barh([0], [1 - gate_mean], left=[gate_mean], color='#FF9800', height=0.5, label='Image')
+        ax2.set_xlim(0, 1)
+        ax2.set_ylim(-0.5, 0.5)
+        ax2.set_yticks([])
+        ax2.set_xlabel("Contribution Weight")
+        ax2.set_title(f"Concept vs Image Contribution\n(Gate Mean: {gate_mean:.3f})", fontsize=10, fontweight='bold')
+        ax2.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2, fontsize=9)
+        
+        # Add interpretation text
+        if gate_mean > 0.6:
+            interp = "CONCEPT-heavy"
+            color = '#2196F3'
+        elif gate_mean < 0.4:
+            interp = "IMAGE-heavy"
+            color = '#FF9800'
+        else:
+            interp = "BALANCED"
+            color = '#4CAF50'
+        ax2.text(0.5, 0.3, interp, ha='center', va='center', fontsize=12, fontweight='bold', color=color)
+    else:
+        ax2.text(0.5, 0.5, "Gate stats\nnot available", ha='center', va='center', fontsize=10)
+        ax2.axis("off")
+    
+    # Subplot 3: Gate distribution details
+    ax3 = fig.add_subplot(2, 4, 3)
+    if gate_stats is not None:
+        stats_text = (
+            f"Gate Statistics:\n"
+            f"━━━━━━━━━━━━━━━━\n"
+            f"Mean:  {gate_stats['mean']:.4f}\n"
+            f"Std:   {gate_stats['std']:.4f}\n"
+            f"Min:   {gate_stats['min']:.4f}\n"
+            f"Max:   {gate_stats['max']:.4f}\n"
+            f"━━━━━━━━━━━━━━━━\n\n"
+            f"Gate > 0.5 = Concepts\n"
+            f"Gate < 0.5 = Images"
+        )
+        ax3.text(0.1, 0.9, stats_text, transform=ax3.transAxes,
+                 fontsize=10, verticalalignment='top', fontfamily='monospace',
+                 bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+    ax3.axis("off")
+    ax3.set_title("Contribution Details", fontsize=10)
+    
+    # Subplot 4: Attention statistics
+    ax4 = fig.add_subplot(2, 4, 4)
+    if attn_stats is not None:
+        attn_text = (
+            f"Attention Statistics:\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"Entropy:     {attn_stats['entropy']:.4f}\n"
+            f"Max Patch:   {attn_stats['max_patch_idx']}\n"
+            f"Max Value:   {attn_stats['max_attention']:.4f}\n"
+            f"━━━━━━━━━━━━━━━━━━━\n\n"
+            f"High entropy = diffuse\n"
+            f"Low entropy = focused"
+        )
+        ax4.text(0.1, 0.9, attn_text, transform=ax4.transAxes,
+                 fontsize=10, verticalalignment='top', fontfamily='monospace',
+                 bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.5))
+    else:
+        ax4.text(0.5, 0.5, "Attention stats\nnot available", ha='center', va='center', fontsize=10)
+    ax4.axis("off")
+    ax4.set_title("Attention Details", fontsize=10)
+    
+    # ========== BOTTOM ROW: Concept Predictions ==========
+    # Subplot 5: Top-5 meta concepts (spanning 2 columns)
+    ax5 = fig.add_subplot(2, 2, 3)
     y_pos = np.arange(len(top5_concepts))
     colors = plt.cm.Blues(np.linspace(0.4, 0.8, len(top5_concepts)))[::-1]
-    bars = ax2.barh(y_pos, top5_probs_np[::-1], color=colors)
-    ax2.set_yticks(y_pos)
-    ax2.set_yticklabels([c[:30] + "..." if len(c) > 30 else c for c in top5_concepts[::-1]], fontsize=9)
-    ax2.set_xlabel("Probability")
-    ax2.set_title("Top 5 Concept Predictions", fontsize=10)
-    ax2.set_xlim(0, 1)
+    bars = ax5.barh(y_pos, top5_probs_np[::-1], color=colors)
+    ax5.set_yticks(y_pos)
+    ax5.set_yticklabels([c[:40] + "..." if len(c) > 40 else c for c in top5_concepts[::-1]], fontsize=9)
+    ax5.set_xlabel("Probability")
+    ax5.set_title("Top 5 Child Concept Predictions", fontsize=10, fontweight='bold')
+    ax5.set_xlim(0, 1)
     
     for bar, prob in zip(bars, top5_probs_np[::-1]):
-        ax2.text(prob + 0.02, bar.get_y() + bar.get_height()/2, f"{prob:.3f}", va='center', fontsize=8)
+        ax5.text(prob + 0.02, bar.get_y() + bar.get_height()/2, f"{prob:.3f}", va='center', fontsize=8)
     
-    # Subplot 3: Top-3 parent concepts (if available)
+    # Subplot 6: Top-3 parent concepts (spanning 2 columns)
+    ax6 = fig.add_subplot(2, 2, 4)
     if parent_probs is not None and len(top3_parents) > 0:
-        ax3 = fig.add_subplot(1, n_cols, 3)
         y_pos = np.arange(len(top3_parents))
         colors = plt.cm.Greens(np.linspace(0.4, 0.8, len(top3_parents)))[::-1]
-        bars = ax3.barh(y_pos, top3_parent_probs_np[::-1], color=colors)
-        ax3.set_yticks(y_pos)
-        ax3.set_yticklabels([p[:30] + "..." if len(p) > 30 else p for p in top3_parents[::-1]], fontsize=9)
-        ax3.set_xlabel("Probability")
-        ax3.set_title("Top 3 Parent Concepts", fontsize=10)
-        ax3.set_xlim(0, 1)
+        bars = ax6.barh(y_pos, top3_parent_probs_np[::-1], color=colors)
+        ax6.set_yticks(y_pos)
+        ax6.set_yticklabels([p[:40] + "..." if len(p) > 40 else p for p in top3_parents[::-1]], fontsize=9)
+        ax6.set_xlabel("Probability")
+        ax6.set_title("Top 3 Parent Concept Predictions", fontsize=10, fontweight='bold')
+        ax6.set_xlim(0, 1)
         
         for bar, prob in zip(bars, top3_parent_probs_np[::-1]):
-            ax3.text(prob + 0.02, bar.get_y() + bar.get_height()/2, f"{prob:.3f}", va='center', fontsize=8)
+            ax6.text(prob + 0.02, bar.get_y() + bar.get_height()/2, f"{prob:.3f}", va='center', fontsize=8)
+    else:
+        ax6.text(0.5, 0.5, "Parent concepts\nnot available", ha='center', va='center', fontsize=10)
+        ax6.axis("off")
     
     plt.tight_layout()
     
