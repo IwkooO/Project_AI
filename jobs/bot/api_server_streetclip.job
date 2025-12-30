@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
-#SBATCH --job-name=sc-api
+#SBATCH --job-name=gc-api
 #SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/bot/api_server_streetclip.log
-#SBATCH --time=24:00:00
+#SBATCH --time=2:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 

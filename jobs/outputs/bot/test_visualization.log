@@ -1,0 +1,81 @@
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+INFO:bot.api_server:Loading Stage 2 checkpoint from /scratch-shared/pnair/Project_AI/results/stage2_cross_attention_both/2025-12-25_09-13-54/checkpoints/best_model_stage2_xattn.pt
+INFO:scripts.training.train_stage2_cross_attention:Loading Stage0 encoder weights from /scratch-shared/pnair/Project_AI/results/stage0-prototype/geolocal_StreetCLIP/2025-12-24_09-29-59/checkpoints/best_model_stage0.pt
+INFO:scripts.training.train_stage2_cross_attention:Loaded Stage0 encoder weights into Stage2 image_encoder (missing=0, unexpected=0)
+INFO:scripts.training.train_stage2_cross_attention:Loading Stage 1 checkpoint from /scratch-shared/pnair/Project_AI/results/stage1-prototype/geolocal_StreetCLIP/2025-12-24_19-10-45/checkpoints/best_model_stage1.pt
+INFO:scripts.training.train_stage2_cross_attention:Loaded Stage 1 model with 2105 concepts, 236 parents
+INFO:bot.api_server:📍 Saved error map: round_09_142318_error_map.png
+================================================================================
+Testing visualization with real Stage 2 model inference
+================================================================================
+✓ Checkpoint: /scratch-shared/pnair/Project_AI/results/stage2_cross_attention_both/2025-12-25_09-13-54/checkpoints/best_model_stage2_xattn.pt
+✓ Test image: /scratch-shared/pnair/Project_AI/results/geoguessr_game_logs/2025-12-30_08-52-19-new-nice-preds/round_09_085748_input.png
+✓ Output directory: /scratch-shared/pnair/Project_AI/results/test_visualization_real
+✓ Using device: cuda
+
+================================================================================
+Loading Stage 2 checkpoint...
+================================================================================
+✓ Model loaded successfully
+
+================================================================================
+Loading and preprocessing image...
+================================================================================
+✓ Loaded image: (1904, 810)
+✓ Preprocessed image tensor: torch.Size([1, 3, 336, 336])
+
+================================================================================
+Running inference...
+================================================================================
+  Running Stage 2 forward pass...
+✓ Prediction: (-4.829580°, -80.792068°)
+✓ Gate stats: mean=0.4802, std=0.2647
+✓ Attention stats: entropy=5.9982, max_patch=76
+✓ Concept predictions retrieved
+✓ Top cells data prepared: [826, 801, 819]
+
+================================================================================
+Testing visualizations...
+================================================================================
+
+1. Testing create_concept_visualization...
+   ✓ Full concept visualization created
+
+2. Testing create_error_map_visualization...
+   ✓ Error map visualization created
+
+3. Testing individual panels...
+   ✓ Geographic map panel (with error) created
+   ✓ Gate gauge panel created
+   ✓ Confidence panel created
+   ✓ Concept bar panel created
+
+================================================================================
+✅ All visualization tests completed!
+================================================================================
+📁 Output files saved to: /scratch-shared/pnair/Project_AI/results/test_visualization_real
+
+Generated files:
+  - round_09_085748_concepts.png
+  - round_09_135920_error_map.png
+  - round_09_140622_error_map.png
+  - round_09_141439_error_map.png
+  - round_09_142318_error_map.png
+  - test_concept_bar.png
+  - test_confidence_panel.png
+  - test_gate_gauge.png
+  - test_geographic_map_with_error.png

@@ -1,0 +1,51 @@
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+INFO:bot.api_server:Loading Stage 2 checkpoint from /scratch-shared/pnair/Project_AI/results/stage2_cross_attention_both/2025-12-25_09-13-54/checkpoints/best_model_stage2_xattn.pt
+INFO:scripts.training.train_stage2_cross_attention:Loading Stage0 encoder weights from /scratch-shared/pnair/Project_AI/results/stage0-prototype/geolocal_StreetCLIP/2025-12-24_09-29-59/checkpoints/best_model_stage0.pt
+INFO:scripts.training.train_stage2_cross_attention:Loaded Stage0 encoder weights into Stage2 image_encoder (missing=0, unexpected=0)
+INFO:scripts.training.train_stage2_cross_attention:Loading Stage 1 checkpoint from /scratch-shared/pnair/Project_AI/results/stage1-prototype/geolocal_StreetCLIP/2025-12-24_19-10-45/checkpoints/best_model_stage1.pt
+INFO:scripts.training.train_stage2_cross_attention:Loaded Stage 1 model with 2105 concepts, 236 parents
+================================================================================
+Testing Cell Computation
+================================================================================
+✓ Using device: cpu
+
+Loading checkpoint...
+✓ Loaded 1048 cell centers
+
+================================================================================
+Testing find_nearest_cell function
+================================================================================
+
+Paris (48.8566°, 2.3522°):
+  Cell ID: 492
+  Confidence: 1.0000
+
+Peru (from test) (-4.7487°, -80.8164°):
+  Cell ID: 826
+  Confidence: 1.0000
+
+New York (40.7128°, -74.0060°):
+  Cell ID: 1004
+  Confidence: 0.9992
+
+Chile (-37.2362°, -71.2526°):
+  Cell ID: 72
+  Confidence: 1.0000
+
+================================================================================
+✅ Cell computation test passed!
+================================================================================

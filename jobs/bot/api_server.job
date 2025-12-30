@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
-#SBATCH --job-name=p-api
+#SBATCH --job-name=b-api
 #SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/bot/api_server.log
-#SBATCH --time=24:00:00
+#SBATCH --time=4:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 
@@ -23,7 +23,7 @@ pip install flask-cors
 
 # Stage 2 checkpoint path
 STAGE2_CHECKPOINT="/scratch-shared/pnair/Project_AI/results/stage2_cross_attention_both/2025-12-25_09-13-54/checkpoints/best_model_stage2_xattn.pt"
-
+#STAGE2_CHECKPOINT="/scratch-shared/pnair/Project_AI/results/stage2_cross_attention_concept_only/2025-12-25_09-13-56/checkpoints/best_model_stage2_xattn.pt"
 # Run API server
 python bot/api_server.py \
     --checkpoint $STAGE2_CHECKPOINT \

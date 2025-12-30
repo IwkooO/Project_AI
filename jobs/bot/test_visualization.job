@@ -1,0 +1,23 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=test-viz
+#SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/bot/test_visualization.log
+#SBATCH --time=0:30:00
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=32G
+
+# Activate environment
+module load 2025
+module load Anaconda3/2025.06-1
+cd /scratch-shared/pnair/Project_AI/
+module load CUDA/12.8.0
+
+source activate streetview_pnair
+export PYTHONNOUSERSITE=1
+export PYTHONPATH=/scratch-shared/pnair/Project_AI:$PYTHONPATH
+export PATH="$CONDA_PREFIX/bin:$PATH"
+
+# Run test visualization script
+python bot/test_visualization.py
+
