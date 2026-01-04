@@ -27,177 +27,23 @@ INFO:scripts.training.train_stage2_cross_attention:Loading Stage0 encoder weight
 INFO:scripts.training.train_stage2_cross_attention:Loaded Stage0 encoder weights into Stage2 image_encoder (missing=0, unexpected=0)
 INFO:scripts.training.train_stage2_cross_attention:Loading Stage 1 checkpoint from /scratch-shared/pnair/Project_AI/results/stage1-prototype/geolocal_StreetCLIP/2025-12-24_19-10-45/checkpoints/best_model_stage1.pt
 INFO:scripts.training.train_stage2_cross_attention:Loaded Stage 1 model with 2105 concepts, 236 parents
-INFO:__main__:📊 Logging session started: /scratch-shared/pnair/Project_AI/results/geoguessr_game_logs/2025-12-30_14-34-50
-INFO:__main__:📄 Session CSV: /scratch-shared/pnair/Project_AI/results/geoguessr_game_logs/2025-12-30_14-34-50/session_results.csv
+INFO:__main__:📊 Logging session started: /scratch-shared/pnair/Project_AI/results/geoguessr_game_logs/2025-12-31_12-56-23
+INFO:__main__:📄 Session CSV: /scratch-shared/pnair/Project_AI/results/geoguessr_game_logs/2025-12-31_12-56-23/session_results.csv
 INFO:__main__:Model loaded successfully. Starting Flask server...
  * Serving Flask app 'api_server'
  * Debug mode: off
 INFO:werkzeug:[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on all addresses (0.0.0.0)
  * Running on http://127.0.0.1:5000
- * Running on http://145.136.62.121:5000
+ * Running on http://145.136.62.98:5000
 INFO:werkzeug:[33mPress CTRL+C to quit[0m
-INFO:__main__:🔬 Gate stats: mean=0.4494, std=0.2767 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #1: lat=8.5454, lng=80.5530
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:35:16] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 1 to 2025-12-30_14-34-50/
-INFO:__main__:🔬 Gate stats: mean=0.4406, std=0.2732 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #2: lat=8.0450, lng=6.7415
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:36:46] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 2 to 2025-12-30_14-34-50/
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:37:04] "GET /api/v1/health HTTP/1.1" 200 -
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:39:52] "GET /api/v1/health HTTP/1.1" 200 -
-INFO:__main__:🔬 Gate stats: mean=0.4503, std=0.2594 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #3: lat=42.5170, lng=18.9201
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:40:28] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 3 to 2025-12-30_14-34-50/
-INFO:__main__:🔬 Gate stats: mean=0.4345, std=0.2678 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #4: lat=14.3276, lng=146.3322
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:41:00] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 4 to 2025-12-30_14-34-50/
-INFO:__main__:🔬 Gate stats: mean=0.4718, std=0.2617 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #5: lat=41.4637, lng=27.6237
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:41:42] "POST /api/v1/predict HTTP/1.1" 200 -
-/gpfs/scratch1/shared/pnair/Project_AI/bot/api_server.py:653: UserWarning: Glyph 156 (\x9c) missing from font(s) DejaVu Serif.
-  plt.savefig(output_path, dpi=300, bbox_inches="tight", facecolor='white', edgecolor='none')
-INFO:__main__:📊 Logged round 5 to 2025-12-30_14-34-50/
-INFO:__main__:🔬 Gate stats: mean=0.4851, std=0.2541 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #6: lat=44.0572, lng=20.7557
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:42:12] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 6 to 2025-12-30_14-34-50/
-INFO:__main__:🔬 Gate stats: mean=0.4819, std=0.2671 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #7: lat=67.8024, lng=19.7330
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:42:57] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 7 to 2025-12-30_14-34-50/
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:43:43] "GET /api/v1/health HTTP/1.1" 200 -
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:46:25] "[31m[1mGET /api/v1/new_session HTTP/1.1[0m" 405 -
-INFO:__main__:📊 Logging session started: /scratch-shared/pnair/Project_AI/results/geoguessr_game_logs/2025-12-30_14-46-26
-INFO:__main__:📄 Session CSV: /scratch-shared/pnair/Project_AI/results/geoguessr_game_logs/2025-12-30_14-46-26/session_results.csv
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:46:26] "POST /api/v1/new_session HTTP/1.1" 200 -
-INFO:__main__:🔬 Gate stats: mean=0.5013, std=0.2746 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #1: lat=49.3706, lng=17.0219
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:46:49] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 1 to 2025-12-30_14-46-26/
-INFO:__main__:🔬 Gate stats: mean=0.4971, std=0.2735 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #2: lat=47.1092, lng=17.5864
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:47:14] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 2 to 2025-12-30_14-46-26/
-INFO:__main__:🔬 Gate stats: mean=0.4957, std=0.2728 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #3: lat=44.0817, lng=20.9853
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:47:41] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 3 to 2025-12-30_14-46-26/
-INFO:__main__:🔬 Gate stats: mean=0.4918, std=0.2728 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #4: lat=53.3704, lng=16.9264
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:48:09] "POST /api/v1/predict HTTP/1.1" 200 -
-/gpfs/scratch1/shared/pnair/Project_AI/bot/api_server.py:653: UserWarning: Glyph 151 (\x97) missing from font(s) DejaVu Serif.
-  plt.savefig(output_path, dpi=300, bbox_inches="tight", facecolor='white', edgecolor='none')
-INFO:__main__:📊 Logged round 4 to 2025-12-30_14-46-26/
-INFO:__main__:🔬 Gate stats: mean=0.5029, std=0.2731 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #5: lat=47.0628, lng=17.5599
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:48:47] "POST /api/v1/predict HTTP/1.1" 200 -
-/gpfs/scratch1/shared/pnair/Project_AI/bot/api_server.py:653: UserWarning: Glyph 151 (\x97) missing from font(s) DejaVu Serif.
-  plt.savefig(output_path, dpi=300, bbox_inches="tight", facecolor='white', edgecolor='none')
-INFO:__main__:📊 Logged round 5 to 2025-12-30_14-46-26/
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:53:40] "[31m[1mGET /api/v1/new_session HTTP/1.1[0m" 405 -
-INFO:__main__:📊 Logging session started: /scratch-shared/pnair/Project_AI/results/geoguessr_game_logs/2025-12-30_14-53-41
-INFO:__main__:📄 Session CSV: /scratch-shared/pnair/Project_AI/results/geoguessr_game_logs/2025-12-30_14-53-41/session_results.csv
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:53:41] "POST /api/v1/new_session HTTP/1.1" 200 -
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:53:55] "GET /api/v1/health HTTP/1.1" 200 -
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:54:02] "[31m[1mGET /api/v1/new_session HTTP/1.1[0m" 405 -
-INFO:__main__:📊 Logging session started: /scratch-shared/pnair/Project_AI/results/geoguessr_game_logs/2025-12-30_14-54-03
-INFO:__main__:📄 Session CSV: /scratch-shared/pnair/Project_AI/results/geoguessr_game_logs/2025-12-30_14-54-03/session_results.csv
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:54:03] "POST /api/v1/new_session HTTP/1.1" 200 -
-INFO:__main__:🔬 Gate stats: mean=0.4480, std=0.2657 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #1: lat=42.9563, lng=25.3080
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:54:31] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 1 to 2025-12-30_14-54-03/
-INFO:__main__:🔬 Gate stats: mean=0.4585, std=0.2640 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #2: lat=45.9304, lng=16.2078
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:54:56] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 2 to 2025-12-30_14-54-03/
-INFO:__main__:🔬 Gate stats: mean=0.4521, std=0.2643 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #3: lat=45.9011, lng=16.1940
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:55:28] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 3 to 2025-12-30_14-54-03/
-INFO:__main__:🔬 Gate stats: mean=0.4452, std=0.2646 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #4: lat=42.9840, lng=25.2901
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:55:57] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 4 to 2025-12-30_14-54-03/
-INFO:__main__:🔬 Gate stats: mean=0.4587, std=0.2663 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #5: lat=45.4427, lng=17.8781
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:56:40] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 5 to 2025-12-30_14-54-03/
-INFO:__main__:🔬 Gate stats: mean=0.4651, std=0.2674 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #6: lat=45.9533, lng=16.0931
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:57:04] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 6 to 2025-12-30_14-54-03/
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:58:42] "[31m[1mGET /api/v1/new_session HTTP/1.1[0m" 405 -
-INFO:__main__:📊 Logging session started: /scratch-shared/pnair/Project_AI/results/geoguessr_game_logs/2025-12-30_14-58-42
-INFO:__main__:📄 Session CSV: /scratch-shared/pnair/Project_AI/results/geoguessr_game_logs/2025-12-30_14-58-42/session_results.csv
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:58:42] "POST /api/v1/new_session HTTP/1.1" 200 -
-INFO:__main__:🔬 Gate stats: mean=0.4544, std=0.2745 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #1: lat=43.7457, lng=104.4222
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:59:05] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 1 to 2025-12-30_14-58-42/
-INFO:__main__:🔬 Gate stats: mean=0.4578, std=0.2751 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #2: lat=43.6941, lng=104.4454
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 14:59:36] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 2 to 2025-12-30_14-58-42/
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 15:06:35] "GET /api/v1/health HTTP/1.1" 200 -
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 15:06:42] "[31m[1mGET /api/v1/new_session HTTP/1.1[0m" 405 -
-INFO:__main__:📊 Logging session started: /scratch-shared/pnair/Project_AI/results/geoguessr_game_logs/2025-12-30_15-06-43
-INFO:__main__:📄 Session CSV: /scratch-shared/pnair/Project_AI/results/geoguessr_game_logs/2025-12-30_15-06-43/session_results.csv
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 15:06:43] "POST /api/v1/new_session HTTP/1.1" 200 -
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 15:06:55] "[31m[1mGET /api/v1/new_session HTTP/1.1[0m" 405 -
-INFO:__main__:📊 Logging session started: /scratch-shared/pnair/Project_AI/results/geoguessr_game_logs/2025-12-30_15-06-56
-INFO:__main__:📄 Session CSV: /scratch-shared/pnair/Project_AI/results/geoguessr_game_logs/2025-12-30_15-06-56/session_results.csv
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 15:06:56] "POST /api/v1/new_session HTTP/1.1" 200 -
-INFO:__main__:🔬 Gate stats: mean=0.4469, std=0.2766 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #1: lat=44.7297, lng=4.3484
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 15:07:21] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 1 to 2025-12-30_15-06-56/
-INFO:__main__:🔬 Gate stats: mean=0.4261, std=0.2619 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #2: lat=64.6915, lng=-139.4492
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 15:10:01] "POST /api/v1/predict HTTP/1.1" 200 -
-/gpfs/scratch1/shared/pnair/Project_AI/bot/api_server.py:653: UserWarning: Glyph 142 (\x8e) missing from font(s) DejaVu Serif.
-  plt.savefig(output_path, dpi=300, bbox_inches="tight", facecolor='white', edgecolor='none')
-INFO:__main__:📊 Logged round 2 to 2025-12-30_15-06-56/
-INFO:__main__:🔬 Gate stats: mean=0.4900, std=0.2608 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #3: lat=54.8448, lng=25.4180
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 15:10:25] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 3 to 2025-12-30_15-06-56/
-INFO:__main__:🔬 Gate stats: mean=0.4403, std=0.2521 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #4: lat=36.3757, lng=36.8660
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 15:11:06] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 4 to 2025-12-30_15-06-56/
-INFO:__main__:🔬 Gate stats: mean=0.4657, std=0.2702 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #5: lat=46.3599, lng=12.1078
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 15:11:31] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 5 to 2025-12-30_15-06-56/
-INFO:__main__:🔬 Gate stats: mean=0.4504, std=0.2708 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #6: lat=12.9854, lng=104.5273
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 15:20:34] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 6 to 2025-12-30_15-06-56/
-INFO:__main__:🔬 Gate stats: mean=0.4750, std=0.2658 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #7: lat=42.5986, lng=23.3842
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 15:21:09] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 7 to 2025-12-30_15-06-56/
-INFO:__main__:🔬 Gate stats: mean=0.4865, std=0.2689 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #8: lat=45.1654, lng=13.3977
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 15:21:40] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 8 to 2025-12-30_15-06-56/
-INFO:__main__:🔬 Gate stats: mean=0.4170, std=0.2643 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #9: lat=-0.2302, lng=35.5119
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 15:22:00] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 9 to 2025-12-30_15-06-56/
-INFO:__main__:🔬 Gate stats: mean=0.4683, std=0.2630 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #10: lat=45.3305, lng=13.6819
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 15:22:35] "POST /api/v1/predict HTTP/1.1" 200 -
-/gpfs/scratch1/shared/pnair/Project_AI/bot/api_server.py:653: UserWarning: Glyph 142 (\x8e) missing from font(s) DejaVu Serif.
-  plt.savefig(output_path, dpi=300, bbox_inches="tight", facecolor='white', edgecolor='none')
-INFO:__main__:📊 Logged round 10 to 2025-12-30_15-06-56/
-INFO:__main__:🔬 Gate stats: mean=0.4592, std=0.2734 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
-INFO:__main__:Prediction #11: lat=10.8719, lng=106.3061
-INFO:werkzeug:172.18.63.192 - - [30/Dec/2025 15:23:08] "POST /api/v1/predict HTTP/1.1" 200 -
-INFO:__main__:📊 Logged round 11 to 2025-12-30_15-06-56/
-[2025-12-30T15:24:49.116] error: *** JOB 17985246 ON gcn121 CANCELLED AT 2025-12-30T15:24:49 DUE to SIGNAL Terminated ***
+INFO:__main__:🔬 Gate stats: mean=0.4565, std=0.2766 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
+INFO:__main__:Prediction #1: lat=45.1328, lng=4.3474
+INFO:werkzeug:172.18.63.190 - - [31/Dec/2025 12:56:42] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:📊 Logged round 1 to 2025-12-31_12-56-23/
+INFO:__main__:🔬 Gate stats: mean=0.4508, std=0.2746 (gate>0.5 = concept-heavy, gate<0.5 = image-heavy)
+INFO:__main__:Prediction #2: lat=-31.8096, lng=-60.8178
+INFO:werkzeug:172.18.63.190 - - [31/Dec/2025 12:56:45] "POST /api/v1/predict HTTP/1.1" 200 -
+INFO:__main__:📊 Logged round 2 to 2025-12-31_12-56-23/
+INFO:werkzeug:172.18.63.190 - - [31/Dec/2025 13:04:35] "GET /api/v1/health HTTP/1.1" 200 -
+[2025-12-31T13:38:54.807] error: *** JOB 17997489 ON gcn98 CANCELLED AT 2025-12-31T13:38:54 DUE to SIGNAL Terminated ***

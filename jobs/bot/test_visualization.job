@@ -21,3 +21,4 @@ export PATH="$CONDA_PREFIX/bin:$PATH"
 # Run test visualization script
 python bot/test_visualization.py
 
+

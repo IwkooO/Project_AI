@@ -45,6 +45,14 @@ from scripts.evaluation.eval_stage2_on_split import find_latest_stage2_checkpoin
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Check GeoCLIP availability
+try:
+    from geoclip import GeoCLIP
+    GEOCLIP_AVAILABLE = True
+except ImportError:
+    GEOCLIP_AVAILABLE = False
+    logger.warning("GeoCLIP not available, GeoCLIP evaluation will be skipped")
+
 def _is_vanilla_from_stage0(stage0_checkpoint) -> bool:
     if stage0_checkpoint is None:
         return True
@@ -57,6 +65,60 @@ THRESHOLD_ACCURACIES = {
     "region": 200.0,
     "country": 750.0,
 }
+
+
+def load_hf_dataset(split: str):
+    """Load HF GeoGuessr dataset, preferring local cache over download."""
+    logger.info("Loading HF dataset: fren-gor/geoguessr-locations")
+    logger.info("This may take a few minutes...")
+
+    # Check if cache directory exists
+    cache_dir = Path("/scratch-shared/pnair/Project_AI/.cache/huggingface/hub/datasets--fren-gor--geoguessr-locations")
+    if cache_dir.exists():
+        logger.info(f"Using local cache: {cache_dir}")
+        
+        # Set cache directory to parent (hub directory)
+        parent_cache_dir = cache_dir.parent
+        
+        # Try loading with cache first
+        import os
+        original_offline = os.environ.get("HF_HUB_OFFLINE")
+        
+        try:
+            # First attempt: try with normal cache loading
+            hf_dataset = load_dataset(
+                "fren-gor/geoguessr-locations",
+                split=split,
+                cache_dir=str(parent_cache_dir),
+                download_mode="reuse_cache_if_exists",
+            )
+            logger.info(f"Loaded {len(hf_dataset)} samples from split '{split}' from local cache")
+            return hf_dataset
+        except Exception as e:
+            # If network error occurs, try with offline mode
+            logger.warning(f"Network error during cache loading: {e}")
+            logger.info("Retrying with offline mode...")
+            os.environ["HF_HUB_OFFLINE"] = "1"
+            
+            hf_dataset = load_dataset(
+                "fren-gor/geoguessr-locations",
+                split=split,
+                cache_dir=str(parent_cache_dir),
+                download_mode="reuse_cache_if_exists",
+            )
+            logger.info(f"Loaded {len(hf_dataset)} samples from split '{split}' from local cache (offline mode)")
+            return hf_dataset
+        finally:
+            # Restore original offline setting
+            if original_offline is not None:
+                os.environ["HF_HUB_OFFLINE"] = original_offline
+            else:
+                os.environ.pop("HF_HUB_OFFLINE", None)
+    else:
+        logger.info("Local cache not found, downloading dataset...")
+        hf_dataset = load_dataset("fren-gor/geoguessr-locations", split=split)
+        logger.info(f"Loaded {len(hf_dataset)} samples from split '{split}'")
+        return hf_dataset
 
 
 class HFGeoGuessrDataset(Dataset):
@@ -193,6 +255,86 @@ def load_stage2_checkpoint(
     cell_centers = ckpt["cell_centers"].to(device)
     
     return model, image_encoder, stage1_model, cell_centers, concept_info, ckpt
+
+
+@torch.no_grad()
+def evaluate_geoclip_on_hf_dataset(
+    geoclip_model,
+    hf_dataset,
+    max_samples: Optional[int] = None,
+) -> Dict:
+    """Evaluate GeoCLIP model on HF dataset."""
+    logger.info("Evaluating GeoCLIP on HF dataset...")
+
+    haversine_errors = []
+    total_samples = 0
+
+    # Process samples
+    for idx, sample in enumerate(tqdm(hf_dataset, desc="Evaluating GeoCLIP")):
+        if max_samples and idx >= max_samples:
+            break
+
+        # Load panorama_360 image
+        panorama_img = sample.get("panorama_360")
+        if panorama_img is None:
+            continue
+
+        # Convert to PIL Image
+        if isinstance(panorama_img, dict) and "bytes" in panorama_img:
+            img_bytes = panorama_img["bytes"]
+            pil_image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        else:
+            pil_image = panorama_img.convert("RGB") if hasattr(panorama_img, "convert") else Image.open(panorama_img).convert("RGB")
+
+        # Save to temporary file for GeoCLIP
+        import tempfile
+        import os
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
+            pil_image.save(tmp_file.name)
+            tmp_path = tmp_file.name
+
+        try:
+            # Get GeoCLIP prediction (top 1)
+            top_pred_gps, top_pred_prob = geoclip_model.predict(tmp_path, top_k=1)
+
+            # Ground truth coordinates
+            true_lat = float(sample.get("lat", 0.0))
+            true_lng = float(sample.get("lng", 0.0))
+            true_coords = torch.tensor([true_lat, true_lng], dtype=torch.float32)
+
+            # Predicted coordinates
+            pred_lat, pred_lng = top_pred_gps[0]
+            pred_coords = torch.tensor([pred_lat, pred_lng], dtype=torch.float32)
+
+            # Calculate distance error
+            dist = haversine_distance(pred_coords.unsqueeze(0), true_coords.unsqueeze(0))
+            haversine_errors.append(dist.item())
+
+            total_samples += 1
+
+        finally:
+            # Clean up temporary file
+            os.unlink(tmp_path)
+
+    if total_samples == 0:
+        return {"error": "No samples processed"}
+
+    median_error = np.median(haversine_errors)
+    mean_error = np.mean(haversine_errors)
+
+    # Threshold accuracies
+    threshold_accs = {}
+    for name, threshold in THRESHOLD_ACCURACIES.items():
+        threshold_accs[f"acc_{name}"] = np.mean(np.array(haversine_errors) <= threshold)
+
+    return {
+        "loss": None,  # GeoCLIP doesn't have a loss
+        "cell_acc": None,  # GeoCLIP doesn't have cell accuracy
+        "median_error_km": median_error,
+        "mean_error_km": mean_error,
+        **threshold_accs,
+        "total_samples": total_samples,
+    }
 
 
 @torch.no_grad()
@@ -486,12 +628,132 @@ def main():
         default=False,
         help="If set, ignore Stage1/Stage0 lineage and use base StreetCLIP weights for patch extraction (for before/after comparison).",
     )
+    parser.add_argument("--specific_checkpoints", nargs="+", default=None,
+                        help="List of specific Stage 2 checkpoint paths to evaluate")
+    parser.add_argument("--include_geoclip", action="store_true",
+                        help="Include GeoCLIP evaluation alongside Stage 2 models")
     
     args = parser.parse_args()
-    
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
-    
+
+    # Specific checkpoints mode
+    if args.specific_checkpoints or args.include_geoclip:
+        logger.info("Evaluating specific checkpoints and/or GeoCLIP...")
+
+        # Load HF dataset once
+        hf_dataset = load_hf_dataset(args.split)
+
+        all_results = []
+
+        # Evaluate specific Stage 2 checkpoints
+        if args.specific_checkpoints:
+            for ckpt_path_str in args.specific_checkpoints:
+                ckpt_path = Path(ckpt_path_str)
+                if not ckpt_path.exists():
+                    logger.warning(f"Checkpoint not found: {ckpt_path}")
+                    continue
+
+                # Extract variant and ablation mode from path
+                path_parts = ckpt_path.parts
+                variant = "unknown"
+                ablation_mode = "unknown"
+
+                # Try to extract from path structure
+                for part in path_parts:
+                    if "stage2_cross_attention" in part:
+                        if "both" in part:
+                            ablation_mode = "both"
+                        elif "concept_only" in part:
+                            ablation_mode = "concept_only"
+                        elif "image_only" in part:
+                            ablation_mode = "image_only"
+                        if "vanilla_stage1" in part:
+                            variant = "vanilla_stage1"
+                        else:
+                            variant = "trained_stage1"
+
+                logger.info(f"\n{'='*60}")
+                logger.info(f"Evaluating Stage 2: {ckpt_path}")
+                logger.info(f"Variant: {variant}, Ablation Mode: {ablation_mode}")
+                logger.info(f"{'='*60}")
+
+                result = evaluate_single_stage2_hf_checkpoint(
+                    checkpoint_path=ckpt_path,
+                    variant=variant,
+                    ablation_mode=ablation_mode,
+                    hf_dataset=hf_dataset,
+                    batch_size=args.batch_size,
+                    num_workers=args.num_workers,
+                    device=device,
+                    max_samples=args.max_samples,
+                    lambda_cell=args.lambda_cell,
+                    lambda_offset=args.lambda_offset,
+                    force_vanilla_encoder_for_patches=args.force_vanilla_encoder_for_patches,
+                )
+
+                if result:
+                    all_results.append(result)
+                    logger.info(f"  Median Error: {result['median_error_km']:.2f} km")
+                    logger.info(f"  Mean Error: {result['mean_error_km']:.2f} km")
+                    logger.info(f"  Country Accuracy: {result['acc_country']:.4f}")
+
+        # Evaluate GeoCLIP
+        if args.include_geoclip:
+            if not GEOCLIP_AVAILABLE:
+                logger.error("GeoCLIP requested but not available. Install with: pip install geoclip")
+            else:
+                logger.info(f"\n{'='*60}")
+                logger.info("Evaluating GeoCLIP")
+                logger.info(f"{'='*60}")
+
+                geoclip_model = GeoCLIP()
+                geoclip_metrics = evaluate_geoclip_on_hf_dataset(
+                    geoclip_model,
+                    hf_dataset,
+                    max_samples=args.max_samples,
+                )
+
+                if "error" not in geoclip_metrics:
+                    geoclip_result = {
+                        "checkpoint": "GeoCLIP",
+                        "checkpoint_name": "GeoCLIP",
+                        "variant": "geoclip",
+                        "ablation_mode": "geoclip",
+                        "median_error_km": geoclip_metrics["median_error_km"],
+                        "mean_error_km": geoclip_metrics["mean_error_km"],
+                        "cell_acc": None,
+                        "acc_street": geoclip_metrics["acc_street"],
+                        "acc_city": geoclip_metrics["acc_city"],
+                        "acc_region": geoclip_metrics["acc_region"],
+                        "acc_country": geoclip_metrics["acc_country"],
+                        "stage0_checkpoint": "N/A",
+                        "stage1_checkpoint": "N/A",
+                        "dataset": "hf_geoguessr_locations",
+                    }
+                    all_results.append(geoclip_result)
+                    logger.info(f"  Median Error: {geoclip_result['median_error_km']:.2f} km")
+                    logger.info(f"  Mean Error: {geoclip_result['mean_error_km']:.2f} km")
+                    logger.info(f"  Country Accuracy: {geoclip_result['acc_country']:.4f}")
+                else:
+                    logger.warning(f"GeoCLIP evaluation failed: {geoclip_metrics['error']}")
+
+        # Save consolidated CSV
+        if len(all_results) > 0:
+            output_dir = Path(args.results_root) / "evals"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            consolidated_csv = output_dir / "stage2_hf_specific_checkpoints.csv"
+
+            df = pd.DataFrame(all_results)
+            df.to_csv(consolidated_csv, index=False)
+            logger.info(f"\nSaved consolidated CSV to {consolidated_csv}")
+            logger.info(f"Total evaluations: {len(df)}")
+        else:
+            logger.warning("No results to save!")
+
+        return
+
     # Batch mode: auto-detect and evaluate all checkpoints
     if args.batch_mode:
         logger.info("Batch mode: Auto-detecting latest Stage 2 checkpoints...")
@@ -505,10 +767,7 @@ def main():
         logger.info(f"Found {len(checkpoint_tuples)} checkpoint(s) to evaluate")
         
         # Load HF dataset ONCE before the loop
-        logger.info("Loading HF dataset: fren-gor/geoguessr-locations")
-        logger.info("This may take a few minutes...")
-        hf_dataset = load_dataset("fren-gor/geoguessr-locations", split=args.split)
-        logger.info(f"Loaded {len(hf_dataset)} samples from split '{args.split}'")
+        hf_dataset = load_hf_dataset(args.split)
         
         # Evaluate all checkpoints
         all_results = []
@@ -576,9 +835,7 @@ def main():
     ablation_mode = ckpt.get("ablation_mode", "both")
     
     # Load HF dataset
-    logger.info("Loading HF dataset: fren-gor/geoguessr-locations")
-    hf_dataset = load_dataset("fren-gor/geoguessr-locations", split=args.split)
-    logger.info(f"Loaded {len(hf_dataset)} samples from split '{args.split}'")
+    hf_dataset = load_hf_dataset(args.split)
     
     # Create dataset
     transforms = get_transforms_from_processor(image_encoder.image_processor)
