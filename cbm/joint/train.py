@@ -227,8 +227,16 @@ def train_epoch(
     concept_loss_weight: float = 1.0,
     cell_loss_weight: float = 1.0,
     offset_loss_weight: float = 1.0,
+    aux_loss_weight: float = 0.3,  # Weight for auxiliary pathway losses
+    gate_reg_weight: float = 0.1,  # Weight for gate regularization
 ):
-    """Train for one epoch with joint loss from single dataset."""
+    """Train for one epoch with joint loss from single dataset.
+    
+    For 'both' mode with late fusion:
+    - Main loss: on fused predictions (image + gate*concept)
+    - Auxiliary losses: on individual pathway predictions
+    - This ensures BOTH pathways learn useful representations
+    """
     phase1_model.train()
     stage2_model.train()
     concept_adapter.train()
@@ -237,11 +245,18 @@ def train_epoch(
     total_concept_loss = 0.0
     total_cell_loss = 0.0
     total_offset_loss = 0.0
+    total_aux_loss = 0.0
+    total_gate_reg_loss = 0.0
     total_samples = 0
     
     correct_concept_top1 = 0
     correct_concept_top5 = 0
     correct_cells = 0
+    correct_cells_img = 0  # Track image pathway accuracy
+    correct_cells_concept = 0  # Track concept pathway accuracy
+    
+    # Track gate statistics for "both" mode
+    all_gate_values = []
     
     pbar = tqdm(loader, desc=f"Train Epoch {epoch+1}")
     
@@ -264,27 +279,73 @@ def train_epoch(
         # Forward through Phase1
         c_logits, c_hidden, attn_w, _ = phase1_model(patches, pooled_emb=pooled_emb)
         
-        # Concept loss
+        # Concept loss (Phase1)
         concept_loss = concept_criterion(c_logits, c_labels)
         
         # Convert logits to concept embeddings for Stage2
         concept_emb = concept_adapter(c_logits)
         
-        # Forward through Stage2
-        forward_output = stage2_model(concept_emb, patches, pooled_emb)
+        # Forward through Stage2 (pass phase1_logits for confidence gating)
+        forward_output = stage2_model(concept_emb, patches, pooled_emb, phase1_logits=c_logits)
         
         # Handle different return signatures based on mode
+        aux_loss = torch.tensor(0.0, device=device)
         if stage2_model.mode == "both":
-            cell_logits, offset_pred, gate, _, _ = forward_output
+            cell_logits, offset_pred, gate_info, _, _ = forward_output
+            
+            # Track gate statistics
+            if gate_info is not None and isinstance(gate_info, dict):
+                gate_tensor = gate_info.get('gate')
+                if gate_tensor is not None:
+                    all_gate_values.append(gate_tensor.detach().cpu())
+                
+                # ===== AUXILIARY LOSSES for Late Fusion =====
+                # Get individual pathway predictions
+                img_cell_logits = gate_info.get('img_cell_logits')
+                img_offset_pred = gate_info.get('img_offset_pred')
+                concept_cell_logits = gate_info.get('concept_cell_logits')
+                concept_offset_pred = gate_info.get('concept_offset_pred')
+                
+                if img_cell_logits is not None and concept_cell_logits is not None:
+                    # Image pathway auxiliary loss
+                    img_cell_loss = cell_criterion(img_cell_logits, cell_labels)
+                    img_offset_loss = offset_criterion(img_offset_pred, offset_targets)
+                    
+                    # Concept pathway auxiliary loss
+                    concept_cell_loss = cell_criterion(concept_cell_logits, cell_labels)
+                    concept_offset_loss = offset_criterion(concept_offset_pred, offset_targets)
+                    
+                    # Combined auxiliary loss (both pathways should learn)
+                    aux_loss = (img_cell_loss + img_offset_loss * offset_loss_weight / cell_loss_weight + 
+                               concept_cell_loss + concept_offset_loss * offset_loss_weight / cell_loss_weight)
+                    
+                    # Track individual pathway accuracies
+                    correct_cells_img += (img_cell_logits.argmax(dim=1) == cell_labels).sum().item()
+                    correct_cells_concept += (concept_cell_logits.argmax(dim=1) == cell_labels).sum().item()
+            
+            gate = gate_info  # Keep for compatibility
         else:
             cell_logits, offset_pred, gate = forward_output
         
-        # Geo losses
+        # Main geo losses (on fused predictions)
         cell_loss = cell_criterion(cell_logits, cell_labels)
         offset_loss = offset_criterion(offset_pred, offset_targets)
         
-        # Combined loss
-        batch_loss = concept_loss_weight * concept_loss + cell_loss_weight * cell_loss + offset_loss_weight * offset_loss
+        # Gate regularization: penalize gate for being too high (L2 penalty towards 0)
+        # This prevents the gate from opening too much (e.g., staying at 0.99)
+        gate_reg_loss = torch.tensor(0.0, device=device)
+        if stage2_model.mode == "both" and gate_info is not None and isinstance(gate_info, dict):
+            gate = gate_info.get('gate')
+            if gate is not None:
+                # L2 penalty: (gate - 0)^2, encourages gate to stay near 0
+                gate_reg_loss = (gate ** 2).mean()
+        
+        # Combined loss with auxiliary losses and gate regularization
+        batch_loss = (concept_loss_weight * concept_loss + 
+                     cell_loss_weight * cell_loss + 
+                     offset_loss_weight * offset_loss +
+                     aux_loss_weight * aux_loss +
+                     gate_reg_weight * gate_reg_loss)
         
         batch_loss.backward()
         torch.nn.utils.clip_grad_norm_(
@@ -308,13 +369,39 @@ def train_epoch(
         total_concept_loss += concept_loss.item() * batch_size
         total_cell_loss += cell_loss.item() * batch_size
         total_offset_loss += offset_loss.item() * batch_size
+        total_aux_loss += aux_loss.item() * batch_size
+        total_gate_reg_loss += gate_reg_loss.item() * batch_size
         total_samples += batch_size
         
-        pbar.set_postfix({
-            "Loss": f"{batch_loss.item():.4f}",
-            "CAcc1": f"{correct_concept_top1/total_samples:.3f}",
-            "CellAcc": f"{correct_cells/total_samples:.3f}",
-        })
+        # Show individual pathway accuracies in progress bar for "both" mode
+        if stage2_model.mode == "both" and total_samples > 0:
+            pbar.set_postfix({
+                "Loss": f"{batch_loss.item():.4f}",
+                "CAcc1": f"{correct_concept_top1/total_samples:.3f}",
+                "CellAcc": f"{correct_cells/total_samples:.3f}",
+                "ImgAcc": f"{correct_cells_img/total_samples:.3f}",
+                "ConAcc": f"{correct_cells_concept/total_samples:.3f}",
+            })
+        else:
+            pbar.set_postfix({
+                "Loss": f"{batch_loss.item():.4f}",
+                "CAcc1": f"{correct_concept_top1/total_samples:.3f}",
+                "CellAcc": f"{correct_cells/total_samples:.3f}",
+            })
+    
+    # Compute gate statistics
+    gate_stats = None
+    if len(all_gate_values) > 0:
+        all_gates = torch.cat(all_gate_values)  # [total_samples, 1]
+        gate_stats = {
+            'mean': all_gates.mean().item(),
+            'std': all_gates.std().item(),
+            'min': all_gates.min().item(),
+            'max': all_gates.max().item(),
+            'img_acc': correct_cells_img / total_samples if total_samples > 0 else 0.0,
+            'concept_acc': correct_cells_concept / total_samples if total_samples > 0 else 0.0,
+            'gate_reg_loss': total_gate_reg_loss / total_samples if total_samples > 0 else 0.0,
+        }
     
     return (
         total_loss / total_samples if total_samples > 0 else 0.0,
@@ -324,6 +411,7 @@ def train_epoch(
         correct_concept_top1 / total_samples if total_samples > 0 else 0.0,
         correct_concept_top5 / total_samples if total_samples > 0 else 0.0,
         correct_cells / total_samples if total_samples > 0 else 0.0,
+        gate_stats,
     )
 
 
@@ -364,6 +452,9 @@ def eval_epoch(
     all_true_lat = []
     all_true_lng = []
     
+    # Track gate statistics for "both" mode
+    all_gate_values = []
+    
     for batch in tqdm(loader, desc="Eval"):
         patches = batch['patches'].to(device)
         c_labels = batch['c_labels'].to(device)
@@ -391,7 +482,14 @@ def eval_epoch(
         
         # Handle different return signatures based on mode
         if stage2_model.mode == "both":
-            cell_logits, offset_pred, gate, _, _ = forward_output
+            cell_logits, offset_pred, gate_info, _, _ = forward_output
+            # Track gate statistics
+            # gate_info is a dict with keys: 'gate', 'effective_gate', 'confidence'
+            if gate_info is not None and isinstance(gate_info, dict):
+                gate_tensor = gate_info.get('gate')
+                if gate_tensor is not None:
+                    all_gate_values.append(gate_tensor.detach().cpu())
+            gate = gate_info  # Keep for compatibility
         else:
             cell_logits, offset_pred, gate = forward_output
         
@@ -443,6 +541,17 @@ def eval_epoch(
                  cell_loss_weight * (total_cell_loss / total_samples if total_samples > 0 else 0.0) + \
                  offset_loss_weight * (total_offset_loss / total_samples if total_samples > 0 else 0.0)
     
+    # Compute gate statistics
+    gate_stats = None
+    if len(all_gate_values) > 0:
+        all_gates = torch.cat(all_gate_values)  # [total_samples, 1]
+        gate_stats = {
+            'mean': all_gates.mean().item(),
+            'std': all_gates.std().item(),
+            'min': all_gates.min().item(),
+            'max': all_gates.max().item(),
+        }
+    
     return (
         total_loss,
         total_concept_loss / total_samples if total_samples > 0 else 0.0,
@@ -461,6 +570,7 @@ def eval_epoch(
             'true_lng': all_true_lng if len(all_pred_cells) > 0 else np.array([]),
             'distances_km': distances_km if len(all_pred_cells) > 0 else np.array([]),
         },
+        gate_stats,
     )
 
 
@@ -507,6 +617,9 @@ def main():
     parser.add_argument("--concept-loss-weight", type=float, default=1.0, help="Weight for concept prediction loss")
     parser.add_argument("--cell-loss-weight", type=float, default=1.0, help="Weight for cell classification loss")
     parser.add_argument("--offset-loss-weight", type=float, default=6371.0, help="Weight for offset regression loss")
+    parser.add_argument("--aux-loss-weight", type=float, default=0.3, help="Weight for auxiliary pathway losses (late fusion)")
+    parser.add_argument("--gate-bias-init", type=float, default=-4.0, help="Initial gate bias (negative = start closed, -4.0 → ~0.018 output)")
+    parser.add_argument("--gate-reg-weight", type=float, default=0.1, help="Weight for gate regularization (L2 penalty towards 0, prevents gate from opening too much)")
     
     # Checkpoint loading args
     parser.add_argument("--phase1-checkpoint", type=str, default=None, help="Path to Phase1 checkpoint to load (optional)")
@@ -524,7 +637,7 @@ def main():
     parser.add_argument(
         "--concept-temperature",
         type=float,
-        default=1.0,
+        default=2.5,
         help="Temperature for softmax in ConceptEmbeddingAdapter (higher = softer distribution, uses more top-k concepts). Default: 1.0",
     )
     
@@ -727,6 +840,7 @@ def main():
             dropout=args.dropout,
             mode=args.mode,
             pooled_dim=detected_pooled_dim,
+            gate_bias_init=args.gate_bias_init,
         ).to(device)
     else:
         # both or image_only (though image_only doesn't use concepts)
@@ -751,6 +865,7 @@ def main():
             dropout=args.dropout,
             mode=args.mode,
             pooled_dim=detected_pooled_dim,
+            gate_bias_init=args.gate_bias_init,
         ).to(device)
     
     print(f"Phase1 params: {sum(p.numel() for p in phase1_model.parameters())/1e6:.2f}M")
@@ -761,7 +876,8 @@ def main():
     best_val_concept_acc1 = 0.0
     best_val_error = float('inf')
     best_val_loss = float('inf')
-    best_joint_val_loss = float('inf')  # Track best joint checkpoint separately
+    best_val_median_error = float('inf')  # Track best median error for early stopping
+    best_joint_median_error = float('inf')  # Track best joint checkpoint by median distance
     epochs_without_improvement = 0
     
     # Handle resume from joint checkpoint directory
@@ -864,9 +980,13 @@ def main():
                 best_val_error = checkpoint.get('best_val_error', float('inf'))
             if 'best_val_loss' in checkpoint and checkpoint['best_val_loss'] is not None:
                 best_val_loss = checkpoint.get('best_val_loss', float('inf'))
+            if 'best_val_median_error' in checkpoint:
+                best_val_median_error = checkpoint.get('best_val_median_error', float('inf'))
+            if 'best_joint_median_error' in checkpoint:
+                best_joint_median_error = checkpoint.get('best_joint_median_error', float('inf'))
             if 'epochs_without_improvement' in checkpoint:
                 epochs_without_improvement = checkpoint.get('epochs_without_improvement', 0)
-            print(f"Phase2 checkpoint loaded. Starting from epoch {start_epoch}, best_val_error={best_val_error:.2f}km")
+            print(f"Phase2 checkpoint loaded. Starting from epoch {start_epoch}, best_val_error={best_val_error:.2f}km, best_val_median={best_val_median_error:.2f}km, best_joint_median={best_joint_median_error:.2f}km")
         else:
             print(f"Phase2 checkpoint loaded (weights only). Starting from epoch 0.")
     
@@ -961,7 +1081,7 @@ def main():
     print(f"\nStarting joint training for {args.epochs} epochs...")
     print(f"Resuming from epoch {start_epoch}")
     for epoch in range(start_epoch, args.epochs):
-        train_loss, train_concept_loss, train_cell_loss, train_offset_loss, train_concept_acc1, train_concept_acc5, train_cell_acc = train_epoch(
+        train_loss, train_concept_loss, train_cell_loss, train_offset_loss, train_concept_acc1, train_concept_acc5, train_cell_acc, train_gate_stats = train_epoch(
             phase1_model,
             stage2_model,
             concept_adapter,
@@ -975,12 +1095,14 @@ def main():
             args.concept_loss_weight,
             args.cell_loss_weight,
             args.offset_loss_weight,
+            args.aux_loss_weight,
+            args.gate_reg_weight,
         )
         
         scheduler.step()
         current_lr = optimizer.param_groups[0]['lr']
         
-        val_loss, val_concept_loss, val_cell_loss, val_offset_loss, val_concept_acc1, val_concept_acc5, val_cell_acc, val_mean_error, val_median_error, val_threshold_accs, val_preds = eval_epoch(
+        val_loss, val_concept_loss, val_cell_loss, val_offset_loss, val_concept_acc1, val_concept_acc5, val_cell_acc, val_mean_error, val_median_error, val_threshold_accs, val_preds, val_gate_stats = eval_epoch(
             phase1_model,
             stage2_model,
             concept_adapter,
@@ -999,10 +1121,14 @@ def main():
         print(f"  Train: Loss={train_loss:.4f}, Concept={train_concept_loss:.4f} (Acc1={train_concept_acc1:.4f}), Geo={train_cell_loss:.4f}+{train_offset_loss:.4f} (CellAcc={train_cell_acc:.4f})")
         print(f"  Val:   Loss={val_loss:.4f}, Concept={val_concept_loss:.4f} (Acc1={val_concept_acc1:.4f}), Geo={val_cell_loss:.4f}+{val_offset_loss:.4f} (CellAcc={val_cell_acc:.4f})")
         print(f"  Val Error: Mean={val_mean_error:.2f}km, Median={val_median_error:.2f}km")
+        if train_gate_stats is not None:
+            gate_reg = train_gate_stats.get('gate_reg_loss', 0.0)
+            gate_mean = train_gate_stats.get('mean', 0.0)
+            print(f"  Gate: Mean={gate_mean:.4f}, RegLoss={gate_reg:.6f}")
         print(f"  LR: {current_lr:.6f}")
         
         if wandb_run:
-            wandb_run.log({
+            log_dict = {
                 "epoch": epoch + 1,
                 "train/loss": train_loss,
                 "train/concept_loss": train_concept_loss,
@@ -1021,7 +1147,24 @@ def main():
                 "val/mean_error_km": val_mean_error,
                 "val/median_error_km": val_median_error,
                 "lr": current_lr,
-            })
+            }
+            # Add gate statistics if available
+            if train_gate_stats is not None:
+                log_dict.update({
+                    "train/gate_mean": train_gate_stats['mean'],
+                    "train/gate_std": train_gate_stats['std'],
+                    "train/gate_min": train_gate_stats['min'],
+                    "train/gate_max": train_gate_stats['max'],
+                    "train/gate_reg_loss": train_gate_stats.get('gate_reg_loss', 0.0),
+                })
+            if val_gate_stats is not None:
+                log_dict.update({
+                    "val/gate_mean": val_gate_stats['mean'],
+                    "val/gate_std": val_gate_stats['std'],
+                    "val/gate_min": val_gate_stats['min'],
+                    "val/gate_max": val_gate_stats['max'],
+                })
+            wandb_run.log(log_dict)
             wandb_run.log({f"val/{k}": v for k, v in val_threshold_accs.items()})
         
         # Save checkpoints
@@ -1033,23 +1176,25 @@ def main():
         if is_best_geo:
             best_val_error = val_mean_error
         
-        # Early stopping
+        # Early stopping: use median distance (consistent with checkpoint selection)
         if early_stop_enabled:
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
+            if val_median_error < best_val_median_error:
+                best_val_median_error = val_median_error
                 epochs_without_improvement = 0
             else:
                 epochs_without_improvement += 1
             
             if epochs_without_improvement >= args.early_stop_patience:
                 print(f"\n*** Early stopping triggered! ***")
+                print(f"  No improvement in val_median_error for {args.early_stop_patience} epochs.")
+                print(f"  Best val_median_error: {best_val_median_error:.2f}km (achieved at epoch {epoch - epochs_without_improvement + 1})")
                 break
         
-        # Track best joint validation loss (for joint checkpoint saving)
+        # Track best joint checkpoint by median distance (more robust than loss)
         # Check if this is the best joint checkpoint before updating
-        is_best_joint = val_loss < best_joint_val_loss
+        is_best_joint = val_median_error < best_joint_median_error
         if is_best_joint:
-            best_joint_val_loss = val_loss
+            best_joint_median_error = val_median_error
         
         # Save Phase1 checkpoint
         phase1_checkpoint = {
@@ -1155,6 +1300,8 @@ def main():
             'best_val_concept_acc1': best_val_concept_acc1,
             'best_val_error': best_val_error,
             'best_val_loss': best_val_loss if early_stop_enabled else None,
+            'best_val_median_error': best_val_median_error if early_stop_enabled else None,
+            'best_joint_median_error': best_joint_median_error,
             'val_concept_acc1': val_concept_acc1,
             'val_concept_acc5': val_concept_acc5,
             'val_mean_error': val_mean_error,
@@ -1171,15 +1318,18 @@ def main():
         # Save latest joint checkpoint
         torch.save(joint_checkpoint, output_dir / "latest_joint.pt")
         
-        # Save best joint checkpoint based on combined validation loss
-        # (since both models are trained jointly with the combined loss)
+        # Save best joint checkpoint based on median validation distance
+        # (more robust than loss, which depends on arbitrary loss weights)
         if is_best_joint:
             torch.save(joint_checkpoint, output_dir / "best_joint.pt")
-            print(f"  *** Saved best joint checkpoint (epoch {epoch+1}, val_loss={val_loss:.4f}) ***")
+            print(f"  *** Saved best joint checkpoint (epoch {epoch+1}, val_median_error={val_median_error:.2f}km) ***")
     
     print(f"\nTraining complete!")
     print(f"Best val concept Acc1: {best_val_concept_acc1:.4f}")
-    print(f"Best val geo error: {best_val_error:.2f}km")
+    print(f"Best val geo error (mean): {best_val_error:.2f}km")
+    if early_stop_enabled:
+        print(f"Best val median error (early stopping): {best_val_median_error:.2f}km")
+    print(f"Best joint median error: {best_joint_median_error:.2f}km")
     print(f"Best val loss: {best_val_loss:.4f}")
     print(f"Checkpoints saved to: {output_dir}")
     print(f"  - Individual: phase1/best_phase1.pt, phase2/best_phase2.pt")
@@ -1206,7 +1356,7 @@ def main():
         # Evaluate on test set
         test_loss, test_concept_loss, test_cell_loss, test_offset_loss, \
         test_concept_acc1, test_concept_acc5, test_cell_acc, \
-        test_mean_error, test_median_error, test_threshold_accs, test_preds = eval_epoch(
+        test_mean_error, test_median_error, test_threshold_accs, test_preds, test_gate_stats = eval_epoch(
             phase1_model,
             stage2_model,
             concept_adapter,
@@ -1229,6 +1379,12 @@ def main():
         print(f"  Geolocation Error:")
         print(f"    Mean: {test_mean_error:.2f} km")
         print(f"    Median: {test_median_error:.2f} km")
+        if test_gate_stats is not None:
+            print(f"  Gate Statistics:")
+            print(f"    Mean: {test_gate_stats['mean']:.4f}")
+            print(f"    Std: {test_gate_stats['std']:.4f}")
+            print(f"    Min: {test_gate_stats['min']:.4f}")
+            print(f"    Max: {test_gate_stats['max']:.4f}")
         print(f"  Threshold Accuracies:")
         for threshold, acc in test_threshold_accs.items():
             print(f"    {threshold}: {acc:.4f} ({acc*100:.2f}%)")
@@ -1248,13 +1404,15 @@ def main():
             'median_error_km': float(test_median_error),
             'threshold_accuracies': {k: float(v) for k, v in test_threshold_accs.items()},
         }
+        if test_gate_stats is not None:
+            test_results['gate_stats'] = {k: float(v) for k, v in test_gate_stats.items()}
         with open(test_results_path, 'w') as f:
             json.dump(test_results, f, indent=2)
         print(f"\nTest results saved to: {test_results_path}")
         
         # Log to wandb if enabled
         if wandb_run:
-            wandb_run.log({
+            test_log_dict = {
                 "test/loss": test_loss,
                 "test/concept_loss": test_concept_loss,
                 "test/cell_loss": test_cell_loss,
@@ -1264,7 +1422,15 @@ def main():
                 "test/cell_acc": test_cell_acc,
                 "test/mean_error_km": test_mean_error,
                 "test/median_error_km": test_median_error,
-            })
+            }
+            if test_gate_stats is not None:
+                test_log_dict.update({
+                    "test/gate_mean": test_gate_stats['mean'],
+                    "test/gate_std": test_gate_stats['std'],
+                    "test/gate_min": test_gate_stats['min'],
+                    "test/gate_max": test_gate_stats['max'],
+                })
+            wandb_run.log(test_log_dict)
             wandb_run.log({f"test/{k}": v for k, v in test_threshold_accs.items()})
         
         print(f"{'='*60}")

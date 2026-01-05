@@ -201,14 +201,17 @@ class Stage2PooledLogitsGeoHead(nn.Module):
 
 class Stage2CrossAttentionGeoHead(nn.Module):
     """
-    Geolocation head for Phase 2.
+    Geolocation head for Phase 2 with Late Fusion and Separate Heads.
 
     For "both" mode:
-    - Bidirectional cross-attention: concepts ↔ images (both directions)
-    - Adaptive per-sample gating: dynamically weight modalities based on confidence
-    - Late fusion: separate prediction heads for each modality, then combine predictions
-    - Orthogonality regularization: encourages complementary features
-    - Each modality can specialize based on its strengths without over-relying on one
+    - SEPARATE prediction heads for image and concept pathways
+    - Each pathway makes independent predictions (both get gradients!)
+    - Final prediction = image_logits + gate * concept_logits
+    - Gate initialized to ~0 so model starts as image_only
+    - As gate opens, concepts contribute additively
+    
+    Key insight: Late fusion at logit level ensures BOTH pathways learn useful
+    representations, unlike feature-level fusion where one pathway can be ignored.
     """
 
     def __init__(
@@ -222,6 +225,7 @@ class Stage2CrossAttentionGeoHead(nn.Module):
         dropout: float = 0.1,
         mode: str = "both",
         pooled_dim: int | None = None,
+        gate_bias_init: float = -4.0,
     ):
         super().__init__()
 
@@ -242,7 +246,7 @@ class Stage2CrossAttentionGeoHead(nn.Module):
             self.pooled_proj = nn.Linear(pooled_dim, hidden_dim)
 
         if mode == "both":
-            # Image pathway: process pooled embeddings
+            # ===== IMAGE PATHWAY (complete pathway with its own heads) =====
             self.image_adapter = nn.Sequential(
                 nn.LayerNorm(hidden_dim),
                 nn.Linear(hidden_dim, hidden_dim),
@@ -250,7 +254,24 @@ class Stage2CrossAttentionGeoHead(nn.Module):
                 nn.Dropout(dropout),
             )
             
-            # Concept pathway: process concept embeddings
+            # Image pathway's own prediction heads
+            self.image_cell_head = nn.Sequential(
+                nn.LayerNorm(hidden_dim),
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.GELU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim, num_cells),
+            )
+            
+            self.image_offset_head = nn.Sequential(
+                nn.LayerNorm(hidden_dim),
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.GELU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim, 3),
+            )
+            
+            # ===== CONCEPT PATHWAY (complete pathway with its own heads) =====
             self.concept_adapter = nn.Sequential(
                 nn.LayerNorm(hidden_dim),
                 nn.Linear(hidden_dim, hidden_dim),
@@ -258,28 +279,56 @@ class Stage2CrossAttentionGeoHead(nn.Module):
                 nn.Dropout(dropout),
             )
             
-            # Fusion MLP: combines concatenated image and concept features
-            self.fusion_mlp = nn.Sequential(
-                    nn.Linear(hidden_dim * 2, hidden_dim),
+            # Concept pathway's own prediction heads
+            self.concept_cell_head = nn.Sequential(
                 nn.LayerNorm(hidden_dim),
-                    nn.GELU(),
-                    nn.Dropout(dropout),
-                )
-            
-            # Adaptive per-sample gating (optional, can be used to weight contributions)
-            self.fusion_gate = nn.Sequential(
-                nn.Linear(hidden_dim * 2, hidden_dim),
+                nn.Linear(hidden_dim, hidden_dim),
                 nn.GELU(),
                 nn.Dropout(dropout),
-                nn.Linear(hidden_dim, 2),
-                nn.Softmax(dim=-1),
+                nn.Linear(hidden_dim, num_cells),
             )
+            
+            self.concept_offset_head = nn.Sequential(
+                nn.LayerNorm(hidden_dim),
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.GELU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim, 3),
+            )
+            
+            # ===== GATE: controls how much concept logits contribute =====
+            # Gate computed from image features (image decides when to use concepts)
+            self.concept_gate = nn.Sequential(
+                nn.Linear(hidden_dim, hidden_dim // 4),
+                nn.GELU(),
+                nn.Linear(hidden_dim // 4, 1),
+                nn.Sigmoid()
+            )
+            # Initialize gate bias so sigmoid outputs near 0 at start
+            # This makes model mathematically identical to image_only at epoch 0
+            nn.init.constant_(self.concept_gate[-2].bias, gate_bias_init)
+            
         elif mode == "concept_only":
             self.concept_adapter = nn.Sequential(
                 nn.LayerNorm(hidden_dim),
                 nn.Linear(hidden_dim, hidden_dim),
                 nn.GELU(),
                 nn.Dropout(dropout),
+            )
+            # Single head for concept_only mode
+            self.cell_head = nn.Sequential(
+                nn.LayerNorm(hidden_dim),
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.GELU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim, num_cells),
+            )
+            self.offset_head = nn.Sequential(
+                nn.LayerNorm(hidden_dim),
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.GELU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim, 3),
             )
         else:  # image_only
             self.image_adapter = nn.Sequential(
@@ -288,61 +337,71 @@ class Stage2CrossAttentionGeoHead(nn.Module):
                 nn.GELU(),
                 nn.Dropout(dropout),
             )
-
-        # Unified heads for all modes
-        self.cell_head = nn.Sequential(
-            nn.LayerNorm(hidden_dim),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, num_cells),
-        )
-
-        self.offset_head = nn.Sequential(
-            nn.LayerNorm(hidden_dim),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, 3),
-        )
+            # Single head for image_only mode
+            self.cell_head = nn.Sequential(
+                nn.LayerNorm(hidden_dim),
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.GELU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim, num_cells),
+            )
+            self.offset_head = nn.Sequential(
+                nn.LayerNorm(hidden_dim),
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.GELU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim, 3),
+            )
 
     def forward(
         self,
         concept_emb: torch.Tensor,  # [B, concept_dim]
-        patch_tokens: torch.Tensor | None = None,  # [B, P, patch_dim] - now used!
+        patch_tokens: torch.Tensor | None = None,  # [B, P, patch_dim] - unused, kept for API
         pooled_emb: torch.Tensor | None = None,  # [B, pooled_dim]
+        phase1_logits: torch.Tensor | None = None,  # [B, num_concepts] - for confidence weighting
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
         gate = None
         if self.mode == "both":
             if pooled_emb is None:
                 raise ValueError("pooled_emb required for mode='both'")
 
-            # Process image features (pooled global representation - CLS)
+            # ===== IMAGE PATHWAY =====
             img_h = self.pooled_proj(pooled_emb)  # [B, hidden_dim]
             img_h = self.image_adapter(img_h)  # [B, hidden_dim]
             
-            # Process concept features
+            # Image pathway predictions
+            img_cell_logits = self.image_cell_head(img_h)  # [B, num_cells]
+            img_offset_pred = self.image_offset_head(img_h)  # [B, 3]
+            
+            # ===== CONCEPT PATHWAY =====
             concept_h = self.concept_proj(concept_emb)  # [B, hidden_dim]
             concept_h = self.concept_adapter(concept_h)  # [B, hidden_dim]
             
-            # Store features for potentially returning (e.g. for orthogonality)
-            img_h_orig = img_h.clone()
-            concept_h_orig = concept_h.clone()
+            # Concept pathway predictions
+            concept_cell_logits = self.concept_cell_head(concept_h)  # [B, num_cells]
+            concept_offset_pred = self.concept_offset_head(concept_h)  # [B, 3]
             
-            # Simple but robust fusion: concatenation + MLP
-            # This uses the CLS global feature in combination with concepts
-            combined = torch.cat([img_h, concept_h], dim=-1)  # [B, 2*hidden_dim]
-            fused_h = self.fusion_mlp(combined)  # [B, hidden_dim]
+            # ===== GATED LATE FUSION =====
+            # Gate: image decides when to trust concepts (per-sample)
+            # Starts near 0, so model = image_only at epoch 0
+            gate = self.concept_gate(img_h)  # [B, 1]
+    
             
-            # Optional gate for monitoring/weighting
-            fusion_weights = self.fusion_gate(combined)  # [B, 2]
-            gate = fusion_weights[:, 1:2].expand(-1, self.hidden_dim)  # [B, hidden_dim]
+            # Late fusion at logit level: image_logits + gate * concept_logits
+            # This ensures BOTH pathways get gradients through their respective losses
+            cell_logits = img_cell_logits + gate * concept_cell_logits  # [B, num_cells]
+            offset_pred = img_offset_pred + gate * concept_offset_pred  # [B, 3]
             
-            # Final predictions from fused representation
-            cell_logits = self.cell_head(fused_h)
-            offset_pred = self.offset_head(fused_h)
-            
-            return cell_logits, offset_pred, gate, img_h_orig, concept_h_orig
+            # Return info for logging and auxiliary losses
+            gate_info = {
+                'gate': gate,
+                # Include individual pathway predictions for auxiliary losses
+                'img_cell_logits': img_cell_logits,
+                'img_offset_pred': img_offset_pred,
+                'concept_cell_logits': concept_cell_logits,
+                'concept_offset_pred': concept_offset_pred,
+            }
+            return cell_logits, offset_pred, gate_info, img_h, concept_h
             
         elif self.mode == "concept_only":
             concept_h = self.concept_proj(concept_emb)

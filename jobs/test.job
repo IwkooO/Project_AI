@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=9
 #SBATCH --time=01:00:00
-#SBATCH --output=jobs/outputs/test/test_script_smaller.log
+#SBATCH --output=jobs/outputs/test/savee_me.log
 
 module purge
 module load 2025
@@ -15,6 +15,5 @@ cd $HOME/Project_AI/
 
 source activate streetview
 
-python scripts/evaluation/evaluate_test_set.py \
-    --sae-path "checkpoints/sae_smaller/best_sae.pth" \
-    --test-csv "data/6921d7831744c5356b098bf7_balanced/splits/dataset_test.csv"
+export PYTHONPATH=$PYTHONPATH:.
+python scripts/evaluation/eval_best_checkpoint.py

@@ -47,10 +47,10 @@ LR=1e-4
 PHASE1_LR=1e-5        # Low LR to preserve interpretable concepts
 
 # Mode: 'both' (Concepts + CLS)
-MODE="image_only"
+MODE="both"
 
-RUN_TAG="stage3_joint_${MODE}_scratchgeo_dim${CONCEPT_DIM}_pos_imageonly"
-OUTPUT_DIR="checkpoints/stage3_joint/${RUN_TAG}"
+RUN_TAG="stage3_joint_${MODE}_scratchgeo_dim${CONCEPT_DIM}_pos_latefusion_2.5ct_0.05gatereg"
+OUTPUT_DIR="checkpoints/stage3_joint_latefusion/${RUN_TAG}"
 
 # Paths
 SPLITS_DIR="data/6921d7831744c5356b098bf7_balanced/splits"
@@ -169,7 +169,7 @@ python -m cbm.joint.train \
   --use-per-concept-tau \
   --batch-size 64 \
   --num-workers 4 \
-  --epochs 50 \
+  --epochs 100 \
   --lr "$LR" \
   --phase1-lr "$PHASE1_LR" \
   --weight-decay 0.01 \
@@ -179,8 +179,9 @@ python -m cbm.joint.train \
   --wandb \
   --wandb-project "cbm_stage3_joint" \
   --wandb-run-name "$RUN_TAG" \
-  --concept-temperature 5.0 \
-  --early-stop-patience 10
+  --concept-temperature 2.5 \
+  --early-stop-patience 10 \
+  --gate-reg-weight 0.1
 
 echo "============================================================"
 echo "JOINT TRAINING COMPLETE!"
