@@ -3,7 +3,7 @@
 #SBATCH --gpus=1
 #SBATCH --job-name=e-s2-hf
 #SBATCH --output=/scratch-shared/pnair/Project_AI/jobs/outputs/stage2/eval/eval_hf_geoguessr.log
-#SBATCH --time=10:00:00
+#SBATCH --time=24:00:00
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
 
@@ -31,20 +31,20 @@ RESULTS_ROOT="${RESULTS_ROOT:-results}"
 MODE="${MODE:-specific}"  # Can be "batch" or "specific"
 
 if [ "$MODE" = "batch" ]; then
-    echo "Batch mode: Evaluating all latest Stage 2 checkpoints on HF dataset"
-    echo "Results root: $RESULTS_ROOT"
-    echo "Using split: $SPLIT"
-    if [ -n "$MAX_SAMPLES" ]; then
-        echo "Max samples: $MAX_SAMPLES"
-    fi
+echo "Batch mode: Evaluating all latest Stage 2 checkpoints on HF dataset"
+echo "Results root: $RESULTS_ROOT"
+echo "Using split: $SPLIT"
+if [ -n "$MAX_SAMPLES" ]; then
+    echo "Max samples: $MAX_SAMPLES"
+fi
 
-    python scripts/evaluation/eval_hf_geoguessr_locations.py \
-        --batch_mode \
-        --results_root "$RESULTS_ROOT" \
-        --split "$SPLIT" \
-        ${MAX_SAMPLES:+--max_samples $MAX_SAMPLES} \
-        --batch_size 32 \
-        --num_workers 8
+python scripts/evaluation/eval_hf_geoguessr_locations.py \
+    --batch_mode \
+    --results_root "$RESULTS_ROOT" \
+    --split "$SPLIT" \
+    ${MAX_SAMPLES:+--max_samples $MAX_SAMPLES} \
+    --batch_size 32 \
+    --num_workers 8
 else
     echo "Specific checkpoints mode: Evaluating specified Stage 2 checkpoints + GeoCLIP on HF dataset"
     echo "Results root: $RESULTS_ROOT"

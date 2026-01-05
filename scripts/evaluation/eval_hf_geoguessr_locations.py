@@ -263,18 +263,31 @@ def evaluate_geoclip_on_hf_dataset(
     hf_dataset,
     max_samples: Optional[int] = None,
 ) -> Dict:
-    """Evaluate GeoCLIP model on HF dataset."""
+    """Evaluate GeoCLIP model on HF dataset with optimized I/O."""
     logger.info("Evaluating GeoCLIP on HF dataset...")
+
+    import tempfile
+    import os
+    from pathlib import Path
+
+    # Use faster temp directory (prefer /tmp or local scratch)
+    temp_base = os.environ.get("TMPDIR", os.environ.get("SCRATCH", tempfile.gettempdir()))
+    temp_dir = Path(temp_base) / f"geoclip_eval_{os.getpid()}"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    
+    logger.info(f"Using temporary directory: {temp_dir}")
 
     haversine_errors = []
     total_samples = 0
+    temp_files = []
 
-    # Process samples
-    for idx, sample in enumerate(tqdm(hf_dataset, desc="Evaluating GeoCLIP")):
+    # Pre-process: save all images to disk in batch (faster I/O)
+    logger.info("Pre-saving images to temporary directory...")
+    valid_samples = []
+    for idx, sample in enumerate(tqdm(hf_dataset, desc="Pre-saving images")):
         if max_samples and idx >= max_samples:
             break
 
-        # Load panorama_360 image
         panorama_img = sample.get("panorama_360")
         if panorama_img is None:
             continue
@@ -286,35 +299,40 @@ def evaluate_geoclip_on_hf_dataset(
         else:
             pil_image = panorama_img.convert("RGB") if hasattr(panorama_img, "convert") else Image.open(panorama_img).convert("RGB")
 
-        # Save to temporary file for GeoCLIP
-        import tempfile
-        import os
-        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
-            pil_image.save(tmp_file.name)
-            tmp_path = tmp_file.name
+        # Save to temp file (use JPEG for faster I/O)
+        temp_path = temp_dir / f"img_{idx}.jpg"
+        pil_image.save(temp_path, 'JPEG', quality=95, optimize=False)
+        temp_files.append(temp_path)
+        
+        # Store ground truth coordinates
+        true_lat = float(sample.get("lat", 0.0))
+        true_lng = float(sample.get("lng", 0.0))
+        valid_samples.append((temp_path, true_lat, true_lng))
 
-        try:
-            # Get GeoCLIP prediction (top 1)
-            top_pred_gps, top_pred_prob = geoclip_model.predict(tmp_path, top_k=1)
+    logger.info(f"Saved {len(valid_samples)} images. Starting GeoCLIP inference...")
 
-            # Ground truth coordinates
-            true_lat = float(sample.get("lat", 0.0))
-            true_lng = float(sample.get("lng", 0.0))
-            true_coords = torch.tensor([true_lat, true_lng], dtype=torch.float32)
+    # Process all images
+    for temp_path, true_lat, true_lng in tqdm(valid_samples, desc="Evaluating GeoCLIP"):
+        # Get GeoCLIP prediction (top 1)
+        top_pred_gps, top_pred_prob = geoclip_model.predict(str(temp_path), top_k=1)
 
-            # Predicted coordinates
-            pred_lat, pred_lng = top_pred_gps[0]
-            pred_coords = torch.tensor([pred_lat, pred_lng], dtype=torch.float32)
+        # Ground truth coordinates
+        true_coords = torch.tensor([true_lat, true_lng], dtype=torch.float32)
 
-            # Calculate distance error
-            dist = haversine_distance(pred_coords.unsqueeze(0), true_coords.unsqueeze(0))
-            haversine_errors.append(dist.item())
+        # Predicted coordinates
+        pred_lat, pred_lng = top_pred_gps[0]
+        pred_coords = torch.tensor([pred_lat, pred_lng], dtype=torch.float32)
 
-            total_samples += 1
+        # Calculate distance error
+        dist = haversine_distance(pred_coords.unsqueeze(0), true_coords.unsqueeze(0))
+        haversine_errors.append(dist.item())
 
-        finally:
-            # Clean up temporary file
-            os.unlink(tmp_path)
+        total_samples += 1
+
+    # Clean up temporary directory
+    logger.info("Cleaning up temporary files...")
+    import shutil
+    shutil.rmtree(temp_dir, ignore_errors=True)
 
     if total_samples == 0:
         return {"error": "No samples processed"}
@@ -634,10 +652,10 @@ def main():
                         help="Include GeoCLIP evaluation alongside Stage 2 models")
     
     args = parser.parse_args()
-
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
-
+    
     # Specific checkpoints mode
     if args.specific_checkpoints or args.include_geoclip:
         logger.info("Evaluating specific checkpoints and/or GeoCLIP...")
