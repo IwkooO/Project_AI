@@ -1,0 +1,50 @@
+Round: 14
+Timestamp: 104803
+Prediction: (42.691013, 23.072662)
+Google Maps: https://www.google.com/maps?q=42.69101333618164,23.072662353515625
+
+════════════════════════════════════════
+  CONCEPT vs IMAGE CONTRIBUTION (Gate)
+════════════════════════════════════════
+Gate Mean:  0.4809
+Gate Std:   0.2651
+Gate Range: [0.0114, 0.9921]
+
+Interpretation:
+  - gate > 0.5 = CONCEPT-heavy (relies on semantic concepts)
+  - gate < 0.5 = IMAGE-heavy (relies on raw visual patches)
+
+✓ Model is using BALANCED mix of concepts and patches
+
+════════════════════════════════════════
+  ATTENTION STATISTICS
+════════════════════════════════════════
+Attention Entropy:    6.3120
+Max Attention Patch:  157 (value: 0.0030)
+
+Interpretation:
+  - High entropy = diffuse attention (looking at many patches)
+  - Low entropy = focused attention (looking at few patches)
+
+════════════════════════════════════════
+  GEOCELL PREDICTION CONFIDENCE
+════════════════════════════════════════
+Top Cell Confidence: 0.0484
+Top 3 Cells: [281, 869, 968]
+Top 3 Probs: [0.0484, 0.0460, 0.0402]
+
+════════════════════════════════════════
+  CONCEPT PREDICTIONS
+════════════════════════════════════════
+
+Top 5 Child Concepts:
+  0.0641 - Altai landscape
+  0.0565 - Villa O'Higgins
+  0.0474 - Caucasus mountains
+  0.0450 - Vitosha Mountain
+  0.0206 - Cerro Castillo National Park
+
+Top 3 Parent Concepts:
+  0.3811 - landscape_mountains_temperate
+  0.1185 - landscape_mountains
+  0.0797 - landscape_alpine

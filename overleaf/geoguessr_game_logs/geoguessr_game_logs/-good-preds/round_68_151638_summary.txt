@@ -1,0 +1,16 @@
+Round: 68
+Timestamp: 151638
+Prediction: (-6.908197, 113.956940)
+Google Maps: https://www.google.com/maps?q=-6.908197402954102,113.95693969726562
+
+Top 5 Concepts:
+  0.0782 - North Sumatra pole
+  0.0485 - Poles
+  0.0462 - Front Plates on Motorcycles
+  0.0423 - Pole
+  0.0353 - Bali vibes
+
+Top 3 Parent Concepts:
+  0.4135 - pole_shape
+  0.0924 - buddhism
+  0.0620 - infrastructure_lamp

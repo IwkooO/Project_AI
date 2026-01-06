@@ -1,0 +1,16 @@
+Round: 1
+Timestamp: 092743
+Prediction: (49.869568, -99.930084)
+Google Maps: https://www.google.com/maps?q=49.86956787109375,-99.93008422851562
+
+Top 5 Concepts:
+  0.0640 - Blue bus stops
+  0.0424 - MJTS bus stop
+  0.0396 - Winnipeg Transit
+  0.0385 - Orange snow pole
+  0.0372 - Saskatoon Transit
+
+Top 3 Parent Concepts:
+  0.2061 - hydrant
+  0.0946 - post_sign
+  0.0934 - infrastructure_lamps

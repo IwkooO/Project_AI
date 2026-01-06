@@ -1,0 +1,16 @@
+Round: 54
+Timestamp: 121804
+Prediction: (47.668022, 9.813721)
+Google Maps: https://www.google.com/maps?q=47.66802215576172,9.813720703125
+
+Top 5 Concepts:
+  0.2108 - South Germany Architecture 
+  0.0840 - Wooden Shingle Facade
+  0.0744 - Timber Frames
+  0.0537 - Alpine architecture
+  0.0491 - Italian architecture
+
+Top 3 Parent Concepts:
+  0.6135 - building_facade
+  0.1530 - building_shape
+  0.0434 - landscape_sign

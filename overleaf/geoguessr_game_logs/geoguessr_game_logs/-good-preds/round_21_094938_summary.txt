@@ -1,0 +1,16 @@
+Round: 21
+Timestamp: 094938
+Prediction: (26.162340, 128.062531)
+Google Maps: https://www.google.com/maps?q=26.16234016418457,128.06253051757812
+
+Top 5 Concepts:
+  0.1129 - Kansai transformers
+  0.0795 - Okinawa Transformers
+  0.0618 - Hokuriku plates
+  0.0557 - Kansai 120 stepdown
+  0.0468 - Kyushu transformers
+
+Top 3 Parent Concepts:
+  0.4955 - infrastructure_industrial
+  0.2030 - infrastructure_road
+  0.0910 - script_japanese

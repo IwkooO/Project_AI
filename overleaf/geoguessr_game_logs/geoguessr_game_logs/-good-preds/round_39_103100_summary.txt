@@ -1,0 +1,16 @@
+Round: 39
+Timestamp: 103100
+Prediction: (44.984852, 23.497772)
+Google Maps: https://www.google.com/maps?q=44.9848518371582,23.497772216796875
+
+Top 5 Concepts:
+  0.0964 - Vitosha Mountain
+  0.0615 - Vratsa mountains
+  0.0596 - Distinct valley
+  0.0499 - Po_ega valley
+  0.0365 - Brod Posavina hills
+
+Top 3 Parent Concepts:
+  0.1741 - Po_ega valley
+  0.1057 - Ivan__ica and Medvednica
+  0.0754 - statue

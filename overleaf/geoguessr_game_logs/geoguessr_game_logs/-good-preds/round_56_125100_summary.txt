@@ -1,0 +1,16 @@
+Round: 56
+Timestamp: 125100
+Prediction: (-17.974939, -68.738953)
+Google Maps: https://www.google.com/maps?q=-17.974939346313477,-68.73895263671875
+
+Top 5 Concepts:
+  0.0233 - Car with 2 Small Dots on the Left
+  0.0230 - Unique City
+  0.0171 - Cobbled Road, Through Cliza
+  0.0170 - Bright Silver Tent
+  0.0158 - Landscape - Karacadag
+
+Top 3 Parent Concepts:
+  0.0954 - car_meta
+  0.0922 - landscape_hills_arid
+  0.0697 - landscape_hills

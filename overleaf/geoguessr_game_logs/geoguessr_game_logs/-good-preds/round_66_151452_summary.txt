@@ -1,0 +1,16 @@
+Round: 66
+Timestamp: 151452
+Prediction: (61.843430, -6.344635)
+Google Maps: https://www.google.com/maps?q=61.84342956542969,-6.344635009765625
+
+Top 5 Concepts:
+  0.2169 - Car meta - Pickup
+  0.0378 - Hebrides Islands
+  0.0315 - Western Mountains
+  0.0300 - Shetland Islands
+  0.0257 - Unique car
+
+Top 3 Parent Concepts:
+  0.1661 - landscape_mountains_temperate
+  0.1317 - landscape_glacier
+  0.0737 - landscape_mountains

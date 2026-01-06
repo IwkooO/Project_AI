@@ -1,0 +1,16 @@
+Round: 73
+Timestamp: 152817
+Prediction: (47.974655, 7.988556)
+Google Maps: https://www.google.com/maps?q=47.97465515136719,7.988555908203125
+
+Top 5 Concepts:
+  0.0695 - Munich surroundings Bus Stop
+  0.0602 - South Germany Architecture 
+  0.0377 - Suffix "-hofen"
+  0.0271 - Place name suffixes
+  0.0266 - General Architecture #2
+
+Top 3 Parent Concepts:
+  0.3534 - script_latin
+  0.1082 - building_facade
+  0.0642 - script_european

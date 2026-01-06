@@ -1,0 +1,50 @@
+Round: 3
+Timestamp: 092237
+Prediction: (8.285220, 6.152466)
+Google Maps: https://www.google.com/maps?q=8.2852201461792,6.1524658203125
+
+════════════════════════════════════════
+  CONCEPT vs IMAGE CONTRIBUTION (Gate)
+════════════════════════════════════════
+Gate Mean:  0.4412
+Gate Std:   0.2773
+Gate Range: [0.0071, 0.9896]
+
+Interpretation:
+  - gate > 0.5 = CONCEPT-heavy (relies on semantic concepts)
+  - gate < 0.5 = IMAGE-heavy (relies on raw visual patches)
+
+✓ Model is using BALANCED mix of concepts and patches
+
+════════════════════════════════════════
+  ATTENTION STATISTICS
+════════════════════════════════════════
+Attention Entropy:    6.3015
+Max Attention Patch:  347 (value: 0.0061)
+
+Interpretation:
+  - High entropy = diffuse attention (looking at many patches)
+  - Low entropy = focused attention (looking at few patches)
+
+════════════════════════════════════════
+  GEOCELL PREDICTION CONFIDENCE
+════════════════════════════════════════
+Top Cell Confidence: 0.2584
+Top 3 Cells: [773, 530, 936]
+Top 3 Probs: [0.2584, 0.0377, 0.0359]
+
+════════════════════════════════════════
+  CONCEPT PREDICTIONS
+════════════════════════════════════════
+
+Top 5 Child Concepts:
+  0.1292 - pole
+  0.1099 - Pole
+  0.0285 - Shitcam
+  0.0160 - Mari Menuco
+  0.0160 - Infrastructure - Pole Company
+
+Top 3 Parent Concepts:
+  0.2894 - pole_shape
+  0.0781 - landscape_soil
+  0.0701 - infrastructure_lamps

@@ -1,0 +1,50 @@
+Round: 13
+Timestamp: 104103
+Prediction: (-18.262899, -67.048203)
+Google Maps: https://www.google.com/maps?q=-18.26289939880371,-67.04820251464844
+
+════════════════════════════════════════
+  CONCEPT vs IMAGE CONTRIBUTION (Gate)
+════════════════════════════════════════
+Gate Mean:  0.4380
+Gate Std:   0.2573
+Gate Range: [0.0116, 0.9755]
+
+Interpretation:
+  - gate > 0.5 = CONCEPT-heavy (relies on semantic concepts)
+  - gate < 0.5 = IMAGE-heavy (relies on raw visual patches)
+
+✓ Model is using BALANCED mix of concepts and patches
+
+════════════════════════════════════════
+  ATTENTION STATISTICS
+════════════════════════════════════════
+Attention Entropy:    6.3033
+Max Attention Patch:  423 (value: 0.0048)
+
+Interpretation:
+  - High entropy = diffuse attention (looking at many patches)
+  - Low entropy = focused attention (looking at few patches)
+
+════════════════════════════════════════
+  GEOCELL PREDICTION CONFIDENCE
+════════════════════════════════════════
+Top Cell Confidence: 0.0281
+Top 3 Cells: [248, 722, 246]
+Top 3 Probs: [0.0281, 0.0233, 0.0224]
+
+════════════════════════════════════════
+  CONCEPT PREDICTIONS
+════════════════════════════════════════
+
+Top 5 Child Concepts:
+  0.0201 - Ruta 6, Sora Sora To Pocoata
+  0.0194 - Ecuador shitcam
+  0.0169 - High/Low Antenna
+  0.0128 - San Martin Gen 3
+  0.0112 - Ten Digit Yellow Pole Codes
+
+Top 3 Parent Concepts:
+  0.2401 - camera_meta
+  0.1446 - pole_marker
+  0.0861 - traffic_light

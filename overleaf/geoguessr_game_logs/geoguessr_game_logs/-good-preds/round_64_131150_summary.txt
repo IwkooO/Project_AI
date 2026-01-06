@@ -1,0 +1,16 @@
+Round: 64
+Timestamp: 131150
+Prediction: (48.575138, 23.445053)
+Google Maps: https://www.google.com/maps?q=48.575138092041016,23.445053100585938
+
+Top 5 Concepts:
+  0.1286 - The Carpathian Mountains
+  0.0504 - Vladivostok area
+  0.0330 - Caucasus mountains
+  0.0252 - Altai landscape
+  0.0233 - Dense pine trees
+
+Top 3 Parent Concepts:
+  0.2913 - landscape_mountains_temperate
+  0.1799 - vegetation_forest_temperate
+  0.0376 - landscape_hills_temperate

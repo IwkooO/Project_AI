@@ -1,0 +1,16 @@
+Round: 27
+Timestamp: 095239
+Prediction: (-30.181295, -71.214729)
+Google Maps: https://www.google.com/maps?q=-30.18129539489746,-71.21472930908203
+
+Top 5 Concepts:
+  0.1915 - Electricity counter
+  0.0519 - Rounded electric counter
+  0.0263 - Architecture - White Concrete Blocks
+  0.0222 - Pole 7 Digits Vertical
+  0.0203 - Lima Town
+
+Top 3 Parent Concepts:
+  0.2017 - infrastructure_industrial
+  0.0955 - landscape_urban
+  0.0828 - building_facade

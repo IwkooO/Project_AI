@@ -1,0 +1,16 @@
+Round: 41
+Timestamp: 103833
+Prediction: (43.392235, -80.195969)
+Google Maps: https://www.google.com/maps?q=43.392234802246094,-80.19596862792969
+
+Top 5 Concepts:
+  0.0747 - Orange bus stop
+  0.0676 - LT Symbol
+  0.0656 - Arched bus stop
+  0.0417 - Blue Area strip
+  0.0360 - White sticker hydrant
+
+Top 3 Parent Concepts:
+  0.3768 - urban_artifacts
+  0.1080 - hydrant
+  0.0773 - bin

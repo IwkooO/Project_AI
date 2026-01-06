@@ -1,0 +1,16 @@
+Round: 38
+Timestamp: 103035
+Prediction: (38.711288, -76.418472)
+Google Maps: https://www.google.com/maps?q=38.71128845214844,-76.41847229003906
+
+Top 5 Concepts:
+  0.0684 - Downtown logo
+  0.0287 - New Jersey license plates
+  0.0245 - Halifax Transit
+  0.0228 - Delaware license plates
+  0.0212 - Connecticut license plates
+
+Top 3 Parent Concepts:
+  0.0850 - road_sign
+  0.0615 - script_pacific
+  0.0542 - sign_information

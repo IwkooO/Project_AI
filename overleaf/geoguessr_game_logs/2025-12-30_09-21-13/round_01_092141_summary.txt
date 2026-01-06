@@ -1,0 +1,50 @@
+Round: 1
+Timestamp: 092141
+Prediction: (-3.965966, -32.250015)
+Google Maps: https://www.google.com/maps?q=-3.9659664630889893,-32.25001525878906
+
+════════════════════════════════════════
+  CONCEPT vs IMAGE CONTRIBUTION (Gate)
+════════════════════════════════════════
+Gate Mean:  0.4664
+Gate Std:   0.2653
+Gate Range: [0.0150, 0.9826]
+
+Interpretation:
+  - gate > 0.5 = CONCEPT-heavy (relies on semantic concepts)
+  - gate < 0.5 = IMAGE-heavy (relies on raw visual patches)
+
+✓ Model is using BALANCED mix of concepts and patches
+
+════════════════════════════════════════
+  ATTENTION STATISTICS
+════════════════════════════════════════
+Attention Entropy:    6.3314
+Max Attention Patch:  341 (value: 0.0034)
+
+Interpretation:
+  - High entropy = diffuse attention (looking at many patches)
+  - Low entropy = focused attention (looking at few patches)
+
+════════════════════════════════════════
+  GEOCELL PREDICTION CONFIDENCE
+════════════════════════════════════════
+Top Cell Confidence: 0.2073
+Top 3 Cells: [272, 342, 397]
+Top 3 Probs: [0.2073, 0.0362, 0.0340]
+
+════════════════════════════════════════
+  CONCEPT PREDICTIONS
+════════════════════════════════════════
+
+Top 5 Child Concepts:
+  0.1353 - Ilha de Fernando de Noronha
+  0.0602 - Chilo Island
+  0.0592 - Isla de Flores
+  0.0302 - Via del Mar Coastline
+  0.0228 - Punta del Este
+
+Top 3 Parent Concepts:
+  0.3023 - landscape_island
+  0.1242 - Chilo Island
+  0.0430 - Via del Mar Coastline

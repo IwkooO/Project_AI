@@ -1,0 +1,16 @@
+Round: 4
+Timestamp: 100405
+Prediction: (49.404797, 7.097290)
+Google Maps: https://www.google.com/maps?q=49.4047966003418,7.0972900390625
+
+Top 5 Concepts:
+  0.0353 - B Type Guardrail
+  0.0283 - Guardrail types
+  0.0272 - Saarland Cycling Signs
+  0.0262 - Southeast Regensburg flat plains
+  0.0246 - Regensburg Plains
+
+Top 3 Parent Concepts:
+  0.1105 - landscape_plain_temperate
+  0.1039 - tram
+  0.0952 - Baden-Wrttemberg

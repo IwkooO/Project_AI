@@ -1,0 +1,16 @@
+Round: 6
+Timestamp: 093356
+Prediction: (41.757454, 27.633881)
+Google Maps: https://www.google.com/maps?q=41.75745391845703,27.633880615234375
+
+Top 5 Concepts:
+  0.0170 - Street Names
+  0.0162 - Montenegro, Serbia  Shared Cyrillic Letters
+  0.0138 - Romania Unique Latin Letters
+  0.0135 - Lithuania Unique Latin Letters
+  0.0134 - Portugal, Estonia Shared Latin Letters
+
+Top 3 Parent Concepts:
+  0.1080 - script_estonian
+  0.0878 - script_cyrillic
+  0.0732 - script_latin

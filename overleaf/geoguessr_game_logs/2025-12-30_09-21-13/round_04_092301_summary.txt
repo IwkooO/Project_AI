@@ -1,0 +1,50 @@
+Round: 4
+Timestamp: 092301
+Prediction: (16.593588, 104.268524)
+Google Maps: https://www.google.com/maps?q=16.59358787536621,104.26852416992188
+
+════════════════════════════════════════
+  CONCEPT vs IMAGE CONTRIBUTION (Gate)
+════════════════════════════════════════
+Gate Mean:  0.4370
+Gate Std:   0.2661
+Gate Range: [0.0141, 0.9822]
+
+Interpretation:
+  - gate > 0.5 = CONCEPT-heavy (relies on semantic concepts)
+  - gate < 0.5 = IMAGE-heavy (relies on raw visual patches)
+
+✓ Model is using BALANCED mix of concepts and patches
+
+════════════════════════════════════════
+  ATTENTION STATISTICS
+════════════════════════════════════════
+Attention Entropy:    6.2849
+Max Attention Patch:  567 (value: 0.0068)
+
+Interpretation:
+  - High entropy = diffuse attention (looking at many patches)
+  - Low entropy = focused attention (looking at few patches)
+
+════════════════════════════════════════
+  GEOCELL PREDICTION CONFIDENCE
+════════════════════════════════════════
+Top Cell Confidence: 0.0687
+Top 3 Cells: [710, 965, 935]
+Top 3 Probs: [0.0687, 0.0527, 0.0342]
+
+════════════════════════════════════════
+  CONCEPT PREDICTIONS
+════════════════════════════════════════
+
+Top 5 Child Concepts:
+  0.0440 - Entebbe - Vibe
+  0.0439 - Sri Lanka
+  0.0285 - Vientiane
+  0.0272 - Language - Malayalam
+  0.0221 - Pakse
+
+Top 3 Parent Concepts:
+  0.2528 - phone_code
+  0.1374 - script_south_indian
+  0.1108 - car_type

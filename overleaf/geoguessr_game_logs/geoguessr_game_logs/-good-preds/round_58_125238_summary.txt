@@ -1,0 +1,16 @@
+Round: 58
+Timestamp: 125238
+Prediction: (-0.675486, 30.789490)
+Google Maps: https://www.google.com/maps?q=-0.6754860281944275,30.78948974609375
+
+Top 5 Concepts:
+  0.0781 - Galapagos Islands
+  0.0610 - Lake Mburo - Vibes
+  0.0550 - Ilha de Fernando de Noronha
+  0.0327 - Entebbe - Vibe
+  0.0311 - Lake Mburo - Black Soil
+
+Top 3 Parent Concepts:
+  0.2696 - landscape_island
+  0.0903 - landscape_savannah
+  0.0856 - landscape_urban

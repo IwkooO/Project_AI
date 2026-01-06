@@ -1,0 +1,16 @@
+Round: 28
+Timestamp: 100953
+Prediction: (55.258121, -2.514786)
+Google Maps: https://www.google.com/maps?q=55.258121490478516,-2.5147857666015625
+
+Top 5 Concepts:
+  0.1086 - Green and Lush Landscape
+  0.0843 - New Forest landscape
+  0.0775 - Kielder Forest
+  0.0337 - Chilo Island
+  0.0293 - Tree plantations
+
+Top 3 Parent Concepts:
+  0.2025 - vegetation_forest_temperate
+  0.1357 - landscape_hills_temperate
+  0.1017 - Chilo Island

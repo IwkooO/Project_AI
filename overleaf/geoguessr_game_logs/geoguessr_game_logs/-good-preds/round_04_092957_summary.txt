@@ -1,0 +1,16 @@
+Round: 4
+Timestamp: 092957
+Prediction: (49.627972, 13.334915)
+Google Maps: https://www.google.com/maps?q=49.62797164916992,13.334915161132812
+
+Top 5 Concepts:
+  0.0788 - -Ach ending
+  0.0331 - -Ow ending
+  0.0302 - Suffix "-hofen"
+  0.0263 - Weiler
+  0.0259 - Latvia Unique Latin Letters
+
+Top 3 Parent Concepts:
+  0.3156 - script_latin
+  0.0779 - Baden-Wrttemberg
+  0.0705 - script_latvian

@@ -1,0 +1,16 @@
+Round: 22
+Timestamp: 095002
+Prediction: (-39.080078, -70.965195)
+Google Maps: https://www.google.com/maps?q=-39.080078125,-70.96519470214844
+
+Top 5 Concepts:
+  0.0569 - RP23
+  0.0213 - Punta del Este
+  0.0190 - Google car - Cabo Polonio
+  0.0122 - Coastal Road B-430
+  0.0121 - License Plates
+
+Top 3 Parent Concepts:
+  0.2804 - road_dirt_tropical
+  0.0355 - landscape_island
+  0.0308 - phone_code

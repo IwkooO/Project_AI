@@ -1,0 +1,16 @@
+Round: 42
+Timestamp: 103853
+Prediction: (2.045060, 102.918365)
+Google Maps: https://www.google.com/maps?q=2.045060396194458,102.91836547851562
+
+Top 5 Concepts:
+  0.1161 - Street sign
+  0.1010 - Stop Signs
+  0.0586 - Johor yellow street signs
+  0.0537 - S logo bins
+  0.0354 - Perlis and Kedah bins
+
+Top 3 Parent Concepts:
+  0.6885 - road_sign
+  0.0669 - post_sign
+  0.0310 - bin

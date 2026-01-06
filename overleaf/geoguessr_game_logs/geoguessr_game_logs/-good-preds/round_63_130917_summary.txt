@@ -1,0 +1,16 @@
+Round: 63
+Timestamp: 130917
+Prediction: (40.609562, -7.682053)
+Google Maps: https://www.google.com/maps?q=40.609561920166016,-7.6820526123046875
+
+Top 5 Concepts:
+  0.1140 - Word for street - RUA
+  0.0709 - Basque Language
+  0.0488 - Kalea
+  0.0252 - Side walks
+  0.0249 - Cogersa bins
+
+Top 3 Parent Concepts:
+  0.2218 - script_basque
+  0.1047 - script_latin
+  0.0749 - script_catalan

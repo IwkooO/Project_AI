@@ -1,0 +1,16 @@
+Round: 20
+Timestamp: 094912
+Prediction: (53.512146, -104.739883)
+Google Maps: https://www.google.com/maps?q=53.51214599609375,-104.73988342285156
+
+Top 5 Concepts:
+  0.1001 - Manitoba bollards
+  0.0891 - Saskatchewan alternating insulators
+  0.0699 - Sask alt insulators
+  0.0554 - Manitoba stop signs
+  0.0460 - Prairie potholes
+
+Top 3 Parent Concepts:
+  0.1160 - landscape_prairie
+  0.1077 - pole_shape
+  0.0627 - infrastructure_lamp

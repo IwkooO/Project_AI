@@ -1,0 +1,50 @@
+Round: 7
+Timestamp: 103631
+Prediction: (8.529566, 80.594360)
+Google Maps: https://www.google.com/maps?q=8.529565811157227,80.5943603515625
+
+════════════════════════════════════════
+  CONCEPT vs IMAGE CONTRIBUTION (Gate)
+════════════════════════════════════════
+Gate Mean:  0.4505
+Gate Std:   0.2756
+Gate Range: [0.0143, 0.9785]
+
+Interpretation:
+  - gate > 0.5 = CONCEPT-heavy (relies on semantic concepts)
+  - gate < 0.5 = IMAGE-heavy (relies on raw visual patches)
+
+✓ Model is using BALANCED mix of concepts and patches
+
+════════════════════════════════════════
+  ATTENTION STATISTICS
+════════════════════════════════════════
+Attention Entropy:    6.2114
+Max Attention Patch:  223 (value: 0.0045)
+
+Interpretation:
+  - High entropy = diffuse attention (looking at many patches)
+  - Low entropy = focused attention (looking at few patches)
+
+════════════════════════════════════════
+  GEOCELL PREDICTION CONFIDENCE
+════════════════════════════════════════
+Top Cell Confidence: 0.0235
+Top 3 Cells: [936, 773, 631]
+Top 3 Probs: [0.0235, 0.0175, 0.0151]
+
+════════════════════════════════════════
+  CONCEPT PREDICTIONS
+════════════════════════════════════════
+
+Top 5 Child Concepts:
+  0.0297 - Shitcam
+  0.0163 - Long Black Very A-Type
+  0.0146 - Long Black B-Type
+  0.0144 - Long Black A-Type
+  0.0134 - Vegetation - Macaw Palm
+
+Top 3 Parent Concepts:
+  0.2850 - vegetation_plant
+  0.1781 - pole_marker
+  0.0648 - camera_meta

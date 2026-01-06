@@ -1,0 +1,16 @@
+Round: 23
+Timestamp: 095102
+Prediction: (35.915180, -116.760971)
+Google Maps: https://www.google.com/maps?q=35.91518020629883,-116.76097106933594
+
+Top 5 Concepts:
+  0.1348 - Arizona license plates
+  0.0706 - Utah license plates
+  0.0538 - New Mexico license plates
+  0.0519 - Nevada license plates
+  0.0430 - Colorado license plates
+
+Top 3 Parent Concepts:
+  0.1595 - phone_code
+  0.0487 - vegetation_vineyard
+  0.0481 - script_pacific

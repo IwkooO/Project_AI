@@ -1,0 +1,16 @@
+Round: 25
+Timestamp: 095149
+Prediction: (-7.726520, -74.685791)
+Google Maps: https://www.google.com/maps?q=-7.72652006149292,-74.685791015625
+
+Top 5 Concepts:
+  0.0570 - City Roads, Santa Cruz & Suburbs
+  0.0561 - Santo Domingo outskirts
+  0.0454 - Ucayali Pucallpa Gen 3
+  0.0422 - Santo Domingo street name signs
+  0.0292 - Loreto Iquitos Town
+
+Top 3 Parent Concepts:
+  0.4640 - road_dirt_tropical
+  0.0820 - road_urban
+  0.0635 - road_tropical

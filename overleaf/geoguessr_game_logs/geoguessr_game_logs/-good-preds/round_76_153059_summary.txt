@@ -1,0 +1,16 @@
+Round: 76
+Timestamp: 153059
+Prediction: (-45.786350, 168.559387)
+Google Maps: https://www.google.com/maps?q=-45.78635025024414,168.55938720703125
+
+Top 5 Concepts:
+  0.0736 - Bollards
+  0.0503 - Roadlines
+  0.0471 - Roadlines #2
+  0.0305 - Chevrons
+  0.0279 - West Coast
+
+Top 3 Parent Concepts:
+  0.1810 - bollard_shape
+  0.1398 - road_line
+  0.1352 - guardrail

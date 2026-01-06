@@ -1,0 +1,50 @@
+Round: 12
+Timestamp: 104021
+Prediction: (36.968731, 36.705856)
+Google Maps: https://www.google.com/maps?q=36.96873092651367,36.70585632324219
+
+════════════════════════════════════════
+  CONCEPT vs IMAGE CONTRIBUTION (Gate)
+════════════════════════════════════════
+Gate Mean:  0.4318
+Gate Std:   0.2654
+Gate Range: [0.0137, 0.9896]
+
+Interpretation:
+  - gate > 0.5 = CONCEPT-heavy (relies on semantic concepts)
+  - gate < 0.5 = IMAGE-heavy (relies on raw visual patches)
+
+✓ Model is using BALANCED mix of concepts and patches
+
+════════════════════════════════════════
+  ATTENTION STATISTICS
+════════════════════════════════════════
+Attention Entropy:    6.2880
+Max Attention Patch:  53 (value: 0.0045)
+
+Interpretation:
+  - High entropy = diffuse attention (looking at many patches)
+  - Low entropy = focused attention (looking at few patches)
+
+════════════════════════════════════════
+  GEOCELL PREDICTION CONFIDENCE
+════════════════════════════════════════
+Top Cell Confidence: 0.0969
+Top 3 Cells: [956, 951, 952]
+Top 3 Probs: [0.0969, 0.0560, 0.0389]
+
+════════════════════════════════════════
+  CONCEPT PREDICTIONS
+════════════════════════════════════════
+
+Top 5 Child Concepts:
+  0.0390 - Tunis Follow Cars
+  0.0255 - Aqaba taxi
+  0.0233 - Windy Tent Dalanzadgad Highway
+  0.0205 - Greece Unique Greek Letters
+  0.0193 - Sea of Plastic
+
+Top 3 Parent Concepts:
+  0.1373 - script_greek
+  0.0597 - Car with Labeled Metal Holders Ð Urban
+  0.0528 - landscape_plain

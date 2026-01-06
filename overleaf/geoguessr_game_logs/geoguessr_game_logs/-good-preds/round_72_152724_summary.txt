@@ -1,0 +1,16 @@
+Round: 72
+Timestamp: 152724
+Prediction: (-29.434824, -53.223114)
+Google Maps: https://www.google.com/maps?q=-29.434823989868164,-53.223114013671875
+
+Top 5 Concepts:
+  0.0568 - Word for street - RUA
+  0.0559 - Brazil
+  0.0509 - Cear lamps
+  0.0407 - Infrastructure - Sao Paulo Polepaint
+  0.0373 - Blue water tanks
+
+Top 3 Parent Concepts:
+  0.1417 - Cear lamps
+  0.1017 - Paran pole markings
+  0.0839 - phone_code

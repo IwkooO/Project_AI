@@ -1,0 +1,16 @@
+Round: 9
+Timestamp: 093541
+Prediction: (48.558064, -123.552811)
+Google Maps: https://www.google.com/maps?q=48.55806350708008,-123.55281066894531
+
+Top 5 Concepts:
+  0.1388 - White logo sign
+  0.1160 - "L" street sign
+  0.0514 - Sign clasps
+  0.0439 - White outline
+  0.0378 - Green transit design
+
+Top 3 Parent Concepts:
+  0.1142 - hydrant
+  0.0789 - script_pacific
+  0.0665 - sign_information

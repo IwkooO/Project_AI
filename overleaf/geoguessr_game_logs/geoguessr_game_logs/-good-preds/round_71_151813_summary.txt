@@ -1,0 +1,16 @@
+Round: 71
+Timestamp: 151813
+Prediction: (37.565517, 23.819489)
+Google Maps: https://www.google.com/maps?q=37.56551742553711,23.819488525390625
+
+Top 5 Concepts:
+  0.0896 - Greece Unique Greek Letters
+  0.0745 - Greek language
+  0.0427 - Sea of Plastic
+  0.0391 - Greek lamps
+  0.0362 - Greek harp pole
+
+Top 3 Parent Concepts:
+  0.4532 - script_greek
+  0.1048 - vegetation_greenhouse
+  0.0340 - script_latin

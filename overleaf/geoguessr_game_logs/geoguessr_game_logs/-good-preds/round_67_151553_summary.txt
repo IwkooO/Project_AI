@@ -1,0 +1,16 @@
+Round: 67
+Timestamp: 151553
+Prediction: (-23.933424, 29.153091)
+Google Maps: https://www.google.com/maps?q=-23.93342399597168,29.153091430664062
+
+Top 5 Concepts:
+  0.1174 - pole
+  0.0730 - Vibes
+  0.0623 - Suburbian Security
+  0.0286 - Bird Pole
+  0.0284 - Northeast
+
+Top 3 Parent Concepts:
+  0.2303 - landscape_urban
+  0.1213 - pole_bird
+  0.1096 - phone_code

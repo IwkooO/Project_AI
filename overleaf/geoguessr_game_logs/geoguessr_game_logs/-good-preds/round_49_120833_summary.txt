@@ -1,0 +1,16 @@
+Round: 49
+Timestamp: 120833
+Prediction: (27.097729, 88.566498)
+Google Maps: https://www.google.com/maps?q=27.097728729248047,88.56649780273438
+
+Top 5 Concepts:
+  0.0430 - Teal roofs
+  0.0396 - Cusco City
+  0.0393 - Cajamarca Town
+  0.0288 - Architecture - Triangle Metal Roofs
+  0.0279 - Assamese language
+
+Top 3 Parent Concepts:
+  0.2126 - building_roof
+  0.1104 - building_facade
+  0.0865 - building_shape

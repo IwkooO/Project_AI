@@ -1,0 +1,16 @@
+Round: 29
+Timestamp: 101018
+Prediction: (37.739136, 24.402390)
+Google Maps: https://www.google.com/maps?q=37.7391357421875,24.402389526367188
+
+Top 5 Concepts:
+  0.1007 - License plates
+  0.0430 - Greek lamps
+  0.0377 - License Plates
+  0.0365 - Yellow plates
+  0.0309 - Ladder poles
+
+Top 3 Parent Concepts:
+  0.1204 - infrastructure_lamps
+  0.0883 - infrastructure_lamp
+  0.0726 - bin

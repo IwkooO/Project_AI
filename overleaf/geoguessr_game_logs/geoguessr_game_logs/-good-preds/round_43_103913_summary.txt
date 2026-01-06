@@ -1,0 +1,16 @@
+Round: 43
+Timestamp: 103913
+Prediction: (-33.248669, 116.188019)
+Google Maps: https://www.google.com/maps?q=-33.2486686706543,116.18801879882812
+
+Top 5 Concepts:
+  0.0762 - NSW guardrail ending
+  0.0370 - WA property marker
+  0.0270 - Chilo Island
+  0.0238 - Tasmania pole metas
+  0.0210 - ACT gap reflector
+
+Top 3 Parent Concepts:
+  0.2074 - guardrail
+  0.1053 - Chilo Island
+  0.0631 - pole_marker

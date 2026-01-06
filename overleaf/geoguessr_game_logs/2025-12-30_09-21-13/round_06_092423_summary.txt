@@ -1,0 +1,50 @@
+Round: 6
+Timestamp: 092423
+Prediction: (37.538082, -8.063187)
+Google Maps: https://www.google.com/maps?q=37.538082122802734,-8.063186645507812
+
+════════════════════════════════════════
+  CONCEPT vs IMAGE CONTRIBUTION (Gate)
+════════════════════════════════════════
+Gate Mean:  0.4770
+Gate Std:   0.2642
+Gate Range: [0.0194, 0.9848]
+
+Interpretation:
+  - gate > 0.5 = CONCEPT-heavy (relies on semantic concepts)
+  - gate < 0.5 = IMAGE-heavy (relies on raw visual patches)
+
+✓ Model is using BALANCED mix of concepts and patches
+
+════════════════════════════════════════
+  ATTENTION STATISTICS
+════════════════════════════════════════
+Attention Entropy:    6.3424
+Max Attention Patch:  335 (value: 0.0028)
+
+Interpretation:
+  - High entropy = diffuse attention (looking at many patches)
+  - Low entropy = focused attention (looking at few patches)
+
+════════════════════════════════════════
+  GEOCELL PREDICTION CONFIDENCE
+════════════════════════════════════════
+Top Cell Confidence: 0.2700
+Top 3 Cells: [856, 853, 258]
+Top 3 Probs: [0.2700, 0.1123, 0.0470]
+
+════════════════════════════════════════
+  CONCEPT PREDICTIONS
+════════════════════════════════════════
+
+Top 5 Child Concepts:
+  0.1728 - Word for street - RUA
+  0.0858 - Side walks
+  0.0519 - Belt + Bent Knees Portugal
+  0.0295 - Portugal
+  0.0253 - Cobblestone Roads
+
+Top 3 Parent Concepts:
+  0.0863 - road_cobbled
+  0.0620 - script_basque
+  0.0591 - Paran pines

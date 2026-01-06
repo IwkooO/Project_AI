@@ -1,0 +1,16 @@
+Round: 62
+Timestamp: 130822
+Prediction: (48.452896, 23.132843)
+Google Maps: https://www.google.com/maps?q=48.45289611816406,23.132843017578125
+
+Top 5 Concepts:
+  0.1012 - Hungarian Language
+  0.0890 - Bilingual Signs
+  0.0843 - Hungarian Architecture
+  0.0366 - Bashkir bilingual signs
+  0.0357 - Metal/Fake Tiled Roofs
+
+Top 3 Parent Concepts:
+  0.2447 - script_cyrillic
+  0.1590 - script_arabic
+  0.1086 - landscape_rural

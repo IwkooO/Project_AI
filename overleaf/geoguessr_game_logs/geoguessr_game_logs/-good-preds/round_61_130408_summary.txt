@@ -1,0 +1,16 @@
+Round: 61
+Timestamp: 130408
+Prediction: (49.589138, 13.324722)
+Google Maps: https://www.google.com/maps?q=49.58913803100586,13.324722290039062
+
+Top 5 Concepts:
+  0.1321 - Czechia, Slovakia Shared Latin Letters
+  0.1126 - Czechia Unique Latin Letters
+  0.0537 - Sorbian
+  0.0503 - Suffix "-hofen"
+  0.0346 - -Ach ending
+
+Top 3 Parent Concepts:
+  0.7018 - script_latin
+  0.0533 - landscape_sign
+  0.0329 - phone_code

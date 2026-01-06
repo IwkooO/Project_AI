@@ -1,0 +1,16 @@
+Round: 57
+Timestamp: 125128
+Prediction: (-24.940403, -65.326241)
+Google Maps: https://www.google.com/maps?q=-24.94040298461914,-65.32624053955078
+
+Top 5 Concepts:
+  0.1461 - Montevideo
+  0.0894 - La Serena Historic Center
+  0.0409 - Salta
+  0.0344 - Phone Code 51
+  0.0201 - Split
+
+Top 3 Parent Concepts:
+  0.3901 - landscape_urban
+  0.1670 - phone_code
+  0.0539 - landscape_sky

@@ -1,0 +1,16 @@
+Round: 32
+Timestamp: 101135
+Prediction: (46.172169, 16.390594)
+Google Maps: https://www.google.com/maps?q=46.17216873168945,16.390594482421875
+
+Top 5 Concepts:
+  0.1196 - -ec town names
+  0.1002 - Street Names
+  0.0488 - Czechia, Slovakia Shared Latin Letters
+  0.0439 - Street name ending - iela
+  0.0394 - Electricity marker
+
+Top 3 Parent Concepts:
+  0.3534 - script_estonian
+  0.1940 - script_latin
+  0.1021 - script_latvian

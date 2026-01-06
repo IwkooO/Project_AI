@@ -1,0 +1,16 @@
+Round: 40
+Timestamp: 103812
+Prediction: (49.180771, 17.094589)
+Google Maps: https://www.google.com/maps?q=49.18077087402344,17.094589233398438
+
+Top 5 Concepts:
+  0.0716 - Street Signs
+  0.0569 - Czechia, Slovakia Shared Latin Letters
+  0.0518 - Bilingual Signs
+  0.0340 - Pedestrian Sign
+  0.0325 - Poland Unique Latin Letters
+
+Top 3 Parent Concepts:
+  0.4243 - road_sign
+  0.3021 - script_latin
+  0.0637 - script_european

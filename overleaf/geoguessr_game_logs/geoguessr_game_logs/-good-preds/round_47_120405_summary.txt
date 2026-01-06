@@ -1,0 +1,16 @@
+Round: 47
+Timestamp: 120405
+Prediction: (27.338943, 90.425323)
+Google Maps: https://www.google.com/maps?q=27.338943481445312,90.42532348632812
+
+Top 5 Concepts:
+  0.0489 - Teal roofs
+  0.0378 - Assamese language
+  0.0291 - Traditional architecture
+  0.0280 - Pasco Oxapampa
+  0.0238 - Cusco City
+
+Top 3 Parent Concepts:
+  0.1230 - building_roof
+  0.0904 - script_bengali
+  0.0894 - building_shape

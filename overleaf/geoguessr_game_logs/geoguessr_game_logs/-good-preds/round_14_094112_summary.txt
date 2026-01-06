@@ -1,0 +1,16 @@
+Round: 14
+Timestamp: 094112
+Prediction: (48.205193, -2.275146)
+Google Maps: https://www.google.com/maps?q=48.20519256591797,-2.275146484375
+
+Top 5 Concepts:
+  0.0618 - Thatched roofs
+  0.0617 - Gravel front gardens
+  0.0544 - Red Granite
+  0.0352 - Red strip license plate
+  0.0293 - Sylt
+
+Top 3 Parent Concepts:
+  0.2418 - building_facade
+  0.0899 - building_roof
+  0.0728 - landscape_island

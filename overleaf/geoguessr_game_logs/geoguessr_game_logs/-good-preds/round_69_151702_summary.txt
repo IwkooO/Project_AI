@@ -1,0 +1,16 @@
+Round: 69
+Timestamp: 151702
+Prediction: (51.967121, 8.379410)
+Google Maps: https://www.google.com/maps?q=51.96712112426758,8.379409790039062
+
+Top 5 Concepts:
+  0.0876 - Bielefeld Yellow Bands
+  0.0619 - Aldi
+  0.0426 - Schleswig-Holstein Architecture
+  0.0360 - East Pole 
+  0.0284 - Bremerhavem Trash Bin
+
+Top 3 Parent Concepts:
+  0.0854 - bin
+  0.0676 - landscape_plain_temperate
+  0.0607 - infrastructure_industrial

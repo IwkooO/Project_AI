@@ -1,0 +1,16 @@
+Round: 46
+Timestamp: 120355
+Prediction: (27.138496, 88.293579)
+Google Maps: https://www.google.com/maps?q=27.13849639892578,88.2935791015625
+
+Top 5 Concepts:
+  0.0627 - Architecture - Triangle Metal Roofs
+  0.0439 - Traditional architecture
+  0.0378 - Teal roofs
+  0.0361 - Architecture - Square Panel Houses
+  0.0288 - Unique Architecture
+
+Top 3 Parent Concepts:
+  0.3109 - building_roof
+  0.2325 - building_facade
+  0.1868 - building_shape

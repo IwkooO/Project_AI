@@ -1,0 +1,16 @@
+Round: 6
+Timestamp: 100427
+Prediction: (59.682590, 10.348663)
+Google Maps: https://www.google.com/maps?q=59.68259048461914,10.348663330078125
+
+Top 5 Concepts:
+  0.1222 - Sweden
+  0.0719 - Norway
+  0.0373 - Swedish Gyatt
+  0.0361 - Denmark, Norway, Sweden Shared Latin Letters
+  0.0359 - Green Plates
+
+Top 3 Parent Concepts:
+  0.3544 - phone_code
+  0.0570 - road_sign
+  0.0493 - road_snow

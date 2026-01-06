@@ -1,0 +1,16 @@
+Round: 60
+Timestamp: 125424
+Prediction: (-45.906010, 168.511169)
+Google Maps: https://www.google.com/maps?q=-45.906009674072266,168.51116943359375
+
+Top 5 Concepts:
+  0.0745 - Southland Pole Guard 
+  0.0506 - Solid outer lines without middle line
+  0.0295 - Tightly Packed Wooden Fences
+  0.0245 - NSW guardrail ending
+  0.0214 - Thin Metal Fence Post
+
+Top 3 Parent Concepts:
+  0.1820 - landscape_hills_temperate
+  0.0780 - bollard_shape
+  0.0683 - vegetation_forest_temperate

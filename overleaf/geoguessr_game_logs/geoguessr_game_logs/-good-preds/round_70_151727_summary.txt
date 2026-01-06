@@ -1,0 +1,16 @@
+Round: 70
+Timestamp: 151727
+Prediction: (18.284864, -64.476837)
+Google Maps: https://www.google.com/maps?q=18.28486442565918,-64.47683715820312
+
+Top 5 Concepts:
+  0.2725 - Unique Car
+  0.2689 - Unique car
+  0.0547 - USV unique car
+  0.0226 - License Plates
+  0.0154 - Gen 3 Cars
+
+Top 3 Parent Concepts:
+  0.4291 - car_meta
+  0.2216 - car_type
+  0.0256 - San Jos White Tag

@@ -1,0 +1,16 @@
+Round: 48
+Timestamp: 120823
+Prediction: (27.199974, 88.452332)
+Google Maps: https://www.google.com/maps?q=27.199974060058594,88.45233154296875
+
+Top 5 Concepts:
+  0.0453 - Architecture - Triangle Metal Roofs
+  0.0374 - Traditional architecture
+  0.0356 - Teal roofs
+  0.0355 - Architecture
+  0.0317 - Cusco City
+
+Top 3 Parent Concepts:
+  0.2596 - building_roof
+  0.2246 - building_facade
+  0.1427 - building_shape

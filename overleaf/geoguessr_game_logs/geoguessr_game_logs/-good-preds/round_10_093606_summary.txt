@@ -1,0 +1,16 @@
+Round: 10
+Timestamp: 093606
+Prediction: (35.672897, 139.797913)
+Google Maps: https://www.google.com/maps?q=35.67289733886719,139.79791259765625
+
+Top 5 Concepts:
+  0.1151 - Shikoku orange band
+  0.1039 - Chugoku arrow
+  0.0957 - Hokuriku plates
+  0.0649 - Chugoku plate
+  0.0508 - Kansai transformers
+
+Top 3 Parent Concepts:
+  0.4598 - infrastructure_industrial
+  0.0742 - script_japanese
+  0.0712 - building_facade

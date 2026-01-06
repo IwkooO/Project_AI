@@ -1,0 +1,16 @@
+Round: 30
+Timestamp: 101043
+Prediction: (36.541607, -97.313255)
+Google Maps: https://www.google.com/maps?q=36.54160690307617,-97.3132553100586
+
+Top 5 Concepts:
+  0.0735 - Texan roads
+  0.0342 - Wide middle lines
+  0.0333 - Thick road lines
+  0.0286 - Great Plains
+  0.0279 - Concrete highways
+
+Top 3 Parent Concepts:
+  0.3155 - road_line
+  0.1458 - infrastructure_road
+  0.1123 - landscape_prairie

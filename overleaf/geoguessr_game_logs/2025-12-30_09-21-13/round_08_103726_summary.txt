@@ -1,0 +1,50 @@
+Round: 8
+Timestamp: 103726
+Prediction: (31.567919, 75.090332)
+Google Maps: https://www.google.com/maps?q=31.56791877746582,75.09033203125
+
+════════════════════════════════════════
+  CONCEPT vs IMAGE CONTRIBUTION (Gate)
+════════════════════════════════════════
+Gate Mean:  0.4681
+Gate Std:   0.2663
+Gate Range: [0.0075, 0.9904]
+
+Interpretation:
+  - gate > 0.5 = CONCEPT-heavy (relies on semantic concepts)
+  - gate < 0.5 = IMAGE-heavy (relies on raw visual patches)
+
+✓ Model is using BALANCED mix of concepts and patches
+
+════════════════════════════════════════
+  ATTENTION STATISTICS
+════════════════════════════════════════
+Attention Entropy:    6.2220
+Max Attention Patch:  118 (value: 0.0047)
+
+Interpretation:
+  - High entropy = diffuse attention (looking at many patches)
+  - Low entropy = focused attention (looking at few patches)
+
+════════════════════════════════════════
+  GEOCELL PREDICTION CONFIDENCE
+════════════════════════════════════════
+Top Cell Confidence: 0.3015
+Top 3 Cells: [568, 550, 638]
+Top 3 Probs: [0.3015, 0.1651, 0.0722]
+
+════════════════════════════════════════
+  CONCEPT PREDICTIONS
+════════════════════════════════════════
+
+Top 5 Child Concepts:
+  0.1221 - Language - Punjabi
+  0.0992 - Punjab electricity boxes
+  0.0599 - Infrastructure - Punjabi Electricity Counters
+  0.0588 - Architecture - Sikhism
+  0.0555 - Punjabi language
+
+Top 3 Parent Concepts:
+  0.2703 - infrastructure_industrial
+  0.2128 - script_north_indian
+  0.0639 - script_devanagari

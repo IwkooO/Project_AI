@@ -1,0 +1,16 @@
+Round: 13
+Timestamp: 093741
+Prediction: (33.027328, -101.655884)
+Google Maps: https://www.google.com/maps?q=33.02732849121094,-101.6558837890625
+
+Top 5 Concepts:
+  0.0624 - Texas license plates
+  0.0317 - Salta
+  0.0296 - Brittlebush
+  0.0295 - Texan roads
+  0.0281 - Saguaro Cactus
+
+Top 3 Parent Concepts:
+  0.1749 - vegetation_grassland
+  0.1235 - vegetation_cacti
+  0.1232 - vegetation_shrubland_arid

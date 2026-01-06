@@ -1,0 +1,16 @@
+Round: 26
+Timestamp: 095214
+Prediction: (39.196938, 15.803406)
+Google Maps: https://www.google.com/maps?q=39.196937561035156,15.80340576171875
+
+Top 5 Concepts:
+  0.0390 - License plates
+  0.0367 - Prato Valley
+  0.0317 - Infamous Low Rock Walls
+  0.0274 - Carrer
+  0.0224 - Barolo Wine Region
+
+Top 3 Parent Concepts:
+  0.1562 - vegetation_greenhouse
+  0.1282 - vegetation_vineyard
+  0.0747 - script_catalan

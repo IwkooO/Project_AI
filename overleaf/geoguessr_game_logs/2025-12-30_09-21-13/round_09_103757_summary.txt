@@ -1,0 +1,50 @@
+Round: 9
+Timestamp: 103757
+Prediction: (11.392594, 78.052887)
+Google Maps: https://www.google.com/maps?q=11.392594337463379,78.05288696289062
+
+════════════════════════════════════════
+  CONCEPT vs IMAGE CONTRIBUTION (Gate)
+════════════════════════════════════════
+Gate Mean:  0.4578
+Gate Std:   0.2566
+Gate Range: [0.0206, 0.9780]
+
+Interpretation:
+  - gate > 0.5 = CONCEPT-heavy (relies on semantic concepts)
+  - gate < 0.5 = IMAGE-heavy (relies on raw visual patches)
+
+✓ Model is using BALANCED mix of concepts and patches
+
+════════════════════════════════════════
+  ATTENTION STATISTICS
+════════════════════════════════════════
+Attention Entropy:    6.2558
+Max Attention Patch:  388 (value: 0.0068)
+
+Interpretation:
+  - High entropy = diffuse attention (looking at many patches)
+  - Low entropy = focused attention (looking at few patches)
+
+════════════════════════════════════════
+  GEOCELL PREDICTION CONFIDENCE
+════════════════════════════════════════
+Top Cell Confidence: 0.1110
+Top 3 Cells: [551, 599, 570]
+Top 3 Probs: [0.1110, 0.0730, 0.0697]
+
+════════════════════════════════════════
+  CONCEPT PREDICTIONS
+════════════════════════════════════════
+
+Top 5 Child Concepts:
+  0.1377 - Language - Telugu
+  0.1026 - Language - Tamil
+  0.0583 - Infrastructure - White-Black-White Paint
+  0.0538 - Infrastructure - Tamil Nadu Pole
+  0.0521 - Telugu language
+
+Top 3 Parent Concepts:
+  0.7461 - script_south_indian
+  0.0442 - vegetation_coastline
+  0.0197 - pole_marker

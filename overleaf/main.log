@@ -1,10 +1,10 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2024.11.30)  26 DEC 2025 16:54
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2025.12.26)  6 JAN 2026 23:04
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
  %&-line parsing enabled.
-**/home/pradyutnair/Documents/Project_AI/overleaf/main.tex
-(/home/pradyutnair/Documents/Project_AI/overleaf/main.tex
+**/home/pradyutnair/Documents-backup/Project_AI/overleaf/main.tex
+(/home/pradyutnair/Documents-backup/Project_AI/overleaf/main.tex
 LaTeX2e <2021-11-15> patch level 1
 L3 programming layer <2022-01-21> (./uva-inf-article.cls
 Document Class: uva-inf-article 
@@ -502,22 +502,18 @@ Package: xfp 2022-01-12 L3 Floating point unit
 Package: babel 2022/01/26 3.70 The Babel package
 \babel@savecnt=\count321
 \U@D=\dimen268
-\l@unhyphenated=\language3
+\l@unhyphenated=\language87
  (/usr/share/texlive/texmf-dist/tex/generic/babel/txtbabel.def)
 \bbl@readstream=\read4
 \bbl@dirlevel=\count322
  (/usr/share/texlive/texmf-dist/tex/generic/babel-english/english.ldf
 Language: english 2017/06/06 v3.3r English support from the babel system
-Package babel Info: Hyphen rules for 'british' set to \l@english
-(babel)             (\language0). Reported on input line 82.
-Package babel Info: Hyphen rules for 'UKenglish' set to \l@english
-(babel)             (\language0). Reported on input line 83.
 Package babel Info: Hyphen rules for 'canadian' set to \l@english
 (babel)             (\language0). Reported on input line 102.
-Package babel Info: Hyphen rules for 'australian' set to \l@english
-(babel)             (\language0). Reported on input line 105.
-Package babel Info: Hyphen rules for 'newzealand' set to \l@english
-(babel)             (\language0). Reported on input line 108.
+Package babel Info: Hyphen rules for 'australian' set to \l@ukenglish
+(babel)             (\language54). Reported on input line 105.
+Package babel Info: Hyphen rules for 'newzealand' set to \l@ukenglish
+(babel)             (\language54). Reported on input line 108.
 )) (/usr/share/texlive/texmf-dist/tex/latex/amsmath/amsmath.sty
 Package: amsmath 2021/10/15 v2.17l AMS math features
 \@mathmargin=\skip76
@@ -600,118 +596,137 @@ Package: booktabs 2020/01/12 v1.61803398 Publication quality tables
 \@thisruleclass=\count337
 \@lastruleclass=\count338
 \@thisrulewidth=\dimen290
+) (/usr/share/texlive/texmf-dist/tex/latex/tools/tabularx.sty
+Package: tabularx 2020/01/15 v2.11c `tabularx' package (DPC)
+ (/usr/share/texlive/texmf-dist/tex/latex/tools/array.sty
+Package: array 2021/10/04 v2.5f Tabular extension package (FMi)
+\col@sep=\dimen291
+\ar@mcellbox=\box65
+\extrarowheight=\dimen292
+\NC@list=\toks42
+\extratabsurround=\skip79
+\backup@length=\skip80
+\ar@cellbox=\box66
+)
+\TX@col@width=\dimen293
+\TX@old@table=\dimen294
+\TX@old@col=\dimen295
+\TX@target=\dimen296
+\TX@delta=\dimen297
+\TX@cols=\count339
+\TX@ftn=\toks43
 ) (/usr/share/texlive/texmf-dist/tex/latex/algorithms/algorithm.sty
 Package: algorithm 2009/08/24 v0.1 Document Style `algorithm' - floating environment
  (/usr/share/texlive/texmf-dist/tex/latex/float/float.sty
 Package: float 2001/11/08 v1.3d Float enhancements (AL)
-\c@float@type=\count339
-\float@exts=\toks42
-\float@box=\box65
-\@float@everytoks=\toks43
-\@floatcapt=\box66
+\c@float@type=\count340
+\float@exts=\toks44
+\float@box=\box67
+\@float@everytoks=\toks45
+\@floatcapt=\box68
 )
-\@float@every@algorithm=\toks44
-\c@algorithm=\count340
+\@float@every@algorithm=\toks46
+\c@algorithm=\count341
 ) (/usr/share/texlive/texmf-dist/tex/latex/algorithms/algorithmic.sty
 Package: algorithmic 2009/08/24 v0.1 Document Style `algorithmic'
-\c@ALC@unique=\count341
-\c@ALC@line=\count342
-\c@ALC@rem=\count343
-\c@ALC@depth=\count344
-\ALC@tlm=\skip79
-\algorithmicindent=\skip80
+\c@ALC@unique=\count342
+\c@ALC@line=\count343
+\c@ALC@rem=\count344
+\c@ALC@depth=\count345
+\ALC@tlm=\skip81
+\algorithmicindent=\skip82
 ) (/usr/share/texlive/texmf-dist/tex/latex/caption/subcaption.sty
 Package: subcaption 2020/10/07 v1.3j Sub-captions (AR)
  (/usr/share/texlive/texmf-dist/tex/latex/caption/caption.sty
 Package: caption 2020/10/26 v3.5g Customizing captions (AR)
  (/usr/share/texlive/texmf-dist/tex/latex/caption/caption3.sty
 Package: caption3 2020/10/21 v2.2e caption3 kernel (AR)
-\captionmargin=\dimen291
-\captionmargin@=\dimen292
-\captionwidth=\dimen293
-\caption@tempdima=\dimen294
-\caption@indent=\dimen295
-\caption@parindent=\dimen296
-\caption@hangindent=\dimen297
+\captionmargin=\dimen298
+\captionmargin@=\dimen299
+\captionwidth=\dimen300
+\caption@tempdima=\dimen301
+\caption@indent=\dimen302
+\caption@parindent=\dimen303
+\caption@hangindent=\dimen304
 Package caption Info: Standard document class detected.
 )
-\c@caption@flags=\count345
-\c@continuedfloat=\count346
+\c@caption@flags=\count346
+\c@continuedfloat=\count347
 Package caption Info: float package is loaded.
 Package caption Info: hyperref package is loaded.
 )
-\c@subfigure=\count347
-\c@subtable=\count348
+\c@subfigure=\count348
+\c@subtable=\count349
 ) (/usr/share/texlive/texmf-dist/tex/latex/multirow/multirow.sty
 Package: multirow 2021/03/15 v2.8 Span multiple rows of a table
-\multirow@colwidth=\skip81
-\multirow@cntb=\count349
-\multirow@dima=\skip82
-\bigstrutjot=\dimen298
+\multirow@colwidth=\skip83
+\multirow@cntb=\count350
+\multirow@dima=\skip84
+\bigstrutjot=\dimen305
 ) (/usr/share/texlive/texmf-dist/tex/latex/biblatex/biblatex.sty
 Package: biblatex 2022/02/02 v3.17 programmable bibliographies (PK/MW)
  (/usr/share/texlive/texmf-dist/tex/latex/logreq/logreq.sty
 Package: logreq 2010/08/04 v1.0 xml request logger
-\lrq@indent=\count350
+\lrq@indent=\count351
  (/usr/share/texlive/texmf-dist/tex/latex/logreq/logreq.def
 File: logreq.def 2010/08/04 v1.0 logreq spec v1.0
 ))
-\c@tabx@nest=\count351
-\c@listtotal=\count352
-\c@listcount=\count353
-\c@liststart=\count354
-\c@liststop=\count355
-\c@citecount=\count356
-\c@citetotal=\count357
-\c@multicitecount=\count358
-\c@multicitetotal=\count359
-\c@instcount=\count360
-\c@maxnames=\count361
-\c@minnames=\count362
-\c@maxitems=\count363
-\c@minitems=\count364
-\c@citecounter=\count365
-\c@maxcitecounter=\count366
-\c@savedcitecounter=\count367
-\c@uniquelist=\count368
-\c@uniquename=\count369
-\c@refsection=\count370
-\c@refsegment=\count371
-\c@maxextratitle=\count372
-\c@maxextratitleyear=\count373
-\c@maxextraname=\count374
-\c@maxextradate=\count375
-\c@maxextraalpha=\count376
-\c@abbrvpenalty=\count377
-\c@highnamepenalty=\count378
-\c@lownamepenalty=\count379
-\c@maxparens=\count380
-\c@parenlevel=\count381
-\blx@tempcnta=\count382
-\blx@tempcntb=\count383
-\blx@tempcntc=\count384
-\c@blx@maxsection=\count385
-\c@blx@maxsegment@0=\count386
-\blx@notetype=\count387
-\blx@parenlevel@text=\count388
-\blx@parenlevel@foot=\count389
-\c@blx@sectionciteorder@0=\count390
-\blx@entrysetcounter=\count391
-\blx@biblioinstance=\count392
-\labelnumberwidth=\skip83
-\labelalphawidth=\skip84
-\biblabelsep=\skip85
-\bibitemsep=\skip86
-\bibnamesep=\skip87
-\bibinitsep=\skip88
-\bibparsep=\skip89
-\bibhang=\skip90
+\c@tabx@nest=\count352
+\c@listtotal=\count353
+\c@listcount=\count354
+\c@liststart=\count355
+\c@liststop=\count356
+\c@citecount=\count357
+\c@citetotal=\count358
+\c@multicitecount=\count359
+\c@multicitetotal=\count360
+\c@instcount=\count361
+\c@maxnames=\count362
+\c@minnames=\count363
+\c@maxitems=\count364
+\c@minitems=\count365
+\c@citecounter=\count366
+\c@maxcitecounter=\count367
+\c@savedcitecounter=\count368
+\c@uniquelist=\count369
+\c@uniquename=\count370
+\c@refsection=\count371
+\c@refsegment=\count372
+\c@maxextratitle=\count373
+\c@maxextratitleyear=\count374
+\c@maxextraname=\count375
+\c@maxextradate=\count376
+\c@maxextraalpha=\count377
+\c@abbrvpenalty=\count378
+\c@highnamepenalty=\count379
+\c@lownamepenalty=\count380
+\c@maxparens=\count381
+\c@parenlevel=\count382
+\blx@tempcnta=\count383
+\blx@tempcntb=\count384
+\blx@tempcntc=\count385
+\c@blx@maxsection=\count386
+\c@blx@maxsegment@0=\count387
+\blx@notetype=\count388
+\blx@parenlevel@text=\count389
+\blx@parenlevel@foot=\count390
+\c@blx@sectionciteorder@0=\count391
+\blx@entrysetcounter=\count392
+\blx@biblioinstance=\count393
+\labelnumberwidth=\skip85
+\labelalphawidth=\skip86
+\biblabelsep=\skip87
+\bibitemsep=\skip88
+\bibnamesep=\skip89
+\bibinitsep=\skip90
+\bibparsep=\skip91
+\bibhang=\skip92
 \blx@bcfin=\read5
 \blx@bcfout=\write5
-\blx@langwohyphens=\language4
-\c@mincomprange=\count393
-\c@maxcomprange=\count394
-\c@mincompwidth=\count395
+\blx@langwohyphens=\language88
+\c@mincomprange=\count394
+\c@maxcomprange=\count395
+\c@mincompwidth=\count396
 Package biblatex Info: Trying to load biblatex default data model...
 Package biblatex Info: ... file 'blx-dm.def' found.
  (/usr/share/texlive/texmf-dist/tex/latex/biblatex/blx-dm.def
@@ -721,88 +736,88 @@ Package biblatex Info: Trying to load biblatex style data model...
 Package biblatex Info: ... file 'authoryear-comp.dbx' not found.
 Package biblatex Info: Trying to load biblatex custom data model...
 Package biblatex Info: ... file 'biblatex-dm.cfg' not found.
-\c@afterword=\count396
-\c@savedafterword=\count397
-\c@annotator=\count398
-\c@savedannotator=\count399
-\c@author=\count400
-\c@savedauthor=\count401
-\c@bookauthor=\count402
-\c@savedbookauthor=\count403
-\c@commentator=\count404
-\c@savedcommentator=\count405
-\c@editor=\count406
-\c@savededitor=\count407
-\c@editora=\count408
-\c@savededitora=\count409
-\c@editorb=\count410
-\c@savededitorb=\count411
-\c@editorc=\count412
-\c@savededitorc=\count413
-\c@foreword=\count414
-\c@savedforeword=\count415
-\c@holder=\count416
-\c@savedholder=\count417
-\c@introduction=\count418
-\c@savedintroduction=\count419
-\c@namea=\count420
-\c@savednamea=\count421
-\c@nameb=\count422
-\c@savednameb=\count423
-\c@namec=\count424
-\c@savednamec=\count425
-\c@translator=\count426
-\c@savedtranslator=\count427
-\c@shortauthor=\count428
-\c@savedshortauthor=\count429
-\c@shorteditor=\count430
-\c@savedshorteditor=\count431
-\c@labelname=\count432
-\c@savedlabelname=\count433
-\c@institution=\count434
-\c@savedinstitution=\count435
-\c@lista=\count436
-\c@savedlista=\count437
-\c@listb=\count438
-\c@savedlistb=\count439
-\c@listc=\count440
-\c@savedlistc=\count441
-\c@listd=\count442
-\c@savedlistd=\count443
-\c@liste=\count444
-\c@savedliste=\count445
-\c@listf=\count446
-\c@savedlistf=\count447
-\c@location=\count448
-\c@savedlocation=\count449
-\c@organization=\count450
-\c@savedorganization=\count451
-\c@origlocation=\count452
-\c@savedoriglocation=\count453
-\c@origpublisher=\count454
-\c@savedorigpublisher=\count455
-\c@publisher=\count456
-\c@savedpublisher=\count457
-\c@language=\count458
-\c@savedlanguage=\count459
-\c@origlanguage=\count460
-\c@savedoriglanguage=\count461
-\c@pageref=\count462
-\c@savedpageref=\count463
-\shorthandwidth=\skip91
-\shortjournalwidth=\skip92
-\shortserieswidth=\skip93
-\shorttitlewidth=\skip94
-\shortauthorwidth=\skip95
-\shorteditorwidth=\skip96
-\locallabelnumberwidth=\skip97
-\locallabelalphawidth=\skip98
-\localshorthandwidth=\skip99
-\localshortjournalwidth=\skip100
-\localshortserieswidth=\skip101
-\localshorttitlewidth=\skip102
-\localshortauthorwidth=\skip103
-\localshorteditorwidth=\skip104
+\c@afterword=\count397
+\c@savedafterword=\count398
+\c@annotator=\count399
+\c@savedannotator=\count400
+\c@author=\count401
+\c@savedauthor=\count402
+\c@bookauthor=\count403
+\c@savedbookauthor=\count404
+\c@commentator=\count405
+\c@savedcommentator=\count406
+\c@editor=\count407
+\c@savededitor=\count408
+\c@editora=\count409
+\c@savededitora=\count410
+\c@editorb=\count411
+\c@savededitorb=\count412
+\c@editorc=\count413
+\c@savededitorc=\count414
+\c@foreword=\count415
+\c@savedforeword=\count416
+\c@holder=\count417
+\c@savedholder=\count418
+\c@introduction=\count419
+\c@savedintroduction=\count420
+\c@namea=\count421
+\c@savednamea=\count422
+\c@nameb=\count423
+\c@savednameb=\count424
+\c@namec=\count425
+\c@savednamec=\count426
+\c@translator=\count427
+\c@savedtranslator=\count428
+\c@shortauthor=\count429
+\c@savedshortauthor=\count430
+\c@shorteditor=\count431
+\c@savedshorteditor=\count432
+\c@labelname=\count433
+\c@savedlabelname=\count434
+\c@institution=\count435
+\c@savedinstitution=\count436
+\c@lista=\count437
+\c@savedlista=\count438
+\c@listb=\count439
+\c@savedlistb=\count440
+\c@listc=\count441
+\c@savedlistc=\count442
+\c@listd=\count443
+\c@savedlistd=\count444
+\c@liste=\count445
+\c@savedliste=\count446
+\c@listf=\count447
+\c@savedlistf=\count448
+\c@location=\count449
+\c@savedlocation=\count450
+\c@organization=\count451
+\c@savedorganization=\count452
+\c@origlocation=\count453
+\c@savedoriglocation=\count454
+\c@origpublisher=\count455
+\c@savedorigpublisher=\count456
+\c@publisher=\count457
+\c@savedpublisher=\count458
+\c@language=\count459
+\c@savedlanguage=\count460
+\c@origlanguage=\count461
+\c@savedoriglanguage=\count462
+\c@pageref=\count463
+\c@savedpageref=\count464
+\shorthandwidth=\skip93
+\shortjournalwidth=\skip94
+\shortserieswidth=\skip95
+\shorttitlewidth=\skip96
+\shortauthorwidth=\skip97
+\shorteditorwidth=\skip98
+\locallabelnumberwidth=\skip99
+\locallabelalphawidth=\skip100
+\localshorthandwidth=\skip101
+\localshortjournalwidth=\skip102
+\localshortserieswidth=\skip103
+\localshorttitlewidth=\skip104
+\localshortauthorwidth=\skip105
+\localshorteditorwidth=\skip106
 Package biblatex Info: Trying to load compatibility code...
 Package biblatex Info: ... file 'blx-compat.def' found.
  (/usr/share/texlive/texmf-dist/tex/latex/biblatex/blx-compat.def
@@ -812,19 +827,19 @@ Package biblatex Info: Trying to load generic definitions...
 Package biblatex Info: ... file 'biblatex.def' found.
  (/usr/share/texlive/texmf-dist/tex/latex/biblatex/biblatex.def
 File: biblatex.def 2022/02/02 v3.17 biblatex compatibility (PK/MW)
-\c@textcitecount=\count464
-\c@textcitetotal=\count465
-\c@textcitemaxnames=\count466
-\c@biburlbigbreakpenalty=\count467
-\c@biburlbreakpenalty=\count468
-\c@biburlnumpenalty=\count469
-\c@biburlucpenalty=\count470
-\c@biburllcpenalty=\count471
+\c@textcitecount=\count465
+\c@textcitetotal=\count466
+\c@textcitemaxnames=\count467
+\c@biburlbigbreakpenalty=\count468
+\c@biburlbreakpenalty=\count469
+\c@biburlnumpenalty=\count470
+\c@biburlucpenalty=\count471
+\c@biburllcpenalty=\count472
 \biburlbigskip=\muskip18
 \biburlnumskip=\muskip19
 \biburlucskip=\muskip20
 \biburllcskip=\muskip21
-\c@smartand=\count472
+\c@smartand=\count473
 )
 Package biblatex Info: Trying to load bibliography style 'authoryear-comp'...
 Package biblatex Info: ... file 'authoryear-comp.bbx' found.
@@ -838,8 +853,8 @@ Package biblatex Info: Trying to load bibliography style 'standard'...
 Package biblatex Info: ... file 'standard.bbx' found.
  (/usr/share/texlive/texmf-dist/tex/latex/biblatex/bbx/standard.bbx
 File: standard.bbx 2022/02/02 v3.17 biblatex bibliography style (PK/MW)
-\c@bbx:relatedcount=\count473
-\c@bbx:relatedtotal=\count474
+\c@bbx:relatedcount=\count474
+\c@bbx:relatedtotal=\count475
 )))
 Package biblatex Info: Trying to load citation style 'authoryear-comp'...
 Package biblatex Info: ... file 'authoryear-comp.cbx' found.
@@ -879,25 +894,25 @@ Package csquotes Info: Redefining alias 'default' -> 'english'.
  (./main.aux)
 \openout1 = `main.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 41.
-LaTeX Font Info:    ... okay on input line 41.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 41.
-LaTeX Font Info:    ... okay on input line 41.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 41.
-LaTeX Font Info:    ... okay on input line 41.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 41.
-LaTeX Font Info:    ... okay on input line 41.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 41.
-LaTeX Font Info:    ... okay on input line 41.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 41.
-LaTeX Font Info:    ... okay on input line 41.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 41.
-LaTeX Font Info:    ... okay on input line 41.
-LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 41.
-LaTeX Font Info:    ... okay on input line 41.
-LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 41.
-LaTeX Font Info:    ... okay on input line 41.
-Package hyperref Info: Link coloring OFF on input line 41.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 43.
+LaTeX Font Info:    ... okay on input line 43.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 43.
+LaTeX Font Info:    ... okay on input line 43.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 43.
+LaTeX Font Info:    ... okay on input line 43.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 43.
+LaTeX Font Info:    ... okay on input line 43.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 43.
+LaTeX Font Info:    ... okay on input line 43.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 43.
+LaTeX Font Info:    ... okay on input line 43.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 43.
+LaTeX Font Info:    ... okay on input line 43.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 43.
+LaTeX Font Info:    ... okay on input line 43.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 43.
+LaTeX Font Info:    ... okay on input line 43.
+Package hyperref Info: Link coloring OFF on input line 43.
  (/usr/share/texlive/texmf-dist/tex/latex/hyperref/nameref.sty
 Package: nameref 2021-04-02 v2.47 Cross-referencing by name of section
  (/usr/share/texlive/texmf-dist/tex/latex/refcount/refcount.sty
@@ -905,28 +920,28 @@ Package: refcount 2019/12/15 v3.6 Data extraction from label references (HO)
 ) (/usr/share/texlive/texmf-dist/tex/generic/gettitlestring/gettitlestring.sty
 Package: gettitlestring 2019/12/15 v1.6 Cleanup title references (HO)
 )
-\c@section@level=\count475
+\c@section@level=\count476
 )
-LaTeX Info: Redefining \ref on input line 41.
-LaTeX Info: Redefining \pageref on input line 41.
-LaTeX Info: Redefining \nameref on input line 41.
+LaTeX Info: Redefining \ref on input line 43.
+LaTeX Info: Redefining \pageref on input line 43.
+LaTeX Info: Redefining \nameref on input line 43.
  (./main.out) (./main.out)
 \@outlinefile=\write6
 \openout6 = `main.out'.
 
  (/usr/share/texlive/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
 [Loading MPS to PDF converter (version 2006.09.02).]
-\scratchcounter=\count476
-\scratchdimen=\dimen299
-\scratchbox=\box67
-\nofMPsegments=\count477
-\nofMParguments=\count478
-\everyMPshowfont=\toks45
-\MPscratchCnt=\count479
-\MPscratchDim=\dimen300
-\MPnumerator=\count480
-\makeMPintoPDFobject=\count481
-\everyMPtoPDFconversion=\toks46
+\scratchcounter=\count477
+\scratchdimen=\dimen306
+\scratchbox=\box69
+\nofMPsegments=\count478
+\nofMParguments=\count479
+\everyMPshowfont=\toks47
+\MPscratchCnt=\count480
+\MPscratchDim=\dimen307
+\MPnumerator=\count481
+\makeMPintoPDFobject=\count482
+\everyMPtoPDFconversion=\toks48
 ) (/usr/share/texlive/texmf-dist/tex/latex/epstopdf-pkg/epstopdf-base.sty
 Package: epstopdf-base 2020-01-24 v2.11 Base part for package epstopdf
 Package epstopdf-base Info: Redefining graphics rule for `.eps' on input line 485.
@@ -935,12 +950,12 @@ File: epstopdf-sys.cfg 2010/07/13 v1.3 Configuration of (r)epstopdf for TeX Live
 ))
 Package lastpage Info: Please have a look at the pageslts package at
 (lastpage)             https://www.ctan.org/pkg/pageslts
-(lastpage)             ! on input line 41.
-Package ragged2e Info: ABD: executing \RaggedRight on input line 41.
+(lastpage)             ! on input line 43.
+Package ragged2e Info: ABD: executing \RaggedRight on input line 43.
  (/usr/share/texlive/texmf-dist/tex/latex/translations/translations-basic-dictionary-english.trsl
 File: translations-basic-dictionary-english.trsl (english translation file `translations-basic-dictionary')
 )
-Package translations Info: loading dictionary `translations-basic-dictionary' for `english'. on input line 41.
+Package translations Info: loading dictionary `translations-basic-dictionary' for `english'. on input line 43.
 
 *geometry* driver: auto-detecting
 *geometry* detected driver: pdftex
@@ -991,19 +1006,19 @@ Package biblatex Info: Automatic encoding selection.
 Package biblatex Info: Trying to load bibliographic data...
 Package biblatex Info: ... file 'main.bbl' found.
  (./main.bbl)
-Package biblatex Info: Reference section=0 on input line 41.
-Package biblatex Info: Reference segment=0 on input line 41.
-<logo/logoUvA_en.pdf, id=71, 258.9675pt x 28.01506pt>
+Package biblatex Info: Reference section=0 on input line 43.
+Package biblatex Info: Reference segment=0 on input line 43.
+<logo/logoUvA_en.pdf, id=75, 258.9675pt x 28.01506pt>
 File: logo/logoUvA_en.pdf Graphic file (type pdf)
 <use logo/logoUvA_en.pdf>
-Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 42.
+Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 44.
 (pdftex.def)             Requested size: 199.16928pt x 21.54686pt.
  (./main.toc
-LaTeX Font Info:    Trying to load font information for U+msa on input line 8.
+LaTeX Font Info:    Trying to load font information for U+msa on input line 5.
  (/usr/share/texlive/texmf-dist/tex/latex/amsfonts/umsa.fd
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 )
-LaTeX Font Info:    Trying to load font information for U+msb on input line 8.
+LaTeX Font Info:    Trying to load font information for U+msb on input line 5.
  (/usr/share/texlive/texmf-dist/tex/latex/amsfonts/umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 ))
@@ -1018,259 +1033,213 @@ runsystem(texcount -1 -sum=1,1,1,0,0,1,1. -merge -q -nobib main.tex > main-words
 
 pdfTeX warning: pdflatex (file ./logo/logoUvA_en.pdf): PDF inclusion: multiple pdfs with page group included in a single page
 >]
-Overfull \hbox (0.37625pt too wide) in paragraph at lines 84--85
-\OT1/cmr/m/n/10 and Philbin []2016[]) demon-strated that train-ing CNNs to clas-sify im-ages into ap-prox-i-mately 26,000 
- []
-
 File: logo/logoUvA_en.pdf Graphic file (type pdf)
 <use logo/logoUvA_en.pdf>
-Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 85.
+Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 87.
 (pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
-[2]
-Overfull \hbox (0.13339pt too wide) in paragraph at lines 86--87
- []\OT1/cmr/bx/n/10 Concept Bot-tle-neck Mod-els.[] \OT1/cmr/m/n/10 The con-cept bot-tle-neck frame-work ([]Koh et al. []2020[]) ad-dresses 
- []
-
-
-Overfull \hbox (6.09956pt too wide) in paragraph at lines 88--89
- []\OT1/cmr/bx/n/10 Vision-Language Mod-els for Ge-olo-ca-tion.[] \OT1/cmr/m/n/10 CLIP ([]Rad-ford et al. []2021[]) learns aligned vision- 
- []
-
-
-Overfull \hbox (0.3206pt too wide) in paragraph at lines 88--89
-\OT1/cmr/m/n/10 language rep-re-sen-ta-tions through con-trastive learn-ing on 400 mil-lion image-text pairs. This foun- 
- []
-
-
-Overfull \hbox (2.73727pt too wide) in paragraph at lines 97--98
+ [2]
+Overfull \hbox (2.73727pt too wide) in paragraph at lines 99--100
 \OT1/cmr/m/n/10 Our ap-proach fol-lows a cur-ricu-lum learn-ing strat-egy ([]Ben-gio et al. []2009[]) that pro-gres-sively builds 
  []
 
-File: logo/logoUvA_en.pdf Graphic file (type pdf)
-<use logo/logoUvA_en.pdf>
-Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 113.
-(pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
-[3]
-<geocells_map/geocells_map_finetuned_both.png, id=957, 1628.0022pt x 860.013pt>
+<geocells_map/geocells_map_finetuned_both.png, id=654, 1628.0022pt x 860.013pt>
 File: geocells_map/geocells_map_finetuned_both.png Graphic file (type png)
 <use geocells_map/geocells_map_finetuned_both.png>
-Package pdftex.def Info: geocells_map/geocells_map_finetuned_both.png  used on input line 118.
+Package pdftex.def Info: geocells_map/geocells_map_finetuned_both.png  used on input line 120.
 (pdftex.def)             Requested size: 204.85802pt x 108.20998pt.
 
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 118--119
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 120--121
 [][]  
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 119--119
+Underfull \hbox (badness 10000) in paragraph at lines 121--121
 [] 
  []
 
-<geocells_map/cell_distribution_finetuned_both.png, id=959, 1004.553pt x 570.6921pt>
+<geocells_map/cell_distribution_finetuned_both.png, id=656, 1004.553pt x 570.6921pt>
 File: geocells_map/cell_distribution_finetuned_both.png Graphic file (type png)
 <use geocells_map/cell_distribution_finetuned_both.png>
-Package pdftex.def Info: geocells_map/cell_distribution_finetuned_both.png  used on input line 124.
+Package pdftex.def Info: geocells_map/cell_distribution_finetuned_both.png  used on input line 126.
 (pdftex.def)             Requested size: 204.85802pt x 116.37436pt.
 
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 124--125
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 126--127
 [][]  
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 125--125
+Underfull \hbox (badness 10000) in paragraph at lines 127--127
 [] 
  []
 
 
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 128--128
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 130--130
 [][]  
  []
 
 File: logo/logoUvA_en.pdf Graphic file (type pdf)
 <use logo/logoUvA_en.pdf>
-Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 159.
+Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 132.
 (pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
-[4 <./geocells_map/geocells_map_finetuned_both.png> <./geocells_map/cell_distribution_finetuned_both.png>]
-Overfull \hbox (19.4414pt too wide) in paragraph at lines 167--169
+[3]
+File: logo/logoUvA_en.pdf Graphic file (type pdf)
+<use logo/logoUvA_en.pdf>
+Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 165.
+(pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
+ [4 <./geocells_map/geocells_map_finetuned_both.png> <./geocells_map/cell_distribution_finetuned_both.png>]
+Overfull \hbox (19.4414pt too wide) in paragraph at lines 169--171
 \OT1/cmr/m/n/10 where $\OML/cmm/m/it/10 T[]$ \OT1/cmr/m/n/10 con-tains frozen text em-bed-dings and $^^A$ is a learn-able resid-ual ini-tial-ized from $\OMS/cmsy/m/n/10 N\OT1/cmr/m/n/10 (0\OML/cmm/m/it/10 ; \OT1/cmr/m/n/10 0\OML/cmm/m/it/10 :\OT1/cmr/m/n/10 01)$. 
  []
 
 File: logo/logoUvA_en.pdf Graphic file (type pdf)
 <use logo/logoUvA_en.pdf>
-Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 203.
+Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 212.
 (pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
 [5]
-Overfull \hbox (0.4317pt too wide) in paragraph at lines 237--238
+Overfull \hbox (0.4317pt too wide) in paragraph at lines 239--240
 \OT1/cmr/m/n/10 We eval-u-ate our ap-proach on both in-distribution test data and an out-of-distribution Ge-oGuessr 
  []
 
+
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 257--257
+[][]  
+ []
+
+
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 280--280
+[][]  
+ []
+
 File: logo/logoUvA_en.pdf Graphic file (type pdf)
 <use logo/logoUvA_en.pdf>
-Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 247.
+Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 297.
 (pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
 [6]
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 255--255
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 314--314
 [][]  
  []
 
-<analysis/stage1_accuracies.png, id=1911, 1002.3849pt x 793.5246pt>
-File: analysis/stage1_accuracies.png Graphic file (type png)
-<use analysis/stage1_accuracies.png>
-Package pdftex.def Info: analysis/stage1_accuracies.png  used on input line 273.
-(pdftex.def)             Requested size: 384.1096pt x 304.07309pt.
-
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 274--274
-[][]  
- []
-
-
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 284--284
-[][]  
- []
-
-
-Overfull \hbox (40.18675pt too wide) in paragraph at lines 286--301
- [][] 
- []
-
-File: logo/logoUvA_en.pdf Graphic file (type pdf)
-<use logo/logoUvA_en.pdf>
-Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 311.
-(pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
-[7]
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 317--317
-[][]  
- []
-
-
-Overfull \hbox (40.18675pt too wide) in paragraph at lines 319--334
- [][] 
- []
-
-<analysis/stage2_test_split_results.png, id=2222, 1002.3849pt x 793.5246pt>
+<analysis/stage2_test_split_results.png, id=1910, 1002.3849pt x 793.5246pt>
 File: analysis/stage2_test_split_results.png Graphic file (type png)
 <use analysis/stage2_test_split_results.png>
-Package pdftex.def Info: analysis/stage2_test_split_results.png  used on input line 345.
+Package pdftex.def Info: analysis/stage2_test_split_results.png  used on input line 342.
 (pdftex.def)             Requested size: 204.85802pt x 162.16504pt.
 
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 345--346
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 342--343
 [][]  
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 346--346
+Underfull \hbox (badness 10000) in paragraph at lines 343--343
 [] 
  []
 
-<analysis/stage2_hf_results.png, id=2223, 1002.3849pt x 793.5246pt>
+<analysis/stage2_hf_results.png, id=1911, 1002.3849pt x 793.5246pt>
 File: analysis/stage2_hf_results.png Graphic file (type png)
 <use analysis/stage2_hf_results.png>
-Package pdftex.def Info: analysis/stage2_hf_results.png  used on input line 351.
+Package pdftex.def Info: analysis/stage2_hf_results.png  used on input line 348.
 (pdftex.def)             Requested size: 204.85802pt x 162.16504pt.
 
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 351--352
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 348--349
 [][]  
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 352--352
+Underfull \hbox (badness 10000) in paragraph at lines 349--349
 [] 
  []
 
 
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 355--355
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 352--352
 [][]  
  []
 
-<analysis/stage2_finetuned_radar.png, id=2225, 1435.0413pt x 454.5783pt>
+
+LaTeX Warning: `!h' float specifier changed to `!ht'.
+
+File: logo/logoUvA_en.pdf Graphic file (type pdf)
+<use logo/logoUvA_en.pdf>
+Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 359.
+(pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
+[7]
+<analysis/stage2_finetuned_radar.png, id=2219, 1435.0413pt x 454.5783pt>
 File: analysis/stage2_finetuned_radar.png Graphic file (type png)
 <use analysis/stage2_finetuned_radar.png>
-Package pdftex.def Info: analysis/stage2_finetuned_radar.png  used on input line 366.
-(pdftex.def)             Requested size: 204.85802pt x 64.88905pt.
+Package pdftex.def Info: analysis/stage2_finetuned_radar.png  used on input line 362.
+(pdftex.def)             Requested size: 256.07741pt x 81.11305pt.
 
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 366--367
-[][]  
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 367--367
-[] 
- []
-
-<analysis/stage2_finetuned_lollipop.png, id=2226, 805.8105pt x 568.7649pt>
-File: analysis/stage2_finetuned_lollipop.png Graphic file (type png)
-<use analysis/stage2_finetuned_lollipop.png>
-Package pdftex.def Info: analysis/stage2_finetuned_lollipop.png  used on input line 372.
-(pdftex.def)             Requested size: 204.85802pt x 144.59485pt.
-
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 372--373
-[][]  
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 373--373
-[] 
- []
-
-
-Overfull \hbox (20.00003pt too wide) in paragraph at lines 376--376
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 363--363
 [][]  
  []
 
 File: logo/logoUvA_en.pdf Graphic file (type pdf)
 <use logo/logoUvA_en.pdf>
-Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 390.
+Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 370.
 (pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
-[8 <./analysis/stage1_accuracies.png>]
-File: logo/logoUvA_en.pdf Graphic file (type pdf)
-<use logo/logoUvA_en.pdf>
-Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 395.
-(pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
- [9 <./analysis/stage2_test_split_results.png> <./analysis/stage2_hf_results.png>]
-Overfull \hbox (8.15395pt too wide) in paragraph at lines 397--398
-\OT1/cmr/m/n/10 cab-u-lary was de-rived from the train-ing data and may miss im-por-tant ge-o-graphic in-di-ca-tors present 
+[8 <./analysis/stage2_test_split_results.png> <./analysis/stage2_hf_results.png> <./analysis/stage2_finetuned_radar.png>]
+Overfull \hbox (20.00003pt too wide) in paragraph at lines 375--375
+[][]  
+ []
+
+
+Overfull \hbox (3.98734pt too wide) in paragraph at lines 401--402
+\OT1/cmr/m/n/10 ma-tion for com-pet-i-tive ge-olo-ca-tion, while pro-vid-ing the sub-stan-tial ben-e-fit of human-interpretable 
+ []
+
+
+Overfull \hbox (2.73721pt too wide) in paragraph at lines 403--404
+\OT1/cmr/m/n/10 trans-fer-able rep-re-sen-ta-tions. Fu-ture work could ex-plore reg-u-lar-iza-tion tech-niques or multi-domain 
  []
 
 File: logo/logoUvA_en.pdf Graphic file (type pdf)
 <use logo/logoUvA_en.pdf>
-Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 416.
+Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 405.
 (pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
-[10 <./analysis/stage2_finetuned_radar.png> <./analysis/stage2_finetuned_lollipop.png>]
-Overfull \hbox (97.49756pt too wide) in paragraph at lines 417--417
+[9]
+Overfull \hbox (0.54272pt too wide) in paragraph at lines 405--406
+[]\OT1/cmr/m/n/10 The hi-er-ar-chi-cal or-ga-ni-za-tion of child and par-ent con-cepts proves valu-able for learn-ing struc- 
+ []
+
+
+Overfull \hbox (97.49756pt too wide) in paragraph at lines 429--429
 \OT1/cmr/m/n/10 View Im-age Clas-si-fi-ca-tion". In: \OT1/cmr/m/it/10 Hug-ging Face Model Hub\OT1/cmr/m/n/10 . Avail-able at: https://huggingface.co/geolocal/StreetCLIP.  
  []
 
 
-Overfull \hbox (0.50116pt too wide) in paragraph at lines 417--417
+Overfull \hbox (0.50116pt too wide) in paragraph at lines 429--429
 [][]\OT1/cmr/m/n/10 M^^?uller-Budack, Eric et al. (2018). \  Ge-olo-ca-tion Es-ti-ma-tion of Pho-tos Us-ing a Hi-er-ar-chi-cal Model 
  []
 
-
+File: logo/logoUvA_en.pdf Graphic file (type pdf)
+<use logo/logoUvA_en.pdf>
+Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 428.
+(pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
+[10] 
 AED: lastpage setting LastPage
 File: logo/logoUvA_en.pdf Graphic file (type pdf)
 <use logo/logoUvA_en.pdf>
-Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 418.
+Package pdftex.def Info: logo/logoUvA_en.pdf  used on input line 430.
 (pdftex.def)             Requested size: 142.26378pt x 15.3908pt.
 [11] (./main.aux)
 Package rerunfilecheck Info: File `main.out' has not changed.
-(rerunfilecheck)             Checksum: A085D900CE6B84FE583D02638D6898D0;2738.
+(rerunfilecheck)             Checksum: 3F90BB27FDA3E0B64DCF75B20C95B023;2945.
 Package logreq Info: Writing requests to 'main.run.xml'.
 \openout1 = `main.run.xml'.
 
  ) 
 Here is how much of TeX's memory you used:
- 34007 strings out of 480247
- 656727 string characters out of 5896150
- 1474730 words of memory out of 5000000
- 51332 multiletter control sequences out of 15000+600000
- 479019 words of font info for 64 fonts, out of 8000000 for 9000
- 14 hyphenation exceptions out of 8191
- 103i,16n,105p,1235b,1840s stack positions out of 5000i,500n,10000p,200000b,80000s
- </home/pradyutnair/.texlive2021/texmf-var/fonts/pk/ljfour/jknappen/ec/tcrm1000.600pk></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmcsc10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmti9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
-Output written on main.pdf (11 pages, 5936212 bytes).
+ 34109 strings out of 478287
+ 658129 string characters out of 5849288
+ 1495330 words of memory out of 5000000
+ 51694 multiletter control sequences out of 15000+600000
+ 480265 words of font info for 69 fonts, out of 8000000 for 9000
+ 1141 hyphenation exceptions out of 8191
+ 103i,16n,105p,1240b,1833s stack positions out of 5000i,500n,10000p,200000b,80000s
+{/usr/share/texmf/fonts/enc/dvips/cm-super/cm-super-ts1.enc}</usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmcsc10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmti9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1000.pfb>
+Output written on main.pdf (11 pages, 5556944 bytes).
 PDF statistics:
- 3550 PDF objects out of 3580 (max. 8388607)
- 1882 compressed objects within 19 object streams
- 81 named destinations out of 1000 (max. 500000)
- 9679 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 3534 PDF objects out of 3580 (max. 8388607)
+ 1869 compressed objects within 19 object streams
+ 68 named destinations out of 1000 (max. 500000)
+ 9677 words of extra memory for PDF output out of 10000 (max. 10000000)
 

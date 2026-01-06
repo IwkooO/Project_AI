@@ -1,0 +1,16 @@
+Round: 53
+Timestamp: 121656
+Prediction: (-17.369373, -71.402107)
+Google Maps: https://www.google.com/maps?q=-17.369373321533203,-71.40210723876953
+
+Top 5 Concepts:
+  0.0440 - Santo Domingo street name signs
+  0.0290 - Pole Tacna/Moquegua
+  0.0287 - City Roads, Oruro
+  0.0227 - Moquegua Ilo
+  0.0155 - Pole Barcode Stickers
+
+Top 3 Parent Concepts:
+  0.1013 - road_urban
+  0.0950 - script_arabic
+  0.0499 - script_latin

@@ -1,0 +1,16 @@
+Round: 5
+Timestamp: 100416
+Prediction: (47.261848, -120.322708)
+Google Maps: https://www.google.com/maps?q=47.26184844970703,-120.32270812988281
+
+Top 5 Concepts:
+  0.0662 - Agricultural golden fields
+  0.0568 - Washington bollards
+  0.0410 - The Rocky Mountains
+  0.0362 - Dryness
+  0.0361 - Washington bollard
+
+Top 3 Parent Concepts:
+  0.1532 - landscape_prairie
+  0.1087 - landscape_fields_temperate
+  0.0599 - landscape_fields

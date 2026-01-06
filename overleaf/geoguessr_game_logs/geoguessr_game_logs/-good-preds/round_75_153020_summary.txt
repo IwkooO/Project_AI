@@ -1,0 +1,16 @@
+Round: 75
+Timestamp: 153020
+Prediction: (13.823648, -14.547791)
+Google Maps: https://www.google.com/maps?q=13.823648452758789,-14.54779052734375
+
+Top 5 Concepts:
+  0.0557 - pole
+  0.0518 - Pickup truck
+  0.0486 - Savannah Landscape
+  0.0445 - Roof Rack car meta
+  0.0428 - Landscape South
+
+Top 3 Parent Concepts:
+  0.1491 - landscape_savannah
+  0.1201 - car_type
+  0.0787 - pole_shape

@@ -1,0 +1,16 @@
+Round: 1
+Timestamp: 100053
+Prediction: (8.548886, 80.533905)
+Google Maps: https://www.google.com/maps?q=8.5488862991333,80.53390502929688
+
+Top 5 Concepts:
+  0.0272 - Shitcam
+  0.0163 - Long Black Very A-Type
+  0.0157 - Wire Numbers
+  0.0153 - Long Black A-Type
+  0.0145 - Poles
+
+Top 3 Parent Concepts:
+  0.2347 - pole_marker
+  0.2077 - vegetation_plant
+  0.0774 - camera_meta

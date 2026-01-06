@@ -1,0 +1,16 @@
+Round: 2
+Timestamp: 092901
+Prediction: (46.389240, 92.925659)
+Google Maps: https://www.google.com/maps?q=46.38924026489258,92.9256591796875
+
+Top 5 Concepts:
+  0.0869 - Chinggis Red Tensioners
+  0.0858 - Khovd Windy HW
+  0.0772 - Grey Tent w/ Hooks, Strips angled downwards
+  0.0591 - Grey Tent w/ Hooks
+  0.0550 - 4 Straps
+
+Top 3 Parent Concepts:
+  0.8036 - landscape_tent
+  0.0308 - railroad
+  0.0198 - landscape_winter

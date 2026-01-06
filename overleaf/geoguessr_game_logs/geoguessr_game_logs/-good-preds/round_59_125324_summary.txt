@@ -1,0 +1,16 @@
+Round: 59
+Timestamp: 125324
+Prediction: (-16.472517, -68.069580)
+Google Maps: https://www.google.com/maps?q=-16.472517013549805,-68.069580078125
+
+Top 5 Concepts:
+  0.0959 - City Roads, El Alto
+  0.0753 - Cusco City
+  0.0436 - City Roads, Sucre
+  0.0394 - Lima Town
+  0.0390 - City Roads, Oruro
+
+Top 3 Parent Concepts:
+  0.3652 - landscape_urban
+  0.1115 - landscape_sky
+  0.0504 - landscape_coastline

@@ -1,0 +1,16 @@
+Round: 74
+Timestamp: 152925
+Prediction: (56.743870, 14.033829)
+Google Maps: https://www.google.com/maps?q=56.74386978149414,14.033828735351562
+
+Top 5 Concepts:
+  0.0284 - Southern Half
+  0.0262 - Most open landscape
+  0.0240 - -Ach ending
+  0.0216 - Street Names
+  0.0162 - Jute
+
+Top 3 Parent Concepts:
+  0.0603 - script_estonian
+  0.0518 - vegetation_hay
+  0.0455 - landscape_flatland_temperate

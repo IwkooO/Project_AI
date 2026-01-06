@@ -1,0 +1,16 @@
+Round: 12
+Timestamp: 093730
+Prediction: (33.427799, -101.992378)
+Google Maps: https://www.google.com/maps?q=33.427799224853516,-101.99237823486328
+
+Top 5 Concepts:
+  0.1909 - Texas license plates
+  0.0741 - Oklahoma license plates
+  0.0635 - Alabama license plates
+  0.0409 - New Mexico license plates
+  0.0360 - Georgia license plates
+
+Top 3 Parent Concepts:
+  0.1471 - car_meta
+  0.0736 - vegetation_shrubland_arid
+  0.0559 - landscape_prairie

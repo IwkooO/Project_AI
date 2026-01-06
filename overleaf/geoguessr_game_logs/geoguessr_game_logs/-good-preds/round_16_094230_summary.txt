@@ -1,0 +1,16 @@
+Round: 16
+Timestamp: 094230
+Prediction: (37.262901, 36.962723)
+Google Maps: https://www.google.com/maps?q=37.262901306152344,36.96272277832031
+
+Top 5 Concepts:
+  0.0150 - Pedestrian Sign
+  0.0145 - Turkiye Unique Latin Letters
+  0.0131 - Direction Signs
+  0.0129 - Penghu scooters
+  0.0124 - Lithuania Unique Latin Letters
+
+Top 3 Parent Concepts:
+  0.1057 - script_latin
+  0.0570 - script_estonian
+  0.0437 - vegetation_forest_tropical

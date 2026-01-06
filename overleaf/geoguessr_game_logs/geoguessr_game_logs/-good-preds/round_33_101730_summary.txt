@@ -1,0 +1,16 @@
+Round: 33
+Timestamp: 101730
+Prediction: (-7.011309, -78.295387)
+Google Maps: https://www.google.com/maps?q=-7.0113091468811035,-78.2953872680664
+
+Top 5 Concepts:
+  0.1030 - Political Logos Cajamarca
+  0.0639 - Political Logos Amazonas
+  0.0388 - Political Logos Huanuco
+  0.0264 - Antioquia pole paint
+  0.0259 - Pasco Oxapampa
+
+Top 3 Parent Concepts:
+  0.0748 - San Jos White Tag
+  0.0473 - Chilo Island
+  0.0412 - script_south_american

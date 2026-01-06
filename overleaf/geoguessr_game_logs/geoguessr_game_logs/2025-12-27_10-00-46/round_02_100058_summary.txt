@@ -1,0 +1,16 @@
+Round: 2
+Timestamp: 100058
+Prediction: (44.965496, 4.275116)
+Google Maps: https://www.google.com/maps?q=44.96549606323242,4.275115966796875
+
+Top 5 Concepts:
+  0.0472 - Ten Digit Yellow Pole Codes
+  0.0408 - Wire Numbers
+  0.0239 - Blue sticker
+  0.0236 - Red numbers
+  0.0206 - Thicc white signs post
+
+Top 3 Parent Concepts:
+  0.5583 - pole_marker
+  0.0558 - post_sign
+  0.0360 - sticker

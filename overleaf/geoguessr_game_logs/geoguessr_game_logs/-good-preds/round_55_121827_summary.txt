@@ -1,0 +1,16 @@
+Round: 55
+Timestamp: 121827
+Prediction: (65.761711, 26.935501)
+Google Maps: https://www.google.com/maps?q=65.76171112060547,26.935501098632812
+
+Top 5 Concepts:
+  0.1241 - Snowpole
+  0.0872 - Snow Poles
+  0.0849 - Pole Top
+  0.0409 - Hook pole
+  0.0270 - Vegetation - Spruce
+
+Top 3 Parent Concepts:
+  0.1171 - Chilo Island
+  0.1114 - pole_shape
+  0.0696 - script_latvian

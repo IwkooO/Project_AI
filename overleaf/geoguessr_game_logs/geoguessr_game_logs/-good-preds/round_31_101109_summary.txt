@@ -1,0 +1,16 @@
+Round: 31
+Timestamp: 101109
+Prediction: (42.402958, -71.631226)
+Google Maps: https://www.google.com/maps?q=42.402957916259766,-71.6312255859375
+
+Top 5 Concepts:
+  0.1261 - Vermont license plates
+  0.1174 - Eastern white pine
+  0.1116 - Connecticut license plates
+  0.0971 - New Hampshire license plates
+  0.0647 - Massachusetts license plates
+
+Top 3 Parent Concepts:
+  0.1431 - vegetation_forest_temperate
+  0.0834 - vegetation_trees
+  0.0573 - car_meta

@@ -1,0 +1,16 @@
+Round: 7
+Timestamp: 093450
+Prediction: (-38.795189, 177.368652)
+Google Maps: https://www.google.com/maps?q=-38.795188903808594,177.36865234375
+
+Top 5 Concepts:
+  0.1293 - Gisborne yellow tag
+  0.1136 - Vertical Black Sticker - 5 digits
+  0.0977 - Horizontal Black Sticker
+  0.0675 - Warning Sticker
+  0.0670 - Timaru Pole Warning
+
+Top 3 Parent Concepts:
+  0.6122 - sticker
+  0.0922 - pole_marker
+  0.0299 - bin

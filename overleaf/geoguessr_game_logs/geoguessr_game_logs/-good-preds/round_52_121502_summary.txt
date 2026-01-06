@@ -1,0 +1,16 @@
+Round: 52
+Timestamp: 121502
+Prediction: (-34.596458, -54.456856)
+Google Maps: https://www.google.com/maps?q=-34.596458435058594,-54.45685577392578
+
+Top 5 Concepts:
+  0.0480 - Posadas
+  0.0436 - Isla de Flores
+  0.0431 - Punta del Este
+  0.0402 - Google car - Cabo Polonio
+  0.0205 - Chaitn Area
+
+Top 3 Parent Concepts:
+  0.1138 - landscape_hills
+  0.0786 - road_dirt_tropical
+  0.0501 - landscape_coastline_arid

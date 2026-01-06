@@ -1,0 +1,50 @@
+Round: 5
+Timestamp: 092341
+Prediction: (70.436333, 26.335785)
+Google Maps: https://www.google.com/maps?q=70.43633270263672,26.335784912109375
+
+════════════════════════════════════════
+  CONCEPT vs IMAGE CONTRIBUTION (Gate)
+════════════════════════════════════════
+Gate Mean:  0.4853
+Gate Std:   0.2711
+Gate Range: [0.0108, 0.9856]
+
+Interpretation:
+  - gate > 0.5 = CONCEPT-heavy (relies on semantic concepts)
+  - gate < 0.5 = IMAGE-heavy (relies on raw visual patches)
+
+✓ Model is using BALANCED mix of concepts and patches
+
+════════════════════════════════════════
+  ATTENTION STATISTICS
+════════════════════════════════════════
+Attention Entropy:    6.2985
+Max Attention Patch:  515 (value: 0.0056)
+
+Interpretation:
+  - High entropy = diffuse attention (looking at many patches)
+  - Low entropy = focused attention (looking at few patches)
+
+════════════════════════════════════════
+  GEOCELL PREDICTION CONFIDENCE
+════════════════════════════════════════
+Top Cell Confidence: 0.3032
+Top 3 Cells: [777, 782, 779]
+Top 3 Probs: [0.3032, 0.0860, 0.0838]
+
+════════════════════════════════════════
+  CONCEPT PREDICTIONS
+════════════════════════════════════════
+
+Top 5 Child Concepts:
+  0.1173 - Far North
+  0.0548 - Lillehammer and Oppdal
+  0.0371 - Hebrides Islands
+  0.0370 - Southwest
+  0.0324 - Scratches on the road
+
+Top 3 Parent Concepts:
+  0.3165 - landscape_arctic
+  0.0523 - road_snow
+  0.0485 - landscape_coastline

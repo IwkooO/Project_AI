@@ -1,0 +1,50 @@
+Round: 16
+Timestamp: 105008
+Prediction: (-27.630524, 152.233093)
+Google Maps: https://www.google.com/maps?q=-27.630523681640625,152.23309326171875
+
+════════════════════════════════════════
+  CONCEPT vs IMAGE CONTRIBUTION (Gate)
+════════════════════════════════════════
+Gate Mean:  0.4588
+Gate Std:   0.2563
+Gate Range: [0.0166, 0.9860]
+
+Interpretation:
+  - gate > 0.5 = CONCEPT-heavy (relies on semantic concepts)
+  - gate < 0.5 = IMAGE-heavy (relies on raw visual patches)
+
+✓ Model is using BALANCED mix of concepts and patches
+
+════════════════════════════════════════
+  ATTENTION STATISTICS
+════════════════════════════════════════
+Attention Entropy:    6.3312
+Max Attention Patch:  168 (value: 0.0039)
+
+Interpretation:
+  - High entropy = diffuse attention (looking at many patches)
+  - Low entropy = focused attention (looking at few patches)
+
+════════════════════════════════════════
+  GEOCELL PREDICTION CONFIDENCE
+════════════════════════════════════════
+Top Cell Confidence: 0.3020
+Top 3 Cells: [174, 168, 200]
+Top 3 Probs: [0.3020, 0.1250, 0.0297]
+
+════════════════════════════════════════
+  CONCEPT PREDICTIONS
+════════════════════════════════════════
+
+Top 5 Child Concepts:
+  0.2089 - QLD black paint
+  0.1319 - QLD non south-east pole marking
+  0.0409 - NSW yellow plates.
+  0.0334 - Melbourne white blue sticker
+  0.0270 - NSW red no stopping sign
+
+Top 3 Parent Concepts:
+  0.2810 - pole_marker
+  0.1113 - sticker
+  0.0924 - phone_code

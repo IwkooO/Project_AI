@@ -1,0 +1,50 @@
+Round: 15
+Timestamp: 104836
+Prediction: (-51.217087, -72.894844)
+Google Maps: https://www.google.com/maps?q=-51.21708679199219,-72.89484405517578
+
+════════════════════════════════════════
+  CONCEPT vs IMAGE CONTRIBUTION (Gate)
+════════════════════════════════════════
+Gate Mean:  0.4539
+Gate Std:   0.2604
+Gate Range: [0.0160, 0.9924]
+
+Interpretation:
+  - gate > 0.5 = CONCEPT-heavy (relies on semantic concepts)
+  - gate < 0.5 = IMAGE-heavy (relies on raw visual patches)
+
+✓ Model is using BALANCED mix of concepts and patches
+
+════════════════════════════════════════
+  ATTENTION STATISTICS
+════════════════════════════════════════
+Attention Entropy:    6.1818
+Max Attention Patch:  478 (value: 0.0085)
+
+Interpretation:
+  - High entropy = diffuse attention (looking at many patches)
+  - Low entropy = focused attention (looking at few patches)
+
+════════════════════════════════════════
+  GEOCELL PREDICTION CONFIDENCE
+════════════════════════════════════════
+Top Cell Confidence: 0.1106
+Top 3 Cells: [70, 51, 25]
+Top 3 Probs: [0.1106, 0.0669, 0.0666]
+
+════════════════════════════════════════
+  CONCEPT PREDICTIONS
+════════════════════════════════════════
+
+Top 5 Child Concepts:
+  0.1228 - Y-150 and Y-156 in Torres del Paine
+  0.0726 - Road X-753
+  0.0602 - RP21 & RP19
+  0.0475 - X-25 Max East Sunset Coverage
+  0.0393 - Patagonia National Park
+
+Top 3 Parent Concepts:
+  0.3867 - landscape_mountains
+  0.1167 - landscape_lake
+  0.0680 - landscape_shrubland

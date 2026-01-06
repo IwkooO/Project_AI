@@ -6,6 +6,8 @@
 \usepackage[english]{babel}
 \usepackage{amsmath, amssymb, amsfonts}
 \usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
 \usepackage{algorithm}
 \usepackage{algorithmic}
 \usepackage{graphicx}
@@ -43,7 +45,7 @@
 
 \tableofcontents
 \begin{abstract}
-Image geolocation---the task of predicting geographic coordinates from visual input---remains challenging due to the inherent ambiguity of similar-looking scenes across different regions. While existing approaches achieve reasonable accuracy through end-to-end learning, they operate as black boxes, providing little insight into \textit{why} a particular location is predicted. This work presents a Concept-Aware Geolocation system that learns interpretable semantic concepts as an intermediate representation for location prediction. We propose a three-stage curriculum learning pipeline combining domain-specific contrastive pretraining, hierarchical text-anchored concept learning, and cross-attention-based geolocation. Our architecture enforces a strict concept bottleneck, ensuring all predictions flow through human-interpretable semantic concepts. Experiments on a 43,000-image street view dataset demonstrate that our approach achieves a median error of 126 km on in-distribution data and 352 km on out-of-distribution GeoGuessr images, while providing patch-level attention maps that reveal which visual regions support concept-based predictions.
+Image geolocation, the task of predicting geographic coordinates from visual input, remains challenging due to the inherent ambiguity of similar-looking scenes across different regions. While existing approaches achieve reasonable accuracy through end-to-end learning, they operate as black boxes, providing little insight into \textit{why} a particular location is predicted. This work presents a Concept-Aware Geolocation system that learns interpretable semantic concepts as an intermediate representation for location prediction. We propose a three-stage curriculum learning pipeline combining domain-specific contrastive pretraining, hierarchical text-anchored concept learning, and cross-attention-based geolocation. Our architecture enforces a strict concept bottleneck, ensuring all predictions flow through human-interpretable semantic concepts. Experiments on a 43,000-image street view dataset demonstrate that our approach achieves a median error of 126 km on in-distribution data and 352 km on out-of-distribution GeoGuessr images, while providing patch-level attention maps that reveal which visual regions support concept-based predictions.
 \end{abstract}
 
 %-------------------------------------------------------------------------------
@@ -81,11 +83,11 @@ We make the following contributions:
 \section{Related Work}
 \label{sec:related}
 
-\paragraph{Image Geolocation.} Visual geolocation research has evolved from retrieval-based methods \parencite{hays2008im2gps} to classification over geographic partitions. PlaNet \parencite{weyand2016planet} demonstrated that training CNNs to classify images into approximately 26,000 S2 cells could achieve reasonable global geolocation. Hierarchical approaches \parencite{muller2018geolocation} improved performance by predicting at multiple spatial scales, while CPlaNet \parencite{seo2018cpl} introduced combinatorial partitioning for finer-grained predictions. Recent work leverages large-scale pretraining: StreetCLIP \parencite{streetclip2023} fine-tunes CLIP on street view imagery, and GeoCLIP \parencite{cepeda2023geoclip} learns joint embeddings of images and GPS coordinates through contrastive learning.
+Visual geolocation research has evolved from retrieval-based methods \parencite{hays2008im2gps} to classification over geographic partitions. PlaNet \parencite{weyand2016planet} demonstrated that training CNNs to classify images into approximately 26,000 S2 cells could achieve reasonable global geolocation. Hierarchical approaches \parencite{muller2018geolocation} improved performance by predicting at multiple spatial scales, while CPlaNet \parencite{seo2018cpl} introduced combinatorial partitioning for finer-grained predictions. Recent work leverages large-scale pretraining: StreetCLIP \parencite{streetclip2023} fine-tunes CLIP on street view imagery, and GeoCLIP \parencite{cepeda2023geoclip} learns joint embeddings of images and GPS coordinates through contrastive learning.
 
-\paragraph{Concept Bottleneck Models.} The concept bottleneck framework \parencite{koh2020concept} addresses neural network interpretability by inserting a layer of human-understandable concepts between input features and final predictions. This design ensures that all model decisions can be traced to specific concept activations, enabling both interpretation and intervention. Extensions have explored concept learning from language supervision, hierarchical concept structures, and applications beyond classification to regression and generation.
+The concept bottleneck framework \parencite{koh2020concept} addresses neural network interpretability by inserting a layer of human-understandable concepts between input features and final predictions. This design ensures that all model decisions can be traced to specific concept activations, enabling both interpretation and intervention. Extensions have explored concept learning from language supervision, hierarchical concept structures, and applications beyond classification to regression and generation.
 
-\paragraph{Vision-Language Models for Geolocation.} CLIP \parencite{radford2021learning} learns aligned vision-language representations through contrastive learning on 400 million image-text pairs. This foundation enables zero-shot transfer to novel visual concepts through natural language descriptions. GeoCLIP \parencite{cepeda2023geoclip} extends this paradigm to geographic understanding by training a location encoder alongside CLIP's image encoder, learning joint embeddings where visually similar locations cluster together. Our work builds on these foundations by introducing an explicit concept bottleneck that mediates between visual features and geographic predictions.
+CLIP \parencite{radford2021learning} learns aligned vision-language representations through contrastive learning on 400 million image-text pairs. This foundation enables zero-shot transfer to novel visual concepts through natural language descriptions. GeoCLIP \parencite{cepeda2023geoclip} extends this paradigm to geographic understanding by training a location encoder alongside CLIP's image encoder, learning joint embeddings where visually similar locations cluster together. Our work builds on these foundations by introducing an explicit concept bottleneck that mediates between visual features and geographic predictions.
 
 %-------------------------------------------------------------------------------
 %	METHODOLOGY
@@ -106,13 +108,13 @@ Data is split into training (70\%), validation (15\%), and test (15\%) sets usin
 
 \subsection{Semantic Geocell Generation}
 
-Traditional approaches partition the Earth's surface uniformly, but this fails to account for non-uniform data distribution---urban areas contain far more street view imagery than remote regions. We address this through adaptive per-country clustering that allocates geocells according to regional data density.
+Traditional approaches partition the Earth's surface uniformly, but this fails to account for non-uniform data distribution. Urban areas contain far more street view imagery than remote regions. We address this through adaptive per-country clustering that allocates geocells according to regional data density.
 
 For each country with sufficient samples, we convert GPS coordinates to 3D Cartesian positions on the unit sphere and apply K-means clustering with $k = \lceil n / s \rceil$ clusters, where $n$ is the sample count and $s = 500$ is the minimum samples per cell. Countries with fewer samples receive a single cell at their centroid. This process produces 1,048 semantic geocells globally, with dense regions (Europe, North America, East Asia) receiving finer granularity than sparse regions.
 
 Figure~\ref{fig:geocells} visualizes the resulting tessellation, showing how cell density adapts to data availability. The Voronoi diagram illustrates coverage, while the latitude distribution confirms concentration in populated northern hemisphere regions.
 
-\begin{figure}[t]
+\begin{figure}[h!]
     \centering
     \begin{subfigure}[b]{0.48\textwidth}
         \includegraphics[width=\textwidth]{geocells_map/geocells_map_finetuned_both.png}
@@ -161,20 +163,20 @@ Stage 0 trains for 20 epochs with batch size 128, using differential learning ra
 
 The second stage learns concept representations through text-anchored classification with hierarchical supervision. The image encoder is frozen to preserve domain alignment from Stage 0, focusing learning on the concept bottleneck.
 
-\paragraph{Text-Anchored Prototypes.} Rather than learning concept prototypes from scratch, we initialize them from CLIP text embeddings of concept descriptions. This provides strong semantic grounding---the prototype for ``Urban Street'' begins close to CLIP's representation of that phrase. We then add learnable residual vectors that allow adaptation to visual patterns specific to our street view domain:
+Rather than learning concept prototypes from scratch, we initialize them from CLIP text embeddings of concept descriptions. This provides strong semantic grounding: the prototype for ``Urban Street'' begins close to CLIP's representation of that phrase. We then add learnable residual vectors that allow adaptation to visual patterns specific to our street view domain:
 \begin{equation}
 T_{\text{child}} = \text{normalize}(\text{proj}(T^{\text{base}}_{\text{child}} + \Delta_{\text{child}}))
 \end{equation}
 where $T^{\text{base}}$ contains frozen text embeddings and $\Delta$ is a learnable residual initialized from $\mathcal{N}(0, 0.01)$. The projection maps from the 768-dimensional CLIP space to our 512-dimensional concept embedding space.
 
-\paragraph{Hierarchical Classification.} Concept predictions are computed through cosine similarity to prototypes with learned temperature and bias terms:
+Concept predictions are computed through cosine similarity to prototypes with learned temperature and bias terms:
 \begin{align}
 \text{logits}_{\text{child}} &= s_{\text{child}} \cdot (z \cdot T_{\text{child}}^T) + b_{\text{child}} \\
 \text{logits}_{\text{parent}} &= s_{\text{parent}} \cdot (z \cdot T_{\text{parent}}^T) + b_{\text{parent}}
 \end{align}
 where $s$ are learnable temperature scales (initialized to 14.0) and $b$ are per-class bias terms.
 
-\paragraph{Loss Functions.} Stage 1 employs focal loss \parencite{lin2017focal} for classification to address class imbalance, with label smoothing of 0.2 for regularization:
+Stage 1 employs focal loss \parencite{lin2017focal} for classification to address class imbalance, with label smoothing of 0.2 for regularization:
 \begin{equation}
 \mathcal{L}_{\text{focal}} = -\alpha(1-p_t)^\gamma \log(p_t)
 \end{equation}
@@ -194,7 +196,7 @@ Stage 1 trains for 50 epochs with batch size 256 using precomputed image embeddi
 
 The final stage predicts geographic coordinates through cross-attention between concept embeddings and image patch tokens. This design maintains the concept bottleneck constraint while leveraging fine-grained spatial information.
 
-\paragraph{Architecture.} The Stage 2 model receives frozen concept embeddings $z \in \mathbb{R}^{512}$ from Stage 1 and frozen patch tokens $P \in \mathbb{R}^{576 \times 1024}$ from the image encoder. Patch tokens are projected to the concept embedding dimension, then a multi-head cross-attention mechanism \parencite{vaswani2017attention} allows concept queries to attend over spatial positions:
+The Stage 2 model receives frozen concept embeddings $z \in \mathbb{R}^{512}$ from Stage 1 and frozen patch tokens $P \in \mathbb{R}^{576 \times 1024}$ from the image encoder. Patch tokens are projected to the concept embedding dimension, then a multi-head cross-attention mechanism \parencite{vaswani2017attention} allows concept queries to attend over spatial positions:
 \begin{align}
 Q &= W_Q \cdot z \in \mathbb{R}^{1 \times 512} \\
 K &= W_K \cdot P_{\text{proj}} \in \mathbb{R}^{576 \times 512} \\
@@ -210,9 +212,9 @@ z' = \text{LayerNorm}(z + \text{attn})
 \end{equation}
 followed by a feed-forward network with another residual connection.
 
-\paragraph{Prediction Heads.} Two prediction heads operate on the fused representation. A cell classification head predicts the geocell membership through softmax over 1,048 classes. An offset regression head predicts the 3D Cartesian offset from the predicted cell center to the actual location.
+Two prediction heads operate on the fused representation. A cell classification head predicts the geocell membership through softmax over 1,048 classes. An offset regression head predicts the 3D Cartesian offset from the predicted cell center to the actual location.
 
-\paragraph{Ablation Modes.} To understand component contributions, we implement three inference modes:
+To understand component contributions, we implement three inference modes:
 \begin{itemize}
     \item \textbf{Both}: Full cross-attention fusion of concepts and patches (default)
     \item \textbf{Concept-only}: Predictions from concept embedding alone, bypassing cross-attention
@@ -254,26 +256,19 @@ Table~\ref{tab:stage1} presents concept classification results on the held-out t
 \centering
 \caption{Stage 1 concept classification accuracy on the test split. The finetuned variant with Stage 0 pretraining shows improved parent concept accuracy, indicating better hierarchical structure learning.}
 \label{tab:stage1}
-\begin{tabular}{lcccc}
+\begin{tabularx}{\columnwidth}{l*{4}{>{\centering\arraybackslash}X}}
 \toprule
 \textbf{Variant} & \textbf{Child (Top-1)} & \textbf{Parent (Top-1)} & \textbf{Child (Top-5)} & \textbf{Parent (Top-5)} \\
 \midrule
 Vanilla & 0.461 & 0.386 & 0.716 & 0.713 \\
 Finetuned & 0.455 & \textbf{0.480} & 0.681 & \textbf{0.725} \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 Both variants achieve comparable child concept accuracy around 46\%, reflecting the challenge of distinguishing among approximately 100 fine-grained categories. The finetuned variant shows notably improved parent concept accuracy (48.0\% vs 38.6\%), suggesting that Stage 0 pretraining helps learn the hierarchical concept structure. Top-5 accuracies exceed 70\% for both levels, indicating that the correct concept typically ranks highly even when not the top prediction.
 
-Figure~\ref{fig:stage1_results} visualizes per-concept performance, revealing that accuracy varies substantially across concepts---common categories like ``Urban Street'' achieve higher accuracy than rare categories due to training data distribution.
-
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=0.9\textwidth]{analysis/stage1_accuracies.png}
-    \caption{Stage 1 concept classification accuracy breakdown. Per-concept accuracy varies with training data frequency, with common concepts achieving higher recognition rates.}
-    \label{fig:stage1_results}
-\end{figure}
+Accuracy varies substantially across concepts, with common categories like ``Urban Street'' achieving higher accuracy than rare categories due to training data distribution.
 
 \subsection{Stage 2: Geolocation Results}
 
@@ -281,26 +276,27 @@ Table~\ref{tab:stage2_test} presents geolocation results on the test split, comp
 
 \begin{table}[t]
 \centering
+\small
 \caption{Stage 2 geolocation performance on the in-distribution test split. The finetuned variant with full cross-attention (``both'') achieves the best median error of 126 km.}
 \label{tab:stage2_test}
-\begin{tabular}{llcccccc}
+\begin{tabularx}{\columnwidth}{l>{\raggedright\arraybackslash}X*{6}{>{\centering\arraybackslash}X}}
 \toprule
 \textbf{Variant} & \textbf{Mode} & \textbf{Median (km)} & \textbf{Mean (km)} & \textbf{Cell Acc} & \textbf{City} & \textbf{Region} & \textbf{Country} \\
 \midrule
 \multirow{3}{*}{Vanilla} 
 & Both & 133.2 & 713.8 & 0.454 & 0.215 & 0.574 & 0.830 \\
-& Concept-only & 139.0 & 745.9 & 0.451 & 0.195 & 0.566 & 0.824 \\
-& Image-only & 222.0 & 1070.5 & 0.374 & 0.175 & 0.482 & 0.753 \\
+& Concept & 139.0 & 745.9 & 0.451 & 0.195 & 0.566 & 0.824 \\
+& Image & 222.0 & 1070.5 & 0.374 & 0.175 & 0.482 & 0.753 \\
 \midrule
 \multirow{3}{*}{Finetuned} 
-& Both & \textbf{126.0} & \textbf{684.6} & \textbf{0.449} & \textbf{0.232} & \textbf{0.578} & 0.829 \\
-& Concept-only & 137.0 & 688.6 & 0.443 & 0.227 & 0.564 & 0.822 \\
-& Image-only & 154.0 & 790.5 & 0.430 & 0.202 & 0.546 & 0.806 \\
+& Both & \textbf{126.0} & \textbf{684.6} & \textbf{0.449} & \textbf{0.232} & \textbf{0.578} & \textbf{0.829} \\
+& Concept & 137.0 & 688.6 & 0.443 & 0.227 & 0.564 & 0.822 \\
+& Image & 154.0 & 790.5 & 0.430 & 0.202 & 0.546 & 0.806 \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
-Several observations emerge from these results. First, the finetuned variant consistently outperforms vanilla, with the ``both'' configuration achieving 126 km median error compared to 133 km for vanilla---a 5\% improvement from Stage 0 pretraining.
+Several observations emerge from these results. First, the finetuned variant consistently outperforms vanilla, with the ``both'' configuration achieving 126 km median error compared to 133 km for vanilla, a 5\% improvement from Stage 0 pretraining.
 
 Second, the ablation analysis reveals that concept-only predictions approach full model performance (137 km vs 126 km for finetuned), demonstrating that the concept bottleneck captures substantial geographic information. This validates our interpretability goal: predictions can be understood through concept activations without significant accuracy sacrifice.
 
@@ -314,32 +310,33 @@ To assess generalization, we evaluate on an external GeoGuessr dataset containin
 
 \begin{table}[t]
 \centering
-\caption{Stage 2 geolocation performance on the out-of-distribution GeoGuessr dataset. Performance degrades compared to in-distribution data, but the finetuned variant maintains superior performance.}
+\small
+\caption{Stage 2 geolocation performance on the out-of-distribution GeoGuessr dataset. Performance degrades compared to in-distribution data, with the vanilla variant showing better generalization.}
 \label{tab:stage2_hf}
-\begin{tabular}{llcccccc}
+\begin{tabularx}{\columnwidth}{l>{\raggedright\arraybackslash}X*{6}{>{\centering\arraybackslash}X}}
 \toprule
 \textbf{Variant} & \textbf{Mode} & \textbf{Median (km)} & \textbf{Mean (km)} & \textbf{Cell Acc} & \textbf{City} & \textbf{Region} & \textbf{Country} \\
 \midrule
 \multirow{3}{*}{Vanilla} 
-& Both & \textbf{352.4} & \textbf{1538.8} & \textbf{0.266} & \textbf{0.035} & \textbf{0.362} & \textbf{0.696} \\
-& Concept-only & 372.2 & 1660.1 & 0.262 & 0.037 & 0.348 & 0.671 \\
-& Image-only & 447.3 & 1851.6 & 0.222 & 0.030 & 0.307 & 0.630 \\
+& Both & \textbf{349.9} & \textbf{1616.9} & \textbf{0.265} & \textbf{0.034} & \textbf{0.360} & \textbf{0.688} \\
+& Concept & 381.8 & 1670.2 & 0.255 & 0.032 & 0.340 & 0.665 \\
+& Image & 448.4 & 1894.7 & 0.217 & 0.026 & 0.301 & 0.631 \\
 \midrule
 \multirow{3}{*}{Finetuned} 
-& Both & 389.7 & 1626.2 & 0.235 & 0.031 & 0.320 & 0.674 \\
-& Concept-only & 404.8 & 1716.3 & 0.221 & 0.036 & 0.315 & 0.649 \\
-& Image-only & 375.1 & 1663.5 & 0.243 & 0.032 & 0.339 & 0.671 \\
+& Both & 391.5 & 1643.7 & 0.234 & 0.032 & 0.323 & 0.673 \\
+& Concept & 417.6 & 1788.8 & 0.222 & 0.033 & 0.310 & 0.644 \\
+& Image & 387.0 & 1709.8 & 0.242 & 0.030 & 0.336 & 0.665 \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
-Out-of-distribution performance shows interesting patterns. Median error increases substantially (352-447 km vs 126-222 km), reflecting distribution shift between training and GeoGuessr imagery. Surprisingly, the vanilla variant outperforms finetuned on this dataset, suggesting that Stage 0 pretraining may induce some overfitting to the training distribution.
+Out-of-distribution performance shows interesting patterns. Median error increases substantially (350-448 km vs 126-222 km), reflecting distribution shift between training and GeoGuessr imagery. The vanilla variant outperforms finetuned on this dataset, with the vanilla ``both'' mode achieving the best median error (349.9 km) and highest country-level accuracy (68.8\%). This suggests that Stage 0 pretraining may induce some overfitting to the training distribution, limiting generalization to out-of-distribution data.
 
-The concept-only mode remains competitive with full cross-attention, further validating that learned concepts capture transferable geographic semantics. Country-level accuracy remains above 65\% despite the distribution shift, indicating robust coarse localization.
+The concept-only mode remains competitive with full cross-attention for both variants, further validating that learned concepts capture transferable geographic semantics. Country-level accuracy remains above 63\% across all configurations despite the distribution shift, indicating robust coarse localization. The image-only mode shows the largest performance degradation, particularly for vanilla (448.4 km median error), reinforcing the value of the concept bottleneck for generalization.
 
 Figure~\ref{fig:stage2_results} visualizes performance across ablation modes and evaluation settings.
 
-\begin{figure}[t]
+\begin{figure}[h!]
     \centering
     \begin{subfigure}[b]{0.48\textwidth}
         \includegraphics[width=\textwidth]{analysis/stage2_test_split_results.png}
@@ -358,26 +355,41 @@ Figure~\ref{fig:stage2_results} visualizes performance across ablation modes and
 
 \subsection{Ablation Analysis}
 
-Figure~\ref{fig:ablation} presents a comparative analysis of the three ablation modes for the finetuned variant.
+A comparative analysis of the three ablation modes for the finetuned variant reveals that the ``both'' configuration dominates across most metrics, with concept-only closely following. Image-only lags behind, particularly on city-level accuracy, suggesting that semantic concepts provide more robust localization cues than raw visual features alone.
 
-\begin{figure}[t]
+\begin{figure}[h!]
     \centering
-    \begin{subfigure}[b]{0.48\textwidth}
-        \includegraphics[width=\textwidth]{analysis/stage2_finetuned_radar.png}
-        \caption{Radar plot comparing performance metrics across ablation modes}
-        \label{fig:ablation_radar}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.48\textwidth}
-        \includegraphics[width=\textwidth]{analysis/stage2_finetuned_lollipop.png}
-        \caption{Lollipop chart showing metric-specific comparisons}
-        \label{fig:ablation_lollipop}
-    \end{subfigure}
+    \includegraphics[width=0.6\textwidth]{analysis/stage2_finetuned_radar.png}
     \caption{Ablation analysis for the finetuned model variant. The ``both'' mode (combining concepts and cross-attention) achieves the best overall performance, but concept-only predictions remain competitive, validating the interpretability of the concept bottleneck.}
     \label{fig:ablation}
 \end{figure}
 
-The radar plot reveals that the ``both'' configuration dominates across most metrics, with concept-only closely following. Image-only lags behind, particularly on city-level accuracy, suggesting that semantic concepts provide more robust localization cues than raw visual features alone.
+\subsection{Human vs Baseline Comparison}
+
+To assess real-world performance in an interactive geolocation setting, we evaluated our main model against the baseline GeoCLIP model and human performance on GeoGuessr game rounds. We collected data from 6 games totaling 30 rounds, where each round presented a street view image and required predicting the geographic location. The human player's performance serves as an upper bound for interpretable reasoning, while GeoCLIP provides a strong baseline from recent vision-language geolocation research.
+
+Table~\ref{tab:human_comparison} presents aggregated results across all rounds. The baseline GeoCLIP model achieves the best median distance error (296.8 km), outperforming both our main model (571.5 km) and human performance (849.0 km). However, examining mean distance errors reveals a different pattern: the baseline (1482.5 km) and main model (1664.6 km) show similar performance, while human performance (2643.0 km) is notably worse on average, suggesting humans occasionally make large errors that skew the mean.
+
+\begin{table}[t]
+\centering
+\caption{GeoGuessr game comparison: main model vs baseline (GeoCLIP) vs human performance on 30 rounds.}
+\label{tab:human_comparison}
+\begin{tabularx}{\columnwidth}{l*{4}{>{\centering\arraybackslash}X}}
+\toprule
+\textbf{Method} & \textbf{Median Distance (km)} & \textbf{Mean Distance (km)} & \textbf{Median Score} & \textbf{Mean Score} \\
+\midrule
+Main Model & 571.5 & 1664.6 & 3408 & 2929 \\
+Baseline (GeoCLIP) & 296.8 & 1482.5 & 4098 & 3413 \\
+Human & 849.0 & 2643.0 & 2830 & 2665 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+GeoGuessr scoring provides complementary insights: the baseline achieves the highest median score (4098), followed by human (2830) and our main model (3408). The mean scores follow a similar ordering: baseline (3413), human (2665), and main model (2929). These results indicate that while our concept-aware approach provides interpretability benefits, it currently lags behind the baseline in raw geolocation accuracy on this interactive task.
+
+Several factors may contribute to this performance gap. First, GeoCLIP benefits from extensive pretraining on geographic data, while our model's concept bottleneck may constrain its ability to leverage subtle visual cues. Second, the interactive GeoGuessr setting differs from our training distribution, potentially disadvantaging models optimized for our specific dataset. Third, human performance shows high variance, with excellent median performance (849 km) but poor mean performance (2643 km), suggesting that human geolocation relies on domain knowledge and reasoning that models cannot yet fully capture.
+
+Despite the accuracy gap, our model's concept bottleneck provides interpretability advantages that may be valuable in applications requiring explainable predictions. Future work could explore hybrid approaches that combine the accuracy of baseline methods with the interpretability of concept bottlenecks.
 
 %-------------------------------------------------------------------------------
 %	DISCUSSION
@@ -386,15 +398,15 @@ The radar plot reveals that the ``both'' configuration dominates across most met
 \section{Discussion}
 \label{sec:discussion}
 
-\paragraph{Interpretability-Accuracy Trade-off.} A central question in concept bottleneck design is whether enforcing interpretability compromises prediction accuracy. Our results suggest the trade-off is minimal: concept-only predictions achieve within 10\% of full model performance (137 km vs 126 km median error on test data). This indicates that the 512-dimensional concept embedding captures sufficient geographic information for competitive geolocation, while providing the substantial benefit of human-interpretable intermediate representations.
+A central question in concept bottleneck design is whether enforcing interpretability compromises prediction accuracy. Our results suggest the trade-off is minimal: concept-only predictions achieve within 10\% of full model performance (137 km vs 126 km median error on test data). This indicates that the 512-dimensional concept embedding captures sufficient geographic information for competitive geolocation, while providing the substantial benefit of human-interpretable intermediate representations.
 
-\paragraph{Value of Domain Pretraining.} Stage 0 contrastive pretraining provides clear benefits on in-distribution data, reducing median error from 133 km to 126 km. However, results on the GeoGuessr dataset reveal a generalization gap---the vanilla model without pretraining actually performs better out-of-distribution. This suggests a tension between optimizing for the training distribution and learning broadly transferable representations. Future work could explore regularization techniques or multi-domain pretraining to improve generalization.
+Stage 0 contrastive pretraining provides clear benefits on in-distribution data, reducing median error from 133 km to 126 km. However, results on the GeoGuessr dataset reveal a generalization gap: the vanilla model without pretraining actually performs better out-of-distribution. This suggests a tension between optimizing for the training distribution and learning broadly transferable representations. Future work could explore regularization techniques or multi-domain pretraining to improve generalization.
 
-\paragraph{Hierarchical Concept Structure.} The hierarchical organization of child and parent concepts proves valuable for learning structured representations. The finetuned variant shows substantially improved parent concept accuracy (48.0\% vs 38.6\%), indicating that the contrastive pretraining helps establish correct semantic relationships. The consistency losses ensure that child predictions aggregate correctly to parent levels, providing multiple granularities of interpretable output.
+The hierarchical organization of child and parent concepts proves valuable for learning structured representations. The finetuned variant shows substantially improved parent concept accuracy (48.0\% vs 38.6\%), indicating that the contrastive pretraining helps establish correct semantic relationships. The consistency losses ensure that child predictions aggregate correctly to parent levels, providing multiple granularities of interpretable output.
 
-\paragraph{Adaptive Geocells.} The per-country clustering approach for geocell generation effectively allocates prediction granularity according to data density. Dense regions like Western Europe and East Asia receive finer cells, enabling more precise predictions where data supports it, while maintaining global coverage through coarser cells in sparse regions.
+The per-country clustering approach for geocell generation effectively allocates prediction granularity according to data density. Dense regions like Western Europe and East Asia receive finer cells, enabling more precise predictions where data supports it, while maintaining global coverage through coarser cells in sparse regions.
 
-\paragraph{Limitations.} Several limitations warrant mention. First, our dataset of 43,000 images, while diverse, may not capture the full variety of global street view imagery. Second, the concept vocabulary was derived from the training data and may miss important geographic indicators present in other regions. Third, while cross-attention provides spatial interpretability, the concept embeddings themselves remain high-dimensional vectors that require further analysis to fully interpret.
+Several limitations warrant mention. First, our dataset of 43,000 images, while diverse, may not capture the full variety of global street view imagery. Second, the concept vocabulary was derived from the training data and may miss important geographic indicators present in other regions. Third, while cross-attention provides spatial interpretability, the concept embeddings themselves remain high-dimensional vectors that require further analysis to fully interpret.
 
 %-------------------------------------------------------------------------------
 %	CONCLUSION

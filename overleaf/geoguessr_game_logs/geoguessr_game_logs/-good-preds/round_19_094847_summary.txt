@@ -1,0 +1,16 @@
+Round: 19
+Timestamp: 094847
+Prediction: (46.538303, 6.812744)
+Google Maps: https://www.google.com/maps?q=46.53830337524414,6.812744140625
+
+Top 5 Concepts:
+  0.1042 - South Germany Architecture 
+  0.0783 - Timber Frames
+  0.0769 - Arch Roofs
+  0.0443 - -ec town names
+  0.0382 - Wooden Shingle Facade
+
+Top 3 Parent Concepts:
+  0.2374 - building_shape
+  0.1348 - building_facade
+  0.1278 - script_european

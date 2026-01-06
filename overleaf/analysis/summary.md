@@ -24,6 +24,4 @@ This report summarizes the evaluation results for Stage 1 (concept classificatio
 
 | Variant | Ablation | Median Error (km) | Mean Error (km) | Cell Acc | City Acc | Region Acc | Country Acc |
 |---------|----------|-------------------|----------------|----------|----------|------------|-------------|
-| Default | image_only | 447.30 | 1851.63 | 0.2216 | 0.0301 | 0.3069 | 0.6298 |
-| Finetuned | image_only | 375.11 | 1663.49 | 0.2427 | 0.0321 | 0.3392 | 0.6705 |
 

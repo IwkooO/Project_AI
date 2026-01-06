@@ -1,0 +1,16 @@
+Round: 44
+Timestamp: 103933
+Prediction: (36.290314, -97.404816)
+Google Maps: https://www.google.com/maps?q=36.290313720703125,-97.40481567382812
+
+Top 5 Concepts:
+  0.1003 - Great Plains
+  0.0485 - Landscape - Great Plains
+  0.0441 - Texan roads
+  0.0391 - Soybeans
+  0.0367 - Grassland
+
+Top 3 Parent Concepts:
+  0.3147 - landscape_prairie
+  0.0733 - vegetation_grassland_temperate
+  0.0651 - landscape_fields

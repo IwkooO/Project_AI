@@ -1,0 +1,16 @@
+Round: 36
+Timestamp: 102956
+Prediction: (41.426941, -106.316750)
+Google Maps: https://www.google.com/maps?q=41.42694091796875,-106.3167495727539
+
+Top 5 Concepts:
+  0.1047 - The Rocky Mountains
+  0.0816 - Wyoming license plates
+  0.0374 - Utah license plates
+  0.0352 - Colorado license plates
+  0.0311 - New Mexico license plates
+
+Top 3 Parent Concepts:
+  0.0542 - landscape_mountains_temperate
+  0.0534 - landscape_plateau_temperate
+  0.0513 - landscape_plateau

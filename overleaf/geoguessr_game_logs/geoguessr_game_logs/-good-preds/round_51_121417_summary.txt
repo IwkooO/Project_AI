@@ -1,0 +1,16 @@
+Round: 51
+Timestamp: 121417
+Prediction: (-11.830541, -76.919708)
+Google Maps: https://www.google.com/maps?q=-11.830540657043457,-76.91970825195312
+
+Top 5 Concepts:
+  0.0821 - Lima Gen 3 Landscape
+  0.0434 - La Libertad Landscape
+  0.0359 - Lima Hills
+  0.0295 - City Roads, Eastern La Paz
+  0.0292 - Nazareno
+
+Top 3 Parent Concepts:
+  0.1395 - sign_information
+  0.1327 - script_south_american
+  0.1046 - landscape_mountains_arid

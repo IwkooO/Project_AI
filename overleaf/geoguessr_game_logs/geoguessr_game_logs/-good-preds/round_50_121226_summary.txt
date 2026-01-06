@@ -1,0 +1,16 @@
+Round: 50
+Timestamp: 121226
+Prediction: (-18.731091, -65.171806)
+Google Maps: https://www.google.com/maps?q=-18.731090545654297,-65.17180633544922
+
+Top 5 Concepts:
+  0.0319 - WA property marker
+  0.0318 - Comodoro Rivadavia
+  0.0275 - Pole Callao
+  0.0222 - wa pole metas
+  0.0216 - Pole LDS
+
+Top 3 Parent Concepts:
+  0.1820 - pole_marker
+  0.0901 - landscape_coastline_arid
+  0.0660 - landscape_mountains_arid

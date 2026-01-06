@@ -1,0 +1,16 @@
+Round: 34
+Timestamp: 102404
+Prediction: (55.010193, 25.067123)
+Google Maps: https://www.google.com/maps?q=55.01019287109375,25.067123413085938
+
+Top 5 Concepts:
+  0.0475 - General Architecture #2
+  0.0441 - House Numbers
+  0.0347 - Linz Street Signs
+  0.0300 - Mosques
+  0.0296 - Red brick
+
+Top 3 Parent Concepts:
+  0.1440 - landscape_sign
+  0.1122 - script_latin
+  0.1061 - building_facade

@@ -1,0 +1,16 @@
+Round: 3
+Timestamp: 100353
+Prediction: (42.923431, -72.257492)
+Google Maps: https://www.google.com/maps?q=42.923431396484375,-72.25749206542969
+
+Top 5 Concepts:
+  0.1556 - Massachusetts license plates
+  0.0937 - Connecticut license plates
+  0.0833 - New Hampshire license plates
+  0.0488 - New York license plates
+  0.0235 - Maryland license plates
+
+Top 3 Parent Concepts:
+  0.1100 - car_meta
+  0.0745 - car_type
+  0.0531 - bin

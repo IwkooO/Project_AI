@@ -1,0 +1,16 @@
+Round: 11
+Timestamp: 093631
+Prediction: (37.173027, -98.208565)
+Google Maps: https://www.google.com/maps?q=37.17302703857422,-98.20856475830078
+
+Top 5 Concepts:
+  0.0772 - Illinois license plates
+  0.0733 - Oklahoma license plates
+  0.0592 - Alabama license plates
+  0.0535 - Texan roads
+  0.0388 - Indiana license plates
+
+Top 3 Parent Concepts:
+  0.1625 - landscape_prairie
+  0.0398 - script_pacific
+  0.0334 - vegetation_corn

@@ -1,0 +1,16 @@
+Round: 17
+Timestamp: 094725
+Prediction: (42.406807, 27.869186)
+Google Maps: https://www.google.com/maps?q=42.40680694580078,27.869186401367188
+
+Top 5 Concepts:
+  0.0544 - Nessebar/Sozopol
+  0.0444 - Limestone brick
+  0.0327 - Epirotic Architecture
+  0.0305 - Gas Boxes
+  0.0290 - Architecture - Mugla Chimney
+
+Top 3 Parent Concepts:
+  0.1015 - script_arabic
+  0.0802 - Car with Several Barely Visible Dots on the Right Ð Urban
+  0.0649 - building_facade

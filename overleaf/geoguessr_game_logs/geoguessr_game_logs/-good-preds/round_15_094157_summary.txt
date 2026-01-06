@@ -1,0 +1,16 @@
+Round: 15
+Timestamp: 094157
+Prediction: (43.345600, 28.314224)
+Google Maps: https://www.google.com/maps?q=43.34560012817383,28.314224243164062
+
+Top 5 Concepts:
+  0.0556 - Wind turbines
+  0.0528 - Town signs
+  0.0315 - Small alternating hooks
+  0.0306 - Alternating pole top
+  0.0296 - Red gen 4 car
+
+Top 3 Parent Concepts:
+  0.1014 - infrastructure_wind
+  0.0640 - statue
+  0.0494 - Castilla y Len

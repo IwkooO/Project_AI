@@ -1,0 +1,16 @@
+Round: 8
+Timestamp: 093516
+Prediction: (54.040569, 12.884201)
+Google Maps: https://www.google.com/maps?q=54.04056930541992,12.884201049804688
+
+Top 5 Concepts:
+  0.1091 - -Itz ending
+  0.0765 - -Ow ending
+  0.0653 - Suffix "-rath"
+  0.0608 - Suffix "-hofen"
+  0.0589 - Suffix "-scheid"
+
+Top 3 Parent Concepts:
+  0.2108 - script_latin
+  0.1902 - script_celtic
+  0.1692 - Baden-Wrttemberg

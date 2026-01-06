@@ -1,0 +1,50 @@
+Round: 17
+Timestamp: 105045
+Prediction: (44.299633, -76.537834)
+Google Maps: https://www.google.com/maps?q=44.29963302612305,-76.53783416748047
+
+════════════════════════════════════════
+  CONCEPT vs IMAGE CONTRIBUTION (Gate)
+════════════════════════════════════════
+Gate Mean:  0.4838
+Gate Std:   0.2510
+Gate Range: [0.0296, 0.9796]
+
+Interpretation:
+  - gate > 0.5 = CONCEPT-heavy (relies on semantic concepts)
+  - gate < 0.5 = IMAGE-heavy (relies on raw visual patches)
+
+✓ Model is using BALANCED mix of concepts and patches
+
+════════════════════════════════════════
+  ATTENTION STATISTICS
+════════════════════════════════════════
+Attention Entropy:    6.0050
+Max Attention Patch:  78 (value: 0.0058)
+
+Interpretation:
+  - High entropy = diffuse attention (looking at many patches)
+  - Low entropy = focused attention (looking at few patches)
+
+════════════════════════════════════════
+  GEOCELL PREDICTION CONFIDENCE
+════════════════════════════════════════
+Top Cell Confidence: 0.1494
+Top 3 Cells: [355, 305, 324]
+Top 3 Probs: [0.1494, 0.1421, 0.1332]
+
+════════════════════════════════════════
+  CONCEPT PREDICTIONS
+════════════════════════════════════════
+
+Top 5 Child Concepts:
+  0.0529 - Red hydrant with yellow marker
+  0.0470 - Bus stop
+  0.0327 - Yellow hydrant with blue nozzle
+  0.0323 - Blue cap hydrant
+  0.0322 - Brown compost bin
+
+Top 3 Parent Concepts:
+  0.2847 - urban_artifacts
+  0.1672 - hydrant
+  0.0491 - Qubec fire hydrant markers

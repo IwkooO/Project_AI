@@ -1,0 +1,16 @@
+Round: 3
+Timestamp: 092915
+Prediction: (29.641483, 35.731354)
+Google Maps: https://www.google.com/maps?q=29.641483306884766,35.731353759765625
+
+Top 5 Concepts:
+  0.0339 - Vehicle - Flat Roof Tuk-Tuk
+  0.0270 - Metro Manila Province
+  0.0266 - Cavite Province
+  0.0175 - Laguna Province
+  0.0161 - Airport Road
+
+Top 3 Parent Concepts:
+  0.1132 - landscape_urban
+  0.1066 - landscape_arctic
+  0.0630 - landscape_river

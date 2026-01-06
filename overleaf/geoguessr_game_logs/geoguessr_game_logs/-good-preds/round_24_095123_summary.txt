@@ -1,0 +1,16 @@
+Round: 24
+Timestamp: 095123
+Prediction: (47.233822, 39.494553)
+Google Maps: https://www.google.com/maps?q=47.233821868896484,39.49455261230469
+
+Top 5 Concepts:
+  0.1083 - February | No Car (No Antenna)
+  0.0715 - February | No Car (Antenna)
+  0.0540 - February | Red Car
+  0.0444 - March | Black Car (No Antenna)
+  0.0428 - March | No Car (Antenna)
+
+Top 3 Parent Concepts:
+  0.2382 - landscape_winter
+  0.1243 - script_cyrillic
+  0.0779 - camera_meta

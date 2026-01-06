@@ -1,0 +1,16 @@
+Round: 37
+Timestamp: 103016
+Prediction: (8.262506, 6.738281)
+Google Maps: https://www.google.com/maps?q=8.262506484985352,6.73828125
+
+Top 5 Concepts:
+  0.0729 - Unique car
+  0.0686 - License Plates
+  0.0443 - Unique Car
+  0.0304 - Gen 3 Cars
+  0.0279 - Yellow plates
+
+Top 3 Parent Concepts:
+  0.5759 - car_meta
+  0.1286 - car_type
+  0.0805 - pole_marker
