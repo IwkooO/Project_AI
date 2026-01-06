@@ -30,7 +30,7 @@ export WANDB_API_KEY="$wandb_api_key"
 # Matching "Interpretable" Phase 1 Hyperparameters
 TAU=0.25
 TOPK=6
-MIX_LOCAL_KERNEL=0    # Phase 1 script default was 0. Change to 5 if you overrode it during training.
+MIX_LOCAL_KERNEL=5    # Phase 1 script default was 0. Change to 5 if you overrode it during training.
 CONCEPT_DIM=256       # Changed from 768 to 256 to match Phase 1
 MIX_HEADS=4           # Changed to match Phase 1
 MIX_DEPTH=1
@@ -49,7 +49,7 @@ PHASE1_LR=1e-5        # Low LR to preserve interpretable concepts
 # Mode: 'both' (Concepts + CLS)
 MODE="both"
 
-RUN_TAG="stage3_joint_${MODE}_scratchgeo_dim${CONCEPT_DIM}_pos_latefusion_2.5ct_0.05gatereg"
+RUN_TAG="stage3_joint_${MODE}_scratchgeo_dim${CONCEPT_DIM}_pos_latefusion_2.5ct_0.01gatereg_lk5"
 OUTPUT_DIR="checkpoints/stage3_joint_latefusion/${RUN_TAG}"
 
 # Paths
@@ -181,7 +181,7 @@ python -m cbm.joint.train \
   --wandb-run-name "$RUN_TAG" \
   --concept-temperature 2.5 \
   --early-stop-patience 10 \
-  --gate-reg-weight 0.1
+  --gate-reg-weight 0.01
 
 echo "============================================================"
 echo "JOINT TRAINING COMPLETE!"

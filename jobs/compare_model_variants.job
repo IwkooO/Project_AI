@@ -1,0 +1,145 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=compare_models
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=4:00:00
+#SBATCH --output=jobs/outputs/compare_model_variants_%j.out
+
+set -eo pipefail
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd "$HOME/Project_AI/"
+
+mkdir -p jobs/outputs
+
+echo "============================================================"
+echo "Activating project venv"
+echo "============================================================"
+
+# Activate environment
+export GEOTIFF_CSV="${GEOTIFF_CSV:-}"
+set +u
+source activate streetview
+set -u
+
+# ============================================================
+# MODEL COMPARISON CONFIG
+# ============================================================
+
+# Checkpoint directories (relative to project root)
+CHECKPOINT_BOTH="checkpoints/stage3_joint_latefusion/stage3_joint_both_scratchgeo_dim256_pos_latefusion_2.5ct_0.01gatereg"
+CHECKPOINT_CONCEPT="checkpoints/stage3_joint_latefusion/stage3_joint_concept_only_scratchgeo_dim256_pos_latefusion_2.5ct_0gatereg"
+CHECKPOINT_IMAGE="checkpoints/stage3_joint_latefusion/stage3_joint_image_only_scratchgeo_dim256_pos_latefusion_2.5ct_0gatereg"
+
+# Data paths
+# Find Phase 1 run directory to get correct splits and concept data
+PHASE1_BASE_DIR="checkpoints/phase1_adaptive_tau/adaptive_tau_d1_h4_dim256_pos"
+PHASE1_RUN_DIR=$(find "$PHASE1_BASE_DIR" -type d -name "run_*" | sort -r | while read run_dir; do
+  if [[ -d "$run_dir/concept_data_v2" ]] && [[ -f "$run_dir/concept_data_v2/concept_vocab.json" ]]; then
+    echo "$run_dir"
+    break
+  fi
+done | head -n 1)
+
+if [[ -z "$PHASE1_RUN_DIR" ]]; then
+  echo "WARNING: Could not find Phase 1 run directory, using default paths"
+  SPLITS_DIR="data/6921d7831744c5356b098bf7_balanced/splits"
+  CONCEPT_DATA_DIR="data/concept_data_v2"
+else
+  SPLITS_DIR="${PHASE1_RUN_DIR}/splits"
+  CONCEPT_DATA_DIR="${PHASE1_RUN_DIR}/concept_data_v2"
+fi
+
+TEST_CSV="${SPLITS_DIR}/dataset_test.csv"
+CACHED_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip_v2"
+
+# Output directory
+OUTPUT_DIR="results/model_comparison_stage3_latefusion"
+
+mkdir -p "$OUTPUT_DIR"
+mkdir -p jobs/outputs
+
+echo "============================================================"
+echo "MODEL VARIANT COMPARISON"
+echo "============================================================"
+echo "Checkpoint (Both): $CHECKPOINT_BOTH"
+echo "Checkpoint (Concept Only): $CHECKPOINT_CONCEPT"
+echo "Checkpoint (Image Only): $CHECKPOINT_IMAGE"
+echo "Test CSV: $TEST_CSV"
+echo "Concept Data: $CONCEPT_DATA_DIR"
+echo "Output: $OUTPUT_DIR"
+echo "============================================================"
+
+# Verify checkpoints exist
+for ckpt_name in "CHECKPOINT_BOTH" "CHECKPOINT_CONCEPT" "CHECKPOINT_IMAGE"; do
+  ckpt_path="${!ckpt_name}"
+  if [[ ! -d "$ckpt_path" ]]; then
+    echo "ERROR: Checkpoint directory not found: $ckpt_path"
+    exit 1
+  fi
+  if [[ ! -f "$ckpt_path/best_joint.pt" ]] && [[ ! -f "$ckpt_path/phase1/best_phase1.pt" ]]; then
+    echo "WARNING: No checkpoint file found in $ckpt_path"
+  fi
+done
+
+# Verify test CSV exists
+if [[ ! -f "$TEST_CSV" ]]; then
+  echo "ERROR: Test CSV not found at $TEST_CSV"
+  exit 1
+fi
+
+# Verify concept data exists
+if [[ ! -f "$CONCEPT_DATA_DIR/concept_vocab.json" ]]; then
+  echo "ERROR: Concept vocabulary not found at $CONCEPT_DATA_DIR/concept_vocab.json"
+  exit 1
+fi
+
+# Run comparison
+python scripts/evaluation/compare_model_variants.py \
+  --checkpoint-both "$CHECKPOINT_BOTH" \
+  --checkpoint-concept "$CHECKPOINT_CONCEPT" \
+  --checkpoint-image "$CHECKPOINT_IMAGE" \
+  --test-csv "$TEST_CSV" \
+  --concept-data-dir "$CONCEPT_DATA_DIR" \
+  --cached-dir "$CACHED_DIR" \
+  --output-dir "$OUTPUT_DIR" \
+  --concept-dim 256 \
+  --hidden-dim 512 \
+  --num-heads 8 \
+  --num-layers 2 \
+  --dropout 0.1 \
+  --phase1-dropout 0.45 \
+  --mil-topk 6 \
+  --mil-tau 0.25 \
+  --mix-depth 1 \
+  --mix-heads 4 \
+  --mix-mlp-ratio 2.0 \
+  --mix-local-kernel 0 \
+  --proj-type simple \
+  --concept-temperature 2.5 \
+  --batch-size 64 \
+  --num-workers 4 \
+  --device cuda \
+  --save-individual-images \
+  --num-image-samples 20 \
+  --image-selection significant_improvement
+
+echo "============================================================"
+echo "Comparison complete!"
+echo "Results saved to: $OUTPUT_DIR"
+echo "============================================================"
+echo "Generated files:"
+echo "  - performance_comparison.png"
+echo "  - error_analysis.png"
+echo "  - concept_analysis.png"
+echo "  - sample_cases.png"
+echo "  - why_fusion_helps.png"
+echo "  - metrics.json"
+echo "  - individual_images/ (directory with 20 image analyses)"
+echo "============================================================"
+
