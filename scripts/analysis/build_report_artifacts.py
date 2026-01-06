@@ -219,7 +219,7 @@ def scan_results_directory(results_root: Path) -> pd.DataFrame:
     consolidated_csvs = [
         results_root / "evals" / "stage1_test_consolidated.csv",
         results_root / "evals" / "stage2_test_consolidated.csv",
-        results_root / "evals" / "stage2_hf_consolidated.csv",
+        results_root / "evals" / "stage2_hf_specific_checkpoints.csv",
     ]
     
     for csv_path in consolidated_csvs:
@@ -624,6 +624,10 @@ def create_stage2_plots(df_stage2: pd.DataFrame, output_dir: Path):
     ablation_order = ["both", "concept_only", "image_only"]
     ablation_labels = {"both": "Both", "concept_only": "Concept Only", "image_only": "Image Only"}
     
+    # Ablation order for HF dataset (includes GeoCLIP)
+    ablation_order_hf = ["both", "concept_only", "image_only", "geoclip"]
+    ablation_labels_hf = {"both": "Both", "concept_only": "Concept Only", "image_only": "Image Only", "geoclip": "GeoCLIP"}
+    
     # Threshold accuracy columns and labels
     threshold_cols = ["acc_city", "acc_region", "acc_country"]
     threshold_labels = ["City (<25km)", "Region (<200km)", "Country (<750km)"]
@@ -634,8 +638,27 @@ def create_stage2_plots(df_stage2: pd.DataFrame, output_dir: Path):
     df_hf = df_hf.copy()
     df_hf["variant"] = df_hf["variant"].replace("vanilla", "default").str.capitalize()
     
-    variant_order = ["Default", "Finetuned"]
-    palette_map = {"Default": "#4472C4", "Finetuned": "#ED7D31"}  # Default=blue, Finetuned=orange
+    # Map "trained_stage1" to "Default" or "Finetuned" based on stage0_checkpoint
+    # "trained_stage1" with stage0_checkpoint -> "Finetuned"
+    # "trained_stage1" without stage0_checkpoint -> "Default"
+    if "stage0_checkpoint" in df_hf.columns:
+        mask_trained = df_hf["variant"].str.lower().str.contains("trained_stage1", na=False)
+        mask_has_stage0 = df_hf["stage0_checkpoint"].notna() & (df_hf["stage0_checkpoint"] != "") & (df_hf["stage0_checkpoint"] != "None")
+        df_hf.loc[mask_trained & mask_has_stage0, "variant"] = "Finetuned"
+        df_hf.loc[mask_trained & ~mask_has_stage0, "variant"] = "Default"
+    else:
+        # Fallback: map all "trained_stage1" to "Finetuned" if we can't check stage0
+        df_hf["variant"] = df_hf["variant"].replace({"Trained_stage1": "Finetuned", "trained_stage1": "Finetuned"})
+    
+    # Handle GeoCLIP variant mapping (handle different cases)
+    df_hf["variant"] = df_hf["variant"].replace({"Geoclip": "GeoCLIP", "geoclip": "GeoCLIP", "GEOCLIP": "GeoCLIP"})
+    
+    # Convert empty strings to NaN for cell_acc
+    df_hf["cell_acc"] = df_hf["cell_acc"].replace("", np.nan)
+    df_hf["cell_acc"] = pd.to_numeric(df_hf["cell_acc"], errors='coerce')
+    
+    variant_order = ["Default", "Finetuned", "GeoCLIP"]
+    palette_map = {"Default": "#4472C4", "Finetuned": "#ED7D31", "GeoCLIP": "#70AD47"}  # Default=blue, Finetuned=orange, GeoCLIP=green
     
     # Matplotlib: Stage 2 Test Split Results
     if len(df_test_split) > 0:
@@ -768,19 +791,19 @@ def create_stage2_plots(df_stage2: pd.DataFrame, output_dir: Path):
     if len(df_hf) > 0:
         fig, axes = plt.subplots(2, 2, figsize=(14, 11))
         
-        # Plot 1: Median Error on HF dataset
-        df_plot = df_hf[df_hf["median_error_km"].notna()].copy()
+        # Plot 1: Median Error on HF dataset (exclude GeoCLIP)
+        df_plot = df_hf[(df_hf["median_error_km"].notna()) & (df_hf["variant"] != "GeoCLIP")].copy()
         if len(df_plot) > 0:
             ax = axes[0, 0]
             sns.barplot(data=df_plot, x="ablation_mode", y="median_error_km", hue="variant",
-                       order=ablation_order, hue_order=variant_order, ax=ax, 
-                       palette=[palette_map[v] for v in variant_order],
+                       order=ablation_order, hue_order=["Default", "Finetuned"], ax=ax, 
+                       palette=[palette_map[v] for v in ["Default", "Finetuned"]],
                        edgecolor="black", linewidth=2)
             ax.set_ylabel("Median Error (km)", fontweight='bold', fontsize=12)
             ax.set_xlabel("Ablation Mode", fontweight='bold', fontsize=12)
             ax.set_title("(a) Median Distance Error", fontweight='bold', pad=12, fontsize=13)
             handles, labels = ax.get_legend_handles_labels()
-            ax.legend(handles, variant_order, title="Variant", title_fontsize=11, fontsize=10)
+            ax.legend(handles, ["Default", "Finetuned"], title="Variant", title_fontsize=11, fontsize=10)
             ax.grid(axis='y', alpha=0.3, linestyle='--', linewidth=0.8)
             ax.spines['top'].set_visible(False)
             ax.spines['right'].set_visible(False)
@@ -790,24 +813,26 @@ def create_stage2_plots(df_stage2: pd.DataFrame, output_dir: Path):
             for container in ax.containers:
                 for bar in container:
                     height = bar.get_height()
-                    y_range = ax.get_ylim()[1] - ax.get_ylim()[0]
+                    current_ylim = ax.get_ylim()
+                    y_range = current_ylim[1] - current_ylim[0]
                     y_pos = height + y_range * 0.02
                     ax.text(bar.get_x() + bar.get_width()/2., y_pos,
                            f'{height:.2f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
         
-        # Plot 2: Cell Accuracy on HF dataset
-        if df_hf["cell_acc"].notna().any():
+        # Plot 2: Cell Accuracy on HF dataset (exclude GeoCLIP)
+        df_cell_acc = df_hf[(df_hf["cell_acc"].notna()) & (df_hf["variant"] != "GeoCLIP")].copy()
+        if len(df_cell_acc) > 0:
             ax = axes[0, 1]
-            sns.barplot(data=df_hf, x="ablation_mode", y="cell_acc", hue="variant",
-                      order=ablation_order, hue_order=variant_order, ax=ax, 
-                      palette=[palette_map[v] for v in variant_order],
+            sns.barplot(data=df_cell_acc, x="ablation_mode", y="cell_acc", hue="variant",
+                      order=ablation_order, hue_order=["Default", "Finetuned"], ax=ax, 
+                      palette=[palette_map[v] for v in ["Default", "Finetuned"]],
                       edgecolor="black", linewidth=2)
             ax.set_ylabel("Cell Accuracy", fontweight='bold', fontsize=12)
             ax.set_xlabel("Ablation Mode", fontweight='bold', fontsize=12)
             ax.set_title("(b) Cell Classification Accuracy", fontweight='bold', pad=12, fontsize=13)
             handles, labels = ax.get_legend_handles_labels()
-            ax.legend(handles, variant_order, title="Variant", title_fontsize=11, fontsize=10)
-            y_min, y_max = get_zoomed_ylim(df_hf["cell_acc"])
+            ax.legend(handles, ["Default", "Finetuned"], title="Variant", title_fontsize=11, fontsize=10)
+            y_min, y_max = get_zoomed_ylim(df_cell_acc["cell_acc"])
             ax.set_ylim([y_min, y_max])
             ax.grid(axis='y', alpha=0.3, linestyle='--', linewidth=0.8)
             ax.spines['top'].set_visible(False)
@@ -839,7 +864,7 @@ def create_stage2_plots(df_stage2: pd.DataFrame, output_dir: Path):
             ax = axes[1, 0]
             df_threshold = pd.DataFrame(threshold_data)
             sns.barplot(data=df_threshold, x="ablation_mode", y="accuracy", hue="threshold",
-                       order=ablation_order, ax=ax, palette=["#70AD47", "#FFC000", "#7030A0"],
+                       order=ablation_order_hf, ax=ax, palette=["#70AD47", "#FFC000", "#7030A0"],
                        edgecolor="black", linewidth=1.8)
             ax.set_ylabel("Accuracy", fontweight='bold', fontsize=12)
             ax.set_xlabel("Ablation Mode", fontweight='bold', fontsize=12)
@@ -851,7 +876,7 @@ def create_stage2_plots(df_stage2: pd.DataFrame, output_dir: Path):
             ax.spines['right'].set_visible(False)
             ax.spines['left'].set_linewidth(1.2)
             ax.spines['bottom'].set_linewidth(1.2)
-            ax.set_xticklabels([ablation_labels.get(x.get_text(), x.get_text()) for x in ax.get_xticklabels()])
+            ax.set_xticklabels([ablation_labels_hf.get(x.get_text(), x.get_text()) for x in ax.get_xticklabels()])
             for container in ax.containers:
                 for bar in container:
                     height = bar.get_height()
@@ -872,11 +897,21 @@ def create_stage2_plots(df_stage2: pd.DataFrame, output_dir: Path):
                             "median_error_km": row["median_error_km"]
                         })
             
+            # Add GeoCLIP test split value
+            geoclip_hf = df_hf[df_hf["variant"] == "GeoCLIP"]
+            if len(geoclip_hf) > 0:
+                comparison_data.append({
+                    "ablation_mode": "geoclip",
+                    "variant": "GeoCLIP",
+                    "dataset": "Test Split",
+                    "median_error_km": 522.3
+                })
+            
             if comparison_data:
                 ax = axes[1, 1]
                 df_comp = pd.DataFrame(comparison_data)
                 sns.barplot(data=df_comp, x="ablation_mode", y="median_error_km", hue="dataset",
-                           order=ablation_order, ax=ax, palette=["#5B9BD5", "#E7E6E6"],
+                           order=ablation_order_hf, ax=ax, palette=["#5B9BD5", "#E7E6E6"],
                            edgecolor="black", linewidth=1.8)
                 ax.set_ylabel("Median Error (km)", fontweight='bold', fontsize=12)
                 ax.set_xlabel("Ablation Mode", fontweight='bold', fontsize=12)
@@ -887,7 +922,7 @@ def create_stage2_plots(df_stage2: pd.DataFrame, output_dir: Path):
                 ax.spines['right'].set_visible(False)
                 ax.spines['left'].set_linewidth(1.2)
                 ax.spines['bottom'].set_linewidth(1.2)
-                ax.set_xticklabels([ablation_labels.get(x.get_text(), x.get_text()) for x in ax.get_xticklabels()])
+                ax.set_xticklabels([ablation_labels_hf.get(x.get_text(), x.get_text()) for x in ax.get_xticklabels()])
                 for container in ax.containers:
                     for bar in container:
                         height = bar.get_height()

@@ -771,7 +771,7 @@ def main():
             logger.warning("No results to save!")
 
         return
-
+    
     # Batch mode: auto-detect and evaluate all checkpoints
     if args.batch_mode:
         logger.info("Batch mode: Auto-detecting latest Stage 2 checkpoints...")
