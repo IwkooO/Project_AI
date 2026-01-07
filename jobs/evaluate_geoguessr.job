@@ -1,0 +1,143 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=eval_geoguessr
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=4:00:00
+#SBATCH --output=jobs/outputs/evaluate_geoguessr_%j.out
+
+set -eo pipefail
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd "$HOME/Project_AI/"
+
+mkdir -p jobs/outputs
+
+echo "============================================================"
+echo "Activating project venv"
+echo "============================================================"
+
+# Activate environment
+export GEOTIFF_CSV="${GEOTIFF_CSV:-}"
+set +u
+source activate streetview
+set -u
+
+# Install required packages
+pip install reverse_geocoder
+pip install datasets
+pip install hf_transfer 2>/dev/null || echo "Note: hf_transfer not installed (optional, for faster downloads)"
+
+# Set up HuggingFace cache to avoid rate limits
+export HF_HOME="$HOME/.cache/huggingface"
+export HF_DATASETS_CACHE="$HF_HOME/datasets"
+export HF_HUB_ENABLE_HF_TRANSFER=1
+mkdir -p "$HF_HOME"
+# ============================================================
+# GEOGUESSR EVALUATION CONFIG
+# ============================================================
+
+# Checkpoint directory (best performing model)
+CHECKPOINT="/home/igodzwon/Project_AI/checkpoints/stage3_joint_latefusion/stage3_joint_both_scratchgeo_dim256_pos_latefusion_2.5ct_gatereg_0.01_drop0.3"
+
+# Find Phase 1 run directory to get concept data
+PHASE1_BASE_DIR="checkpoints/phase1_adaptive_tau/adaptive_tau_d1_h4_dim256_pos"
+PHASE1_RUN_DIR=$(find "$PHASE1_BASE_DIR" -type d -name "run_*" | sort -r | while read run_dir; do
+  if [[ -d "$run_dir/concept_data_v2" ]] && [[ -f "$run_dir/concept_data_v2/concept_vocab.json" ]]; then
+    echo "$run_dir"
+    break
+  fi
+done | head -n 1)
+
+if [[ -z "$PHASE1_RUN_DIR" ]]; then
+  echo "WARNING: Could not find Phase 1 run directory, using default paths"
+  CONCEPT_DATA_DIR="data/concept_data_v2"
+else
+  CONCEPT_DATA_DIR="${PHASE1_RUN_DIR}/concept_data_v2"
+fi
+
+# Output directory
+OUTPUT_DIR="results/geoguessr_evaluation"
+
+# Number of samples to evaluate (set to -1 for all)
+NUM_SAMPLES=-1
+
+# Number of samples to visualize
+VISUALIZE_SAMPLES=30
+
+mkdir -p "$OUTPUT_DIR"
+mkdir -p jobs/outputs
+
+echo "============================================================"
+echo "GEOGUESSR DATASET EVALUATION"
+echo "============================================================"
+echo "Checkpoint: $CHECKPOINT"
+echo "Concept Data: $CONCEPT_DATA_DIR"
+echo "Output: $OUTPUT_DIR"
+echo "Num Samples: $NUM_SAMPLES"
+echo "Visualize Samples: $VISUALIZE_SAMPLES"
+echo "============================================================"
+
+# Verify checkpoint exists
+if [[ ! -d "$CHECKPOINT" ]]; then
+  echo "ERROR: Checkpoint directory not found: $CHECKPOINT"
+  exit 1
+fi
+if [[ ! -f "$CHECKPOINT/best_joint.pt" ]]; then
+  echo "ERROR: No checkpoint file found at $CHECKPOINT/best_joint.pt"
+  exit 1
+fi
+
+# Verify concept data exists
+if [[ ! -f "$CONCEPT_DATA_DIR/concept_vocab.json" ]]; then
+  echo "ERROR: Concept vocabulary not found at $CONCEPT_DATA_DIR/concept_vocab.json"
+  exit 1
+fi
+
+# Check HuggingFace login
+echo "Checking HuggingFace authentication..."
+if ! python -c "from huggingface_hub import HfApi; HfApi().whoami()" 2>/dev/null; then
+  echo "WARNING: Not logged into HuggingFace. Run 'huggingface-cli login' if dataset access fails."
+fi
+
+# Run evaluation
+python scripts/evaluation/evaluate_geoguessr.py \
+  --checkpoint "$CHECKPOINT" \
+  --concept-data-dir "$CONCEPT_DATA_DIR" \
+  --output-dir "$OUTPUT_DIR" \
+  --num-samples "$NUM_SAMPLES" \
+  --batch-size 32 \
+  --visualize-samples "$VISUALIZE_SAMPLES" \
+  --split "train" \
+  --concept-dim 256 \
+  --patch-dim 1024 \
+  --hidden-dim 512 \
+  --num-heads 8 \
+  --num-layers 2 \
+  --dropout 0.1 \
+  --phase1-dropout 0.45 \
+  --mil-topk 6 \
+  --mil-tau 0.25 \
+  --mix-depth 1 \
+  --mix-heads 4 \
+  --mix-mlp-ratio 2.0 \
+  --proj-type simple \
+  --concept-temperature 2.5 \
+  --device cuda
+
+echo "============================================================"
+echo "Evaluation complete!"
+echo "Results saved to: $OUTPUT_DIR"
+echo "============================================================"
+echo "Generated files:"
+echo "  - metrics.json (quantitative results)"
+echo "  - metrics_summary.png (error distribution and thresholds)"
+echo "  - concept_distribution.png (concept prediction analysis)"
+echo "  - country_analysis.png (country/continent accuracy)"
+echo "  - sample_visualizations/ (attention maps for samples)"
+echo "============================================================"
+

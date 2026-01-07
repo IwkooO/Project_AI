@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
-#SBATCH --job-name=compare_models
+#SBATCH --job-name=top_images_concept
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=4:00:00
-#SBATCH --output=jobs/outputs/compare_model_variants_%j.out
+#SBATCH --output=jobs/outputs/visualize_top_images_per_concept_%j.out
 
 set -eo pipefail
 
@@ -28,13 +28,11 @@ source activate streetview
 set -u
 
 # ============================================================
-# MODEL COMPARISON CONFIG
+# TOP IMAGES PER CONCEPT CONFIG
 # ============================================================
 
-# Checkpoint directories (relative to project root)
+# Checkpoint directory (relative to project root)
 CHECKPOINT_BOTH="/home/igodzwon/Project_AI/checkpoints/stage3_joint_latefusion/stage3_joint_both_scratchgeo_dim256_pos_latefusion_2.5ct_gatereg_0.01_drop0.3"
-CHECKPOINT_CONCEPT="/home/igodzwon/Project_AI/checkpoints/stage3_joint_latefusion/stage3_joint_concept_only_scratchgeo_dim256_pos_latefusion_2.5ct_drop0.3"
-CHECKPOINT_IMAGE="/home/igodzwon/Project_AI/checkpoints/stage3_joint_latefusion/stage3_joint_image_only_scratchgeo_dim256_pos_latefusion_2.5ct_drop0.3"
 
 # Data paths
 # Find Phase 1 run directory to get correct splits and concept data
@@ -58,34 +56,33 @@ fi
 TEST_CSV="${SPLITS_DIR}/dataset_test.csv"
 CACHED_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip_v2"
 
+# Image directory (optional, if images are available)
+IMAGE_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/panorama_processed"
+
 # Output directory
-OUTPUT_DIR="results/model_comparison_stage3_latefusion"
+OUTPUT_DIR="results/top_images_per_concept"
 
 mkdir -p "$OUTPUT_DIR"
 mkdir -p jobs/outputs
 
 echo "============================================================"
-echo "MODEL VARIANT COMPARISON"
+echo "TOP IMAGES PER CONCEPT VISUALIZATION"
 echo "============================================================"
 echo "Checkpoint (Both): $CHECKPOINT_BOTH"
-echo "Checkpoint (Concept Only): $CHECKPOINT_CONCEPT"
-echo "Checkpoint (Image Only): $CHECKPOINT_IMAGE"
 echo "Test CSV: $TEST_CSV"
 echo "Concept Data: $CONCEPT_DATA_DIR"
+echo "Image Dir: $IMAGE_DIR"
 echo "Output: $OUTPUT_DIR"
 echo "============================================================"
 
-# Verify checkpoints exist
-for ckpt_name in "CHECKPOINT_BOTH" "CHECKPOINT_CONCEPT" "CHECKPOINT_IMAGE"; do
-  ckpt_path="${!ckpt_name}"
-  if [[ ! -d "$ckpt_path" ]]; then
-    echo "ERROR: Checkpoint directory not found: $ckpt_path"
-    exit 1
-  fi
-  if [[ ! -f "$ckpt_path/best_joint.pt" ]] && [[ ! -f "$ckpt_path/phase1/best_phase1.pt" ]]; then
-    echo "WARNING: No checkpoint file found in $ckpt_path"
-  fi
-done
+# Verify checkpoint exists
+if [[ ! -d "$CHECKPOINT_BOTH" ]]; then
+  echo "ERROR: Checkpoint directory not found: $CHECKPOINT_BOTH"
+  exit 1
+fi
+if [[ ! -f "$CHECKPOINT_BOTH/best_joint.pt" ]] && [[ ! -f "$CHECKPOINT_BOTH/phase1/best_phase1.pt" ]]; then
+  echo "WARNING: No checkpoint file found in $CHECKPOINT_BOTH"
+fi
 
 # Verify test CSV exists
 if [[ ! -f "$TEST_CSV" ]]; then
@@ -99,14 +96,13 @@ if [[ ! -f "$CONCEPT_DATA_DIR/concept_vocab.json" ]]; then
   exit 1
 fi
 
-# Run comparison
-python scripts/evaluation/compare_model_variants.py \
+# Run visualization
+python scripts/evaluation/visualize_top_images_per_concept.py \
   --checkpoint-both "$CHECKPOINT_BOTH" \
-  --checkpoint-concept "$CHECKPOINT_CONCEPT" \
-  --checkpoint-image "$CHECKPOINT_IMAGE" \
   --test-csv "$TEST_CSV" \
   --concept-data-dir "$CONCEPT_DATA_DIR" \
   --cached-dir "$CACHED_DIR" \
+  --image-dir "$IMAGE_DIR" \
   --output-dir "$OUTPUT_DIR" \
   --concept-dim 256 \
   --hidden-dim 512 \
@@ -125,21 +121,16 @@ python scripts/evaluation/compare_model_variants.py \
   --batch-size 64 \
   --num-workers 4 \
   --device cuda \
-  --save-individual-images \
-  --num-image-samples 20 \
-  --image-selection significant_improvement
+  --num-concepts 20 \
+  --num-images-per-concept 10 \
+  --min-samples 10
 
 echo "============================================================"
-echo "Comparison complete!"
+echo "Visualization complete!"
 echo "Results saved to: $OUTPUT_DIR"
 echo "============================================================"
 echo "Generated files:"
-echo "  - performance_comparison.png"
-echo "  - error_analysis.png"
-echo "  - concept_analysis.png"
-echo "  - sample_cases.png"
-echo "  - why_fusion_helps.png"
-echo "  - metrics.json"
-echo "  - individual_images/ (directory with 20 image analyses)"
+echo "  - concept_XXXX_conceptname.png (one per concept)"
+echo "  - Each file shows top 10 images with attention overlays"
 echo "============================================================"
 

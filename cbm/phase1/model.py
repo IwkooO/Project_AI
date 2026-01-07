@@ -631,6 +631,7 @@ class Phase1CBMCrossAttention(nn.Module):
     Supports:
     - cached mode: forward(patches) where patches are [B, P, patch_dim]
     - trainable backbone mode (optional): forward(images) if vision_encoder is provided
+    - pooled_emb parameter is accepted for API compatibility but not used
     """
 
     def __init__(
@@ -667,7 +668,7 @@ class Phase1CBMCrossAttention(nn.Module):
             topk=topk,
         )
 
-    def forward(self, patches_or_images: torch.Tensor):
+    def forward(self, patches_or_images: torch.Tensor, pooled_emb: torch.Tensor | None = None):
         if self.use_trainable_backbone:
             if self.vision_encoder is None:
                 raise RuntimeError("vision_encoder is None but use_trainable_backbone=True")
@@ -676,6 +677,7 @@ class Phase1CBMCrossAttention(nn.Module):
         else:
             patches = patches_or_images
 
+        # Note: pooled_emb is accepted for API compatibility but not used by cross-attention head
         return self.concept_head(patches)
 
 

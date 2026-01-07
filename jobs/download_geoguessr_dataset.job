@@ -1,0 +1,70 @@
+#!/bin/bash
+#SBATCH --partition=gpu_mig
+#SBATCH --gpus=1
+#SBATCH --job-name=download_geoguessr
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --time=2:00:00
+#SBATCH --output=jobs/outputs/download_geoguessr_%j.out
+
+set -eo pipefail
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd "$HOME/Project_AI/"
+
+mkdir -p jobs/outputs
+
+echo "============================================================"
+echo "Activating project venv"
+echo "============================================================"
+
+# Activate environment
+export GEOTIFF_CSV="${GEOTIFF_CSV:-}"
+set +u
+source activate streetview
+set -u
+
+# Install required packages
+pip install datasets
+pip install hf_transfer 2>/dev/null || echo "Note: hf_transfer not installed (optional)"
+
+# Set up HuggingFace cache
+export HF_HOME="$HOME/.cache/huggingface"
+export HF_DATASETS_CACHE="$HF_HOME/datasets"
+export HF_HUB_ENABLE_HF_TRANSFER=1
+mkdir -p "$HF_HOME"
+export HF_TOKEN=""
+
+# Check HuggingFace authentication (non-interactive)
+echo "Checking HuggingFace authentication..."
+if [[ -n "${HF_TOKEN:-}" ]]; then
+    echo "✅ Using HF_TOKEN from environment"
+    export HF_TOKEN="$HF_TOKEN"
+elif python -c "from huggingface_hub import HfApi; HfApi().whoami()" 2>/dev/null; then
+    echo "✅ HuggingFace token found (already logged in)"
+else
+    echo "WARNING: HuggingFace token not found."
+    echo "If download fails, login on login node with: huggingface-cli login"
+    echo "Or set: export HF_TOKEN=your_token_here before submitting"
+fi
+
+echo "============================================================"
+echo "DOWNLOADING GEOGUESSR DATASET"
+echo "============================================================"
+echo "This will download the entire dataset to cache."
+echo "Cache location: $HF_DATASETS_CACHE"
+echo "============================================================"
+
+# Download dataset
+python scripts/data_processing/download_geoguessr_dataset.py \
+  --split "train"
+
+echo "============================================================"
+echo "Download complete!"
+echo "Dataset cached at: $HF_DATASETS_CACHE"
+echo "You can now run evaluation without rate limit issues."
+echo "============================================================"
+

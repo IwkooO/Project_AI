@@ -47,9 +47,9 @@ LR=1e-4
 PHASE1_LR=1e-5        # Low LR to preserve interpretable concepts
 
 # Mode: 'both' (Concepts + CLS)
-MODE="both"
+MODE="concept_only"
 
-RUN_TAG="stage3_joint_${MODE}_scratchgeo_dim${CONCEPT_DIM}_pos_latefusion_2.5ct_0.01gatereg_lk5"
+RUN_TAG="stage3_joint_${MODE}_scratchgeo_dim${CONCEPT_DIM}_pos_latefusion_2.5ct"
 OUTPUT_DIR="checkpoints/stage3_joint_latefusion/${RUN_TAG}"
 
 # Paths

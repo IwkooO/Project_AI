@@ -1,0 +1,149 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=stage3_crossattn_both
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=24:00:00
+#SBATCH --output=jobs/outputs/stage3_crossattn_both_%j.out
+
+set -eo pipefail
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd "$HOME/Project_AI/"
+mkdir -p jobs/outputs
+
+source activate streetview
+
+wandb_api_key="9073a011764cb23fce5384443a3996ca9c5d9198"
+export WANDB_API_KEY="$wandb_api_key"
+
+# ============================================================
+# STAGE 3 JOINT TRAINING CONFIG (Cross-Attention Version)
+# ============================================================
+# Phase 1 params (from Cross-Attention Phase 1)
+CONCEPT_DIM=256
+MIX_DEPTH=3                 # Cross-attention uses deeper mixer
+MIX_HEADS=4
+MIX_MLP_RATIO=4.0           # Cross-attention uses larger MLP ratio
+MIX_LOCAL_KERNEL=0          # Cross-attention doesn't use local kernel
+PROJ_TYPE=simple
+PHASE1_DROPOUT=0.3          # From Cross-Attention Phase 1: 0.3
+STAGE2_DROPOUT=0.1
+LR=1e-4
+PHASE1_LR=1e-5
+MODE="both"                 # Both mode
+
+# Cross-attention specific params (for reference, not used in Phase 2)
+XATTN_HEADS=8
+XATTN_TEMPERATURE=2.5
+XATTN_TOPK=16
+
+RUN_TAG="stage3_joint_${MODE}_scratchgeo_dim${CONCEPT_DIM}_pos_latefusion_2.5ct_0.01gatereg_crossattn"
+OUTPUT_DIR="checkpoints/stage3_joint_latefusion/${RUN_TAG}"
+
+# Paths
+SPLITS_DIR="data/6921d7831744c5356b098bf7_balanced/splits"
+CACHED_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip_v2"
+
+# Phase 1 checkpoint (Cross-Attention version)
+PHASE1_BASE_DIR="checkpoints/phase1_crossattn/crossattn_dim256_depth3_heads8_pos"
+PHASE1_CHECKPOINT="${PHASE1_BASE_DIR}/phase1/best_phase1.pt"
+
+# Find Phase 1 concept data and splits
+PHASE1_CONCEPT_DATA=$(find "$PHASE1_BASE_DIR" -type d -name "concept_data_v2" | head -n 1)
+PHASE1_SPLITS_DIR=$(find "$PHASE1_BASE_DIR" -type d -path "*/run_*/splits" | head -n 1)
+
+if [[ -z "$PHASE1_CONCEPT_DATA" ]]; then
+    echo "ERROR: Could not find concept_data_v2 in $PHASE1_BASE_DIR"
+    exit 1
+fi
+
+if [[ -z "$PHASE1_SPLITS_DIR" ]]; then
+    echo "WARNING: Could not find Phase 1 splits, using default splits"
+    PHASE1_SPLITS_DIR="$SPLITS_DIR"
+fi
+
+TRAIN_CSV="${PHASE1_SPLITS_DIR}/dataset_train.csv"
+VAL_CSV="${PHASE1_SPLITS_DIR}/dataset_val.csv"
+TEST_CSV="${PHASE1_SPLITS_DIR}/dataset_test.csv"
+
+# Verify CSV files exist
+for csv_file in "$TRAIN_CSV" "$VAL_CSV"; do
+    if [[ ! -f "$csv_file" ]]; then
+        echo "ERROR: CSV file not found: $csv_file"
+        exit 1
+    fi
+done
+
+# Verify concept vocabulary exists
+CONCEPT_VOCAB="${PHASE1_CONCEPT_DATA}/concept_vocab.json"
+if [[ ! -f "$CONCEPT_VOCAB" ]]; then
+    echo "ERROR: Concept vocabulary not found: $CONCEPT_VOCAB"
+    exit 1
+fi
+
+mkdir -p "$OUTPUT_DIR"
+
+echo "============================================================"
+echo "STAGE 3 JOINT TRAINING: Cross-Attention Version (Both Mode)"
+echo "============================================================"
+echo "Mode: $MODE"
+echo "Phase 1 Checkpoint: $PHASE1_CHECKPOINT"
+echo "Concept Data: $PHASE1_CONCEPT_DATA"
+echo "Concept Dim: $CONCEPT_DIM"
+echo "Mix Depth: $MIX_DEPTH"
+echo "Mix Heads: $MIX_HEADS"
+echo "Mix MLP Ratio: $MIX_MLP_RATIO"
+echo "Mix Local Kernel: $MIX_LOCAL_KERNEL"
+echo "Output: $OUTPUT_DIR"
+echo "============================================================"
+
+python -m cbm.joint.train \
+  --train-csv "$TRAIN_CSV" \
+  --val-csv "$VAL_CSV" \
+  --test-csv "$TEST_CSV" \
+  --cached-dir "$CACHED_DIR" \
+  --concept-data-dir "$PHASE1_CONCEPT_DATA" \
+  --output-dir "$OUTPUT_DIR" \
+  --phase1-checkpoint "$PHASE1_CHECKPOINT" \
+  --mode "$MODE" \
+  --num-cells 1000 \
+  --hidden-dim 512 \
+  --num-heads 8 \
+  --num-layers 2 \
+  --dropout "$STAGE2_DROPOUT" \
+  --phase1-dropout "$PHASE1_DROPOUT" \
+  --concept-dim "$CONCEPT_DIM" \
+  --patch-dim 1024 \
+  --mil-topk 16 \
+  --mil-tau 0.25 \
+  --mix-depth "$MIX_DEPTH" \
+  --mix-heads "$MIX_HEADS" \
+  --mix-mlp-ratio "$MIX_MLP_RATIO" \
+  --mix-local-kernel-size "$MIX_LOCAL_KERNEL" \
+  --proj-type "$PROJ_TYPE" \
+  --batch-size 64 \
+  --num-workers 4 \
+  --epochs 100 \
+  --lr "$LR" \
+  --phase1-lr "$PHASE1_LR" \
+  --weight-decay 0.01 \
+  --concept-loss-weight 1.0 \
+  --cell-loss-weight 1.0 \
+  --offset-loss-weight 10.0 \
+  --wandb \
+  --wandb-project "cbm_stage3_joint" \
+  --wandb-run-name "$RUN_TAG" \
+  --concept-temperature 2.5 \
+  --early-stop-patience 10 \
+  --gate-reg-weight 0.01
+
+echo "============================================================"
+echo "Stage 3 Cross-Attention training complete!"
+echo "Checkpoint: ${OUTPUT_DIR}/best_joint.pt"
+echo "============================================================"
+

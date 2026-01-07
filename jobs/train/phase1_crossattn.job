@@ -1,0 +1,125 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=phase1_crossattn
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=18:00:00
+#SBATCH --output=jobs/outputs/phase1_crossattn_%j.out
+
+set -eo pipefail
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd "$HOME/Project_AI/"
+mkdir -p jobs/outputs
+
+source activate streetview
+
+wandb_api_key="9073a011764cb23fce5384443a3996ca9c5d9198"
+export WANDB_API_KEY="$wandb_api_key"
+
+# ============================================================
+# PHASE 1 CONFIG (Cross-Attention Mode)
+# ============================================================
+CONCEPT_DIM=256
+MIX_DEPTH=3              # Cross-attention uses deeper mixer (default: 3)
+MIX_HEADS=4
+MIX_MLP_RATIO=4.0        # Cross-attention uses larger MLP ratio (default: 4.0)
+MIX_LOCAL_KERNEL=0
+PROJ_TYPE=simple
+DROPOUT=0.3
+WEIGHT_DECAY=0.05
+USE_POS_ENCODING=true
+MAX_PATCHES=576
+
+# Cross-attention specific parameters
+XATTN_HEADS=8            # Number of attention heads
+XATTN_TEMPERATURE=2.5    # Attention temperature
+XATTN_TOPK=16           # Top-K patches to attend to (0 = all)
+
+RUN_TAG="crossattn_dim${CONCEPT_DIM}_depth${MIX_DEPTH}_heads${XATTN_HEADS}_pos"
+OUTPUT_DIR="checkpoints/phase1_crossattn/${RUN_TAG}"
+
+# Paths
+SPLITS_DIR="data/6921d7831744c5356b098bf7_balanced/splits"
+CACHED_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip_v2"
+CONCEPT_MAPPING="data/concept_refinement_mapped.csv"
+
+# Per-job working directory
+RUN_ID="${SLURM_JOB_ID:-local_$(date +%Y%m%d_%H%M%S)}"
+RUN_WORKDIR="${OUTPUT_DIR}/run_${RUN_ID}"
+RUN_SPLITS_DIR="${RUN_WORKDIR}/splits"
+RUN_CONCEPT_DATA="${RUN_WORKDIR}/concept_data_v2"
+
+mkdir -p "$OUTPUT_DIR" "$RUN_SPLITS_DIR" "$RUN_CONCEPT_DATA"
+
+# Copy splits
+for split in train val test; do
+  src="${SPLITS_DIR}/dataset_${split}.csv"
+  if [[ -f "${src}.bak" ]]; then
+    cp "${src}.bak" "${RUN_SPLITS_DIR}/dataset_${split}.csv"
+  else
+    cp "$src" "${RUN_SPLITS_DIR}/dataset_${split}.csv"
+  fi
+done
+
+TRAIN_CSV="${RUN_SPLITS_DIR}/dataset_train.csv"
+VAL_CSV="${RUN_SPLITS_DIR}/dataset_val.csv"
+CONCEPT_DATA="$RUN_CONCEPT_DATA"
+
+echo "============================================================"
+echo "PHASE 1: Cross-Attention Mode"
+echo "============================================================"
+
+# Step 1: Map concepts
+python scripts/data_processing/map_generalized_concepts.py \
+  --splits-dir "$RUN_SPLITS_DIR" \
+  --mapping "$CONCEPT_MAPPING"
+
+# Step 2: Precompute geo priors
+python scripts/data_processing/precompute_geo_priors.py \
+  --train-csv "$TRAIN_CSV" \
+  --output-dir "$CONCEPT_DATA" \
+  --s2-level 8
+
+# Step 3: Train Phase 1 with Cross-Attention
+python -m cbm.phase1.train \
+  --train-csv "$TRAIN_CSV" \
+  --val-csv "$VAL_CSV" \
+  --cached-dir "$CACHED_DIR" \
+  --concept-data-dir "$CONCEPT_DATA" \
+  --output-dir "$OUTPUT_DIR" \
+  --epochs 100 \
+  --batch-size 64 \
+  --lr 5e-5 \
+  --warmup-epochs 8 \
+  --wandb \
+  --wandb-run-name "$RUN_TAG" \
+  --head-type cross_attention \
+  --concept-dim "$CONCEPT_DIM" \
+  --mix-depth "$MIX_DEPTH" \
+  --mix-heads "$MIX_HEADS" \
+  --mix-mlp-ratio "$MIX_MLP_RATIO" \
+  --mix-local-kernel-size "$MIX_LOCAL_KERNEL" \
+  --dropout "$DROPOUT" \
+  --weight-decay "$WEIGHT_DECAY" \
+  --selection-metric acc1 \
+  --proj-type "$PROJ_TYPE" \
+  --early-stop-patience 10 \
+  --max-patches "$MAX_PATCHES" \
+  --use-pos-encoding \
+  --xattn-heads "$XATTN_HEADS" \
+  --xattn-temperature "$XATTN_TEMPERATURE" \
+  --xattn-topk "$XATTN_TOPK"
+
+echo "============================================================"
+echo "Phase 1 Cross-Attention training complete!"
+echo "Checkpoint: ${OUTPUT_DIR}/phase1/best_phase1.pt"
+echo "Concept data: $CONCEPT_DATA"
+echo "Splits: $RUN_SPLITS_DIR"
+echo "============================================================"
+
+
