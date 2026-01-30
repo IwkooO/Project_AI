@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
-#SBATCH --job-name=top_images_concept
+#SBATCH --job-name=vis_license_chevron
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=4:00:00
-#SBATCH --output=jobs/outputs/visualize_top_images_per_concept_%j.out
+#SBATCH --output=jobs/outputs/visualize_specific_concepts_%j.out
 
 set -eo pipefail
 
@@ -28,7 +28,7 @@ source activate streetview
 set -u
 
 # ============================================================
-# TOP IMAGES PER CONCEPT CONFIG
+# SPECIFIC CONCEPTS VISUALIZATION CONFIG
 # ============================================================
 
 # Checkpoint directory (relative to project root)
@@ -60,13 +60,13 @@ CACHED_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_ba
 IMAGE_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/panorama_processed"
 
 # Output directory
-OUTPUT_DIR="results/top_images_per_concept"
+OUTPUT_DIR="results/top_images_per_concept_specific"
 
 mkdir -p "$OUTPUT_DIR"
 mkdir -p jobs/outputs
 
 echo "============================================================"
-echo "TOP IMAGES PER CONCEPT VISUALIZATION"
+echo "VISUALIZING SPECIFIC CONCEPTS: chevron, railroad, car_meta, landscape_fog, guardrail, car_type, pole_shape, pole_marker, building_roof, building_facade, landscape_flatland_tropical, landscape_hills_tropical, landscape_mountains_tropical, landscape_mountains_arid, traffic_light"
 echo "============================================================"
 echo "Checkpoint (Both): $CHECKPOINT_BOTH"
 echo "Test CSV: $TEST_CSV"
@@ -96,7 +96,7 @@ if [[ ! -f "$CONCEPT_DATA_DIR/concept_vocab.json" ]]; then
   exit 1
 fi
 
-# Run visualization
+# Run visualization with specific concepts
 python scripts/evaluation/visualize_top_images_per_concept.py \
   --checkpoint-both "$CHECKPOINT_BOTH" \
   --test-csv "$TEST_CSV" \
@@ -121,16 +121,24 @@ python scripts/evaluation/visualize_top_images_per_concept.py \
   --batch-size 64 \
   --num-workers 4 \
   --device cuda \
-  --num-concepts 20 \
   --num-images-per-concept 10 \
-  --min-samples 10
+  --min-samples 10 \
+  --concept-names bollard_design bollard_shape
+  # --concept-names chevron railroad car_meta landscape_fog guardrail car_type pole_shape pole_marker building_roof building_facade landscape_flatland_tropical landscape_hills_tropical landscape_mountains_tropical landscape_mountains_arid traffic_light
 
 echo "============================================================"
 echo "Visualization complete!"
 echo "Results saved to: $OUTPUT_DIR"
 echo "============================================================"
 echo "Generated files:"
-echo "  - concept_XXXX_conceptname.png (one per concept)"
+echo "  - concept_XXXX_license_plate.png"
+echo "  - concept_XXXX_chevron.png"
+echo "  - concept_XXXX_railroad.png"
+echo "  - concept_XXXX_car_meta.png"
+echo "  - concept_XXXX_landscape_fog.png"
+echo "  - concept_XXXX_guardrail.png"
+echo "  - concept_XXXX_car_type.png"
 echo "  - Each file shows top 10 images with attention overlays"
+echo "  - Each image shows original meta_name (unmapped concept)"
 echo "============================================================"
 

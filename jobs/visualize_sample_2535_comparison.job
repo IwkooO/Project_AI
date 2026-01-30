@@ -1,0 +1,32 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=vis_sample_2535
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --time=1:00:00
+#SBATCH --output=jobs/outputs/vis_sample_2535_%j.out
+
+set -eo pipefail
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd "$HOME/Project_AI/"
+
+source activate streetview
+
+python scripts/evaluation/visualize_sample_comparison.py \
+  --sample-idx 2535 \
+  --val-csv /home/igodzwon/Project_AI/checkpoints/phase1_adaptive_tau/adaptive_tau_d1_h4_dim256_pos/run_18113034/splits/dataset_val.csv \
+  --cached-dir /scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip_v2 \
+  --concept-data-dir /home/igodzwon/Project_AI/checkpoints/phase1_adaptive_tau/adaptive_tau_d1_h4_dim256_pos/run_18113034/concept_data_v2 \
+  --checkpoint-adaptive-tau /home/igodzwon/Project_AI/checkpoints/phase1_adaptive_tau/adaptive_tau_d1_h4_dim256_pos \
+  --checkpoint-textinit /home/igodzwon/Project_AI/checkpoints/phase1_textinit_adaptive/reg-cbm_stage_1_textinit_visinit_interpretable_tau0.25_k6_stk0.45_lk5_cdim768_adaptivetau \
+  --checkpoint-crossattn /home/igodzwon/Project_AI/checkpoints/phase1_crossattn/crossattn_dim256_depth3_heads8_pos \
+  --output-path /home/igodzwon/Project_AI/checkpoints/comparison_sample_2535.png \
+  --device cuda
+
+echo "Visualization complete!"
+

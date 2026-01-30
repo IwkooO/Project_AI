@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
-#SBATCH --job-name=top_images_concept
+#SBATCH --job-name=vis_distributions
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --time=4:00:00
-#SBATCH --output=jobs/outputs/visualize_top_images_per_concept_%j.out
+#SBATCH --time=2:00:00
+#SBATCH --output=jobs/outputs/visualize_distributions_only_%j.out
 
 set -eo pipefail
 
@@ -28,7 +28,7 @@ source activate streetview
 set -u
 
 # ============================================================
-# TOP IMAGES PER CONCEPT CONFIG
+# DISTRIBUTION-ONLY VISUALIZATION CONFIG
 # ============================================================
 
 # Checkpoint directory (relative to project root)
@@ -56,22 +56,21 @@ fi
 TEST_CSV="${SPLITS_DIR}/dataset_test.csv"
 CACHED_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/cached_streetclip_v2"
 
-# Image directory (optional, if images are available)
+# Image directory (optional, not needed for distribution-only)
 IMAGE_DIR="/scratch-shared/igodzwon/Project_AI/data/6921d7831744c5356b098bf7_balanced/panorama_processed"
 
 # Output directory
-OUTPUT_DIR="results/top_images_per_concept"
+OUTPUT_DIR="results/activation_distributions"
 
 mkdir -p "$OUTPUT_DIR"
 mkdir -p jobs/outputs
 
 echo "============================================================"
-echo "TOP IMAGES PER CONCEPT VISUALIZATION"
+echo "CREATING ACTIVATION DISTRIBUTIONS FOR: chevron, railroad, car_meta, landscape_fog, guardrail, car_type, pole_shape, pole_marker, building_roof, building_facade, landscape_flatland_tropical, landscape_hills_tropical, landscape_mountains_tropical, landscape_mountains_arid, traffic_light"
 echo "============================================================"
 echo "Checkpoint (Both): $CHECKPOINT_BOTH"
 echo "Test CSV: $TEST_CSV"
 echo "Concept Data: $CONCEPT_DATA_DIR"
-echo "Image Dir: $IMAGE_DIR"
 echo "Output: $OUTPUT_DIR"
 echo "============================================================"
 
@@ -96,7 +95,7 @@ if [[ ! -f "$CONCEPT_DATA_DIR/concept_vocab.json" ]]; then
   exit 1
 fi
 
-# Run visualization
+# Run visualization with distribution-only mode
 python scripts/evaluation/visualize_top_images_per_concept.py \
   --checkpoint-both "$CHECKPOINT_BOTH" \
   --test-csv "$TEST_CSV" \
@@ -121,16 +120,16 @@ python scripts/evaluation/visualize_top_images_per_concept.py \
   --batch-size 64 \
   --num-workers 4 \
   --device cuda \
-  --num-concepts 20 \
   --num-images-per-concept 10 \
-  --min-samples 10
+  --min-samples 10 \
+  --concept-names chevron railroad car_meta landscape_fog guardrail car_type pole_shape pole_marker building_roof building_facade landscape_flatland_tropical landscape_hills_tropical landscape_mountains_tropical landscape_mountains_arid traffic_light bollard_design \
+  --distribution-only
 
 echo "============================================================"
 echo "Visualization complete!"
 echo "Results saved to: $OUTPUT_DIR"
 echo "============================================================"
-echo "Generated files:"
-echo "  - concept_XXXX_conceptname.png (one per concept)"
-echo "  - Each file shows top 10 images with attention overlays"
+echo "Generated file:"
+echo "  - activation_distributions.png (violin plots for all concepts)"
 echo "============================================================"
 

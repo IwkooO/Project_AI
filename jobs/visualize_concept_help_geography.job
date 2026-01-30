@@ -1,0 +1,105 @@
+#!/bin/bash
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=vis_concept_geo
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --time=2:00:00
+#SBATCH --output=jobs/outputs/visualize_concept_help_geography_%j.out
+
+set -eo pipefail
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+
+cd "$HOME/Project_AI/"
+
+mkdir -p jobs/outputs
+
+echo "============================================================"
+echo "Activating project venv"
+echo "============================================================"
+
+# Activate environment
+export GEOTIFF_CSV="${GEOTIFF_CSV:-}"
+set +u
+source activate streetview
+set -u
+
+# ============================================================
+# CONFIG
+# ============================================================
+
+RESULTS_DIR="results/model_comparison_stage3_latefusion"
+CONCEPT_VOCAB="data/concept_data_v2/concept_vocab.json"
+TRAIN_CSV=""
+TEST_CSV=""
+
+# Try to find concept vocab and train/test CSV from Phase 1 run
+PHASE1_BASE_DIR="checkpoints/phase1_adaptive_tau/adaptive_tau_d1_h4_dim256_pos"
+PHASE1_RUN_DIR=$(find "$PHASE1_BASE_DIR" -type d -name "run_*" | sort -r | while read run_dir; do
+  if [[ -d "$run_dir/concept_data_v2" ]] && [[ -f "$run_dir/concept_data_v2/concept_vocab.json" ]]; then
+    echo "$run_dir"
+    break
+  fi
+done | head -n 1)
+
+if [[ -n "$PHASE1_RUN_DIR" ]]; then
+  CONCEPT_VOCAB="${PHASE1_RUN_DIR}/concept_data_v2/concept_vocab.json"
+  if [[ -f "${PHASE1_RUN_DIR}/splits/dataset_train.csv" ]]; then
+    TRAIN_CSV="${PHASE1_RUN_DIR}/splits/dataset_train.csv"
+  fi
+  if [[ -f "${PHASE1_RUN_DIR}/splits/dataset_test.csv" ]]; then
+    TEST_CSV="${PHASE1_RUN_DIR}/splits/dataset_test.csv"
+  fi
+fi
+
+OUTPUT="results/concept_help_geography.png"
+
+echo "============================================================"
+echo "COMPREHENSIVE CONCEPT EFFECTIVENESS ANALYSIS"
+echo "============================================================"
+echo "Results Dir: $RESULTS_DIR"
+echo "Concept Vocab: $CONCEPT_VOCAB"
+echo "Train CSV: $TRAIN_CSV"
+echo "Test CSV: $TEST_CSV"
+echo "Output: $OUTPUT"
+echo "============================================================"
+
+# Check if results_dict.json exists
+if [[ ! -f "$RESULTS_DIR/results_dict.json" ]]; then
+  echo "WARNING: results_dict.json not found. Need to re-run comparison first."
+  echo "Run: sbatch jobs/compare_model_variants.job"
+  exit 1
+fi
+
+# Check if concept vocab exists
+if [[ ! -f "$CONCEPT_VOCAB" ]]; then
+  echo "ERROR: Concept vocabulary not found at $CONCEPT_VOCAB"
+  exit 1
+fi
+
+# Build command with optional train/test CSV
+CMD="python scripts/evaluation/visualize_concept_help_geography.py \
+  --results-dir $RESULTS_DIR \
+  --concept-vocab $CONCEPT_VOCAB \
+  --output $OUTPUT \
+  --min-samples 5"
+
+if [[ -n "$TRAIN_CSV" ]] && [[ -f "$TRAIN_CSV" ]]; then
+  CMD="$CMD --train-csv $TRAIN_CSV"
+fi
+
+if [[ -n "$TEST_CSV" ]] && [[ -f "$TEST_CSV" ]]; then
+  CMD="$CMD --test-csv $TEST_CSV"
+fi
+
+# Run visualization
+eval $CMD
+
+echo "============================================================"
+echo "Visualization complete!"
+echo "Results saved to: $OUTPUT"
+echo "============================================================"
+

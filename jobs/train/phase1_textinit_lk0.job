@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
-#SBATCH --job-name=retrain_phase1
+#SBATCH --job-name=phase1_textinit_lk0
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=18:00:00
-#SBATCH --output=jobs/outputs/retrain_phase1_%j.out
+#SBATCH --output=jobs/outputs/phase1_textinit_lk0_%j.out
 
 set -eo pipefail
 
@@ -22,26 +22,26 @@ wandb_api_key="9073a011764cb23fce5384443a3996ca9c5d9198"
 export WANDB_API_KEY="$wandb_api_key"
 
 # ============================================================
-# PHASE 1 CONFIG (EXACT from WandB)
+# PHASE 1 TEXT-INIT CONFIG (with lk=0)
 # ============================================================
 MIX_DEPTH=1
 MIX_HEADS=4
 MIX_MLP_RATIO=2.0
-CONCEPT_DIM=256
+CONCEPT_DIM=768              # Text-init uses 768
 TAU=0.25
 TOPK=6
-STK_MASK_PROB=0.0
+STK_MASK_PROB=0.45           # From WandB: 0.45
 STK_K_MASK=1
-MIX_LOCAL_KERNEL=0          # From WandB: 0 (not 5!)
+MIX_LOCAL_KERNEL=0           # Changed from 5 to 0
 PROJ_TYPE=simple
-DROPOUT=0.3                 # From WandB: 0.3 (not 0.45!)
-WEIGHT_DECAY=0.05           # From WandB: 0.05 (not 0.1!)
+DROPOUT=0.45                 # From WandB: 0.45
+WEIGHT_DECAY=0.1             # From WandB: 0.1
 USE_POS_ENCODING=true
 MAX_PATCHES=576
 USE_PER_CONCEPT_TAU=true
 
-RUN_TAG="adaptive_tau_d${MIX_DEPTH}_h${MIX_HEADS}_dim${CONCEPT_DIM}_pos_stk0.0"
-OUTPUT_DIR="checkpoints/phase1_adaptive_tau/${RUN_TAG}"
+RUN_TAG="reg-cbm_stage_1_textinit_visinit_interpretable_tau0.25_k6_stk0.45_lk0_cdim768_adaptivetau"
+OUTPUT_DIR="checkpoints/phase1_textinit_adaptive/${RUN_TAG}"
 
 # Paths
 SPLITS_DIR="data/6921d7831744c5356b098bf7_balanced/splits"
@@ -71,7 +71,7 @@ VAL_CSV="${RUN_SPLITS_DIR}/dataset_val.csv"
 CONCEPT_DATA="$RUN_CONCEPT_DATA"
 
 echo "============================================================"
-echo "RETRAINING PHASE 1: Adaptive Tau (EXACT WandB Config)"
+echo "RETRAINING PHASE 1: Text-Init Adaptive Tau (lk=0)"
 echo "============================================================"
 
 # Step 1: Map concepts
@@ -85,32 +85,36 @@ python scripts/data_processing/precompute_geo_priors.py \
   --output-dir "$CONCEPT_DATA" \
   --s2-level 8
 
-# Step 3: Train Phase 1 (EXACT parameters from WandB)
+# Step 3: Train Phase 1 with TEXT INITIALIZATION (lk=0)
 python -m cbm.phase1.train \
   --train-csv "$TRAIN_CSV" \
   --val-csv "$VAL_CSV" \
   --cached-dir "$CACHED_DIR" \
   --concept-data-dir "$CONCEPT_DATA" \
   --output-dir "$OUTPUT_DIR" \
-  --epochs 100 \
+  --epochs 80 \
   --batch-size 64 \
-  --lr 5e-5 \
-  --warmup-epochs 8 \
+  --lr 7e-5 \
+  --warmup-epochs 5 \
   --wandb \
-  --wandb-run-name "adaptive_tau_d1_h4_dim256_pos_stk0.0" \
+  --wandb-run-name "phase1_adaptivetau_tau0.25_k6_stk0.45_lk0_cdim768_adaptivetau" \
   --head-type topk_mil \
-  --concept-dim 256 \
+  --init-concepts-from-text \
+  --concept-dim 768 \
+  --concept-prompt-template "a street view photo containing {}" \
+  --text-model-name "geolocal/StreetCLIP" \
   --attn-tau 0.25 \
   --mil-topk 6 \
   --mix-depth 1 \
   --mix-heads 4 \
   --mix-mlp-ratio 2.0 \
   --mix-local-kernel-size 0 \
-  --dropout 0.3 \
-  --weight-decay 0.05 \
+  --dropout 0.45 \
+  --weight-decay 0.1 \
   --selection-metric acc1 \
-  --stk-mask-prob 0.0 \
+  --stk-mask-prob 0.45 \
   --stk-k-mask 1 \
+  --stk-mask-fill min \
   --proj-type simple \
   --attn-diversity-weight 0.0 \
   --early-stop-patience 10 \
@@ -119,11 +123,59 @@ python -m cbm.phase1.train \
   --use-per-concept-tau
 
 echo "============================================================"
-echo "Phase 1 training complete!"
+echo "Phase 1 Text-Init training complete!"
 echo "Checkpoint: ${OUTPUT_DIR}/phase1/best_phase1.pt"
 echo "Concept data: $CONCEPT_DATA"
 echo "Splits: $RUN_SPLITS_DIR"
 echo "============================================================"
-EOF
 
-chmod +x jobs/retrain_phase1_adaptive_tau.job
+BEST_CHECKPOINT="${OUTPUT_DIR}/phase1/best_phase1.pt"
+TEST_CSV="${RUN_SPLITS_DIR}/dataset_test.csv"
+EVAL_OUTPUT_DIR="${OUTPUT_DIR}/test_evaluation"
+
+if [[ ! -f "$BEST_CHECKPOINT" ]]; then
+  echo "WARNING: Best checkpoint not found at $BEST_CHECKPOINT"
+  echo "Skipping evaluation."
+  exit 0
+fi
+
+echo "============================================================"
+echo "Step 4: Evaluating on Test Set with Visualizations"
+echo "============================================================"
+echo "Checkpoint: $BEST_CHECKPOINT"
+echo "Test CSV: $TEST_CSV"
+echo "Output: $EVAL_OUTPUT_DIR"
+echo "============================================================"
+
+mkdir -p "$EVAL_OUTPUT_DIR"
+
+python -m cbm.phase1.eval \
+  --checkpoint "$BEST_CHECKPOINT" \
+  --test-csv "$TEST_CSV" \
+  --cached-dir "$CACHED_DIR" \
+  --concept-data-dir "$CONCEPT_DATA" \
+  --output-dir "$EVAL_OUTPUT_DIR" \
+  --head-type topk_mil \
+  --concept-dim "$CONCEPT_DIM" \
+  --dropout "$DROPOUT" \
+  --mil-topk "$TOPK" \
+  --mil-tau "$TAU" \
+  --mix-depth "$MIX_DEPTH" \
+  --mix-heads "$MIX_HEADS" \
+  --mix-mlp-ratio "$MIX_MLP_RATIO" \
+  --mix-local-kernel-size "$MIX_LOCAL_KERNEL" \
+  --proj-type "$PROJ_TYPE" \
+  --use-pos-encoding \
+  --max-patches "$MAX_PATCHES" \
+  --use-per-concept-tau \
+  --batch-size 64 \
+  --num-workers 4 \
+  --generate-visualizations \
+  --num-viz-samples 20 \
+  --device cuda
+
+echo "============================================================"
+echo "Evaluation complete!"
+echo "Results saved to: $EVAL_OUTPUT_DIR"
+echo "============================================================"
+

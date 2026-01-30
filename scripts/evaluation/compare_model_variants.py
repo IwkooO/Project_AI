@@ -1721,6 +1721,22 @@ def main():
     with open(output_dir / "metrics.json", 'w') as f:
         json.dump(json_metrics, f, indent=2)
     
+    # Save full results_dict for geographic analysis
+    print("  6. Saving full results for geographic analysis...")
+    # Convert numpy arrays to lists for JSON serialization
+    json_results_dict = {}
+    for model_name, results in results_dict.items():
+        json_results_dict[model_name] = {
+            'predictions': results['predictions'],
+            'errors': results['errors'].tolist() if isinstance(results['errors'], np.ndarray) else results['errors'],
+            'concept_preds': results['concept_preds'].tolist() if isinstance(results['concept_preds'], np.ndarray) else results['concept_preds'],
+            'concept_probs': results.get('concept_probs', []),
+            'gate_values': results.get('gate_values', []).tolist() if isinstance(results.get('gate_values', []), np.ndarray) else results.get('gate_values', []),
+        }
+    
+    with open(output_dir / "results_dict.json", 'w') as f:
+        json.dump(json_results_dict, f, indent=2)
+    
     # Create summary report
     print("\n" + "="*80)
     print("SUMMARY REPORT")

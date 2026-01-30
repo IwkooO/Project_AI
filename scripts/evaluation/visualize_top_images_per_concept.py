@@ -222,6 +222,7 @@ def evaluate_model_for_concepts(
         - concept_probs: [N, K] array of concept probabilities
         - attention_weights: [N, K, P] array of attention weights per concept
         - sample_indices: [N] array of sample indices
+        - ground_truth_labels: [N] array of ground truth concept indices
     """
     phase1_model.eval()
     if stage2_model is not None:
@@ -232,6 +233,7 @@ def evaluate_model_for_concepts(
     all_concept_probs = []
     all_attention_weights = []
     all_sample_indices = []
+    all_ground_truth = []
     
     with torch.no_grad():
         for batch_idx, batch in enumerate(tqdm(test_loader, desc="Evaluating")):
@@ -251,24 +253,29 @@ def evaluate_model_for_concepts(
             # Store results
             all_concept_probs.append(concept_probs.cpu().numpy())
             all_attention_weights.append(attn_weights.cpu().numpy())
+            all_ground_truth.append(concept_labels.cpu().numpy())
             all_sample_indices.extend(range(start_idx, start_idx + batch_size))
     
     return {
         'concept_probs': np.concatenate(all_concept_probs, axis=0),  # [N, K]
         'attention_weights': np.concatenate(all_attention_weights, axis=0),  # [N, K, P]
         'sample_indices': np.array(all_sample_indices),
+        'ground_truth_labels': np.concatenate(all_ground_truth, axis=0),  # [N]
     }
 
 
 def find_top_images_per_concept(
     concept_probs: np.ndarray,  # [N, K]
     sample_indices: np.ndarray,  # [N]
+    ground_truth_labels: np.ndarray,  # [N]
     num_concepts: int,
     num_images_per_concept: int,
     min_samples: int = 10,
+    only_correct: bool = True,
 ) -> Dict[int, List[int]]:
     """
     Find top images for each concept based on concept probability.
+    If only_correct=True, only includes images where the concept is correctly predicted.
     
     Returns:
         Dictionary mapping concept_idx -> list of sample indices (sorted by probability, highest first)
@@ -282,18 +289,38 @@ def find_top_images_per_concept(
         # Get probabilities for this concept across all samples
         concept_scores = concept_probs[:, concept_idx]  # [N]
         
-        # Find top samples
-        top_indices = np.argsort(concept_scores)[-num_images_per_concept:][::-1]
-        top_scores = concept_scores[top_indices]
+        if only_correct:
+            # Filter to only samples where ground truth matches this concept
+            correct_mask = (ground_truth_labels == concept_idx)  # [N]
+            correct_indices = np.where(correct_mask)[0]
+            
+            if len(correct_indices) == 0:
+                # No correct samples for this concept
+                continue
+            
+            # Get scores for correct predictions only
+            correct_scores = concept_scores[correct_indices]  # [num_correct]
+            
+            # Find top samples among correct predictions (show all available, up to num_images_per_concept)
+            top_k = min(num_images_per_concept, len(correct_indices))
+            top_local_indices = np.argsort(correct_scores)[-top_k:][::-1]
+            top_global_indices = correct_indices[top_local_indices]
+            top_scores = correct_scores[top_local_indices]
+        else:
+            # Original behavior: find top samples regardless of correctness
+            top_global_indices = np.argsort(concept_scores)[-num_images_per_concept:][::-1]
+            top_scores = concept_scores[top_global_indices]
         
         # Only include if we have enough samples with non-zero probability
-        if np.sum(concept_scores > 0.01) >= min_samples:
+            if np.sum(concept_scores > 0.01) < min_samples:
+                continue
+        
             # Map back to actual sample indices
-            actual_indices = sample_indices[top_indices].tolist()
-            top_images_per_concept[concept_idx] = {
-                'indices': actual_indices,
-                'scores': top_scores.tolist(),
-            }
+        actual_indices = sample_indices[top_global_indices].tolist()
+        top_images_per_concept[concept_idx] = {
+            'indices': actual_indices,
+            'scores': top_scores.tolist(),
+        }
     
     return top_images_per_concept
 
@@ -339,11 +366,16 @@ def visualize_concept_images(
     """
     Create visualization for a single concept showing top images with attention overlays.
     """
-    indices = top_images_data['indices'][:num_images]
-    scores = top_images_data['scores'][:num_images]
+    # Use all available images (may be less than num_images if fewer correct predictions exist)
+    indices = top_images_data['indices']
+    scores = top_images_data['scores']
     
-    # Calculate grid dimensions
+    # Calculate grid dimensions based on actual number of images
     n_images = len(indices)
+    if n_images == 0:
+        print(f"   Warning: No images found for concept {concept_name}, skipping visualization")
+        return
+    
     n_cols = 5
     n_rows = (n_images + n_cols - 1) // n_cols
     
@@ -354,6 +386,20 @@ def visualize_concept_images(
         row = i // n_cols
         col = i % n_cols
         ax = fig.add_subplot(gs[row, col])
+        
+        # Get original meta_name (unmapped concept) from dataset
+        # NOTE: dataset_idx is an index into the FILTERED dataset, but dataset.df
+        # contains ALL rows (including those skipped during init). We must use
+        # pano_id to find the correct row in the original dataframe.
+        original_meta = None
+        if hasattr(dataset, 'df') and 'meta_name' in dataset.df.columns:
+            if hasattr(dataset, '_pano_ids') and dataset_idx < len(dataset._pano_ids):
+                pano_id = dataset._pano_ids[dataset_idx]
+                matching_rows = dataset.df[dataset.df['pano_id'] == pano_id]
+                if len(matching_rows) > 0:
+                    original_meta = matching_rows.iloc[0]['meta_name']
+                    if pd.isna(original_meta) or original_meta == '':
+                        original_meta = None
         
         # Load image
         img = load_image_from_dataset(dataset, dataset_idx, image_dir=image_dir)
@@ -389,20 +435,147 @@ def visualize_concept_images(
                 # Just show image without attention
                 ax.imshow(img)
             
-            ax.set_title(f'Score: {score:.3f}', fontsize=10, fontweight='bold')
+            # Create title with score and original meta
+            title_parts = [f'Score: {score:.3f}']
+            if original_meta:
+                # Truncate long meta names
+                meta_display = original_meta[:30] + '...' if len(original_meta) > 30 else original_meta
+                title_parts.append(f'Original: {meta_display}')
+            ax.set_title('\n'.join(title_parts), fontsize=9, fontweight='bold')
         else:
             ax.text(0.5, 0.5, f'Image {dataset_idx}\nnot available', 
                    ha='center', va='center', transform=ax.transAxes, fontsize=10)
             ax.set_facecolor('#f0f0f0')
-            ax.set_title(f'Score: {score:.3f}', fontsize=10, fontweight='bold')
+            title_parts = [f'Score: {score:.3f}']
+            if original_meta:
+                meta_display = original_meta[:30] + '...' if len(original_meta) > 30 else original_meta
+                title_parts.append(f'Original: {meta_display}')
+            ax.set_title('\n'.join(title_parts), fontsize=9, fontweight='bold')
         
         ax.axis('off')
     
-    # Add overall title
-    plt.suptitle(f'Top {n_images} Images for Concept: {concept_name}\n(Concept Index: {concept_idx})', 
+    # Hide unused subplot slots if we have fewer images than grid size
+    total_slots = n_rows * n_cols
+    for i in range(n_images, total_slots):
+        row = i // n_cols
+        col = i % n_cols
+        ax = fig.add_subplot(gs[row, col])
+        ax.axis('off')
+    
+    # Add overall title (show actual number of images found)
+    plt.suptitle(f'Top {n_images} Correct Predictions for Concept: {concept_name}\n(Concept Index: {concept_idx})', 
                 fontsize=14, fontweight='bold', y=0.995)
     
     plt.tight_layout(rect=[0, 0, 1, 0.99])
+    plt.savefig(output_path, dpi=200, bbox_inches='tight', facecolor='white', edgecolor='none')
+    plt.close()
+
+
+def visualize_activation_distributions(
+    concept_probs: np.ndarray,  # [N, K]
+    concept_indices: List[int],
+    idx_to_concept: Dict[int, str],
+    ground_truth_labels: np.ndarray,  # [N]
+    output_path: Path,
+    train_counts: Optional[Dict[int, int]] = None,  # Mapping from concept_idx to count in training data
+):
+    """
+    Visualize the distribution of activation scores (probabilities) for specified concepts using violin plots.
+    Only includes samples where the concept prediction is correct (ground truth matches concept).
+    
+    Args:
+        concept_probs: Concept probabilities for all samples [N, K]
+        concept_indices: List of concept indices to visualize
+        idx_to_concept: Mapping from concept index to name
+        ground_truth_labels: Ground truth concept labels for all samples [N]
+        output_path: Path to save the visualization
+    """
+    n_concepts = len(concept_indices)
+    if n_concepts == 0:
+        return
+    
+    # Prepare data for violin plots (only correct predictions)
+    data = []
+    labels = []
+    
+    for concept_idx in concept_indices:
+        concept_name = idx_to_concept.get(concept_idx, f'Concept {concept_idx}')
+        
+        # Filter to only samples where ground truth matches this concept
+        correct_mask = (ground_truth_labels == concept_idx)
+        activations = concept_probs[correct_mask, concept_idx]  # [num_correct]
+        
+        if len(activations) == 0:
+            print(f"   Warning: No correct predictions found for {concept_name}, skipping")
+            continue
+        
+        data.append(activations)
+        
+        # Create label with training count - use full name but split intelligently
+        formatted_name = concept_name.replace('_', ' ').title()
+        
+        # Add training count if available
+        if train_counts and concept_idx in train_counts:
+            count = train_counts[concept_idx]
+            labels.append(f'{formatted_name}\n(idx {concept_idx}, n={count})')
+        else:
+            labels.append(f'{formatted_name}\n(idx {concept_idx})')
+    
+    if len(data) == 0:
+        print("   Error: No data to plot (no correct predictions for any concept)")
+        return
+    
+    # Create figure with violin plots - increase width for longer labels and height for less cramping
+    fig, ax = plt.subplots(1, 1, figsize=(max(16, len(data) * 1.5), 12))
+    
+    # Create violin plots
+    parts = ax.violinplot(
+        data, 
+        positions=range(len(data)),
+        showmeans=True,
+        showmedians=True,
+        widths=0.7
+    )
+    
+    # Customize violin plot colors
+    for pc in parts['bodies']:
+        pc.set_facecolor('steelblue')
+        pc.set_alpha(0.7)
+        pc.set_edgecolor('black')
+        pc.set_linewidth(1)
+    
+    # Customize median and mean lines
+    parts['cmedians'].set_color('orange')
+    parts['cmedians'].set_linewidth(2)
+    parts['cmeans'].set_color('red')
+    parts['cmeans'].set_linewidth(2)
+    
+    # Set labels with better spacing
+    ax.set_xticks(range(len(data)))
+    ax.set_xticklabels(labels, rotation=90, ha='center', va='top', fontsize=8)
+    ax.set_ylabel('Activation Score (Probability)', fontsize=10, fontweight='bold')
+    ax.set_title('Distribution of Activation Scores for Correct Predictions',
+                 fontsize=12, fontweight='bold', pad=15)
+    ax.grid(True, alpha=0.3, axis='y')
+    ax.set_ylim(bottom=0)
+    
+    # Add legend for mean and median lines
+    from matplotlib.lines import Line2D
+    legend_elements = [
+        Line2D([0], [0], color='red', linewidth=2, label='Mean'),
+        Line2D([0], [0], color='orange', linewidth=2, label='Median')
+    ]
+    ax.legend(handles=legend_elements, loc='upper right', fontsize=9)
+    
+    # Calculate bottom margin based on longest label - need more space for rotated labels
+    # Count total characters including newlines
+    max_label_length = max(len(label.replace('\n', ' ')) for label in labels)
+    # For 90-degree rotated labels, need significant vertical space
+    # Each character when rotated 90 degrees takes more vertical space
+    # Use a fixed larger margin to ensure labels don't overlap
+    bottom_margin = 0.4  # Fixed 40% bottom margin for rotated labels
+    
+    plt.tight_layout(rect=[0, bottom_margin, 1, 0.98])  # Leave 40% at bottom for labels
     plt.savefig(output_path, dpi=200, bbox_inches='tight', facecolor='white', edgecolor='none')
     plt.close()
 
@@ -455,6 +628,10 @@ def main():
                        help="Number of top images per concept to show")
     parser.add_argument("--min-samples", type=int, default=10,
                        help="Minimum number of samples required for a concept to be included")
+    parser.add_argument("--concept-names", type=str, nargs="+", default=None,
+                       help="Specific concept names to visualize (e.g., 'license_plate' 'chevron'). If provided, --num-concepts is ignored.")
+    parser.add_argument("--distribution-only", action="store_true",
+                       help="Only create activation distribution plot, skip individual concept visualizations")
     
     args = parser.parse_args()
     
@@ -534,61 +711,139 @@ def main():
     concept_probs = results['concept_probs']  # [N, K]
     attention_weights = results['attention_weights']  # [N, K, P]
     sample_indices = results['sample_indices']  # [N]
+    ground_truth_labels = results['ground_truth_labels']  # [N]
     
     print(f"   Evaluated {len(sample_indices)} samples")
     print(f"   Concept probabilities shape: {concept_probs.shape}")
     print(f"   Attention weights shape: {attention_weights.shape}")
+    print(f"   Ground truth labels shape: {ground_truth_labels.shape}")
     
     # Create mapping from dataset index to results index
     sample_indices_map = {idx: i for i, idx in enumerate(sample_indices)}
     
-    # Find top images per concept
+    # Find top images per concept (only correct predictions)
     print(f"\n{'='*80}")
-    print("Finding top images per concept...")
+    print("Finding top images per concept (correct predictions only)...")
     print(f"{'='*80}")
     top_images_per_concept = find_top_images_per_concept(
-        concept_probs, sample_indices, num_concepts, 
-        args.num_images_per_concept, args.min_samples
+        concept_probs, sample_indices, ground_truth_labels, num_concepts, 
+        args.num_images_per_concept, args.min_samples, only_correct=True
     )
     
     print(f"   Found top images for {len(top_images_per_concept)} concepts")
     
-    # Select top N concepts by frequency or average score
-    concept_avg_scores = {}
+    # Log correct prediction counts for each concept
     for concept_idx, data in top_images_per_concept.items():
-        concept_avg_scores[concept_idx] = np.mean(data['scores'])
-    
-    # Sort by average score
-    sorted_concepts = sorted(concept_avg_scores.items(), key=lambda x: x[1], reverse=True)
-    top_concept_indices = [idx for idx, _ in sorted_concepts[:args.num_concepts]]
-    
-    print(f"\n{'='*80}")
-    print(f"Visualizing top {args.num_concepts} concepts...")
-    print(f"{'='*80}")
-    
-    # Create visualizations
-    for concept_idx in tqdm(top_concept_indices, desc="Creating visualizations"):
         concept_name = idx_to_concept.get(concept_idx, f'Concept {concept_idx}')
+        num_correct = len(data['indices'])
+        requested = args.num_images_per_concept
+        if num_correct < requested:
+            print(f"     {concept_name} (idx {concept_idx}): {num_correct} correct predictions (showing all {num_correct}, requested {requested})")
+        else:
+            print(f"     {concept_name} (idx {concept_idx}): {num_correct} correct predictions (showing top {requested})")
+    
+    # Select concepts to visualize
+    if args.concept_names:
+        # Filter by specific concept names
+        concept_to_idx = {v: k for k, v in idx_to_concept.items()}
+        top_concept_indices = []
+        for concept_name in args.concept_names:
+            if concept_name in concept_to_idx:
+                concept_idx = concept_to_idx[concept_name]
+                if concept_idx in top_images_per_concept:
+                    top_concept_indices.append(concept_idx)
+                    print(f"   Found concept: {concept_name} (idx: {concept_idx})")
+                else:
+                    print(f"   Warning: Concept '{concept_name}' not found in top images (may have < {args.min_samples} samples)")
+            else:
+                print(f"   Warning: Concept '{concept_name}' not found in vocabulary")
         
-        # Sanitize filename
-        safe_name = concept_name.replace('/', '_').replace('\\', '_').replace(' ', '_')
-        safe_name = ''.join(c for c in safe_name if c.isalnum() or c in ('_', '-'))[:50]
+        if not top_concept_indices:
+            print(f"   Error: No valid concepts found. Available concepts include:")
+            for name in sorted(concept_to_idx.keys())[:20]:
+                print(f"     - {name}")
+            return
         
-        output_path = output_dir / f"concept_{concept_idx:04d}_{safe_name}.png"
+        print(f"\n{'='*80}")
+        print(f"Visualizing {len(top_concept_indices)} specified concepts: {args.concept_names}")
+        print(f"{'='*80}")
+    else:
+        # Select top N concepts by frequency or average score
+        concept_avg_scores = {}
+        for concept_idx, data in top_images_per_concept.items():
+            concept_avg_scores[concept_idx] = np.mean(data['scores'])
         
-        visualize_concept_images(
-            concept_idx, concept_name,
-            top_images_per_concept[concept_idx],
-            test_ds,
-            attention_weights,
-            sample_indices_map,
-            output_path,
-            num_images=args.num_images_per_concept,
-            image_dir=image_dir,
+        # Sort by average score
+        sorted_concepts = sorted(concept_avg_scores.items(), key=lambda x: x[1], reverse=True)
+        top_concept_indices = [idx for idx, _ in sorted_concepts[:args.num_concepts]]
+        
+        print(f"\n{'='*80}")
+        print(f"Visualizing top {args.num_concepts} concepts...")
+        print(f"{'='*80}")
+    
+    # Create individual concept visualizations (unless distribution-only mode)
+    if not args.distribution_only:
+        for concept_idx in tqdm(top_concept_indices, desc="Creating visualizations"):
+            concept_name = idx_to_concept.get(concept_idx, f'Concept {concept_idx}')
+            
+            # Sanitize filename
+            safe_name = concept_name.replace('/', '_').replace('\\', '_').replace(' ', '_')
+            safe_name = ''.join(c for c in safe_name if c.isalnum() or c in ('_', '-'))[:50]
+            
+            output_path = output_dir / f"concept_{concept_idx:04d}_{safe_name}.png"
+            
+            visualize_concept_images(
+                concept_idx, concept_name,
+                top_images_per_concept[concept_idx],
+                test_ds,
+                attention_weights,
+                sample_indices_map,
+                output_path,
+                num_images=args.num_images_per_concept,
+                image_dir=image_dir,
+            )
+    
+    # Create activation distribution plot (if concept_names provided or distribution-only mode)
+    if (args.concept_names or args.distribution_only) and len(top_concept_indices) > 0:
+        print(f"\n{'='*80}")
+        print("Creating activation distribution visualization (correct predictions only)...")
+        print(f"{'='*80}")
+        
+        # Load training counts for each concept
+        train_counts = {}
+        train_csv_path = Path(args.test_csv).parent / "dataset_train.csv"
+        if train_csv_path.exists():
+            print(f"   Loading training counts from: {train_csv_path}")
+            train_df = pd.read_csv(train_csv_path)
+            if 'generalized' in train_df.columns:
+                concept_counts = train_df['generalized'].value_counts()
+                concept_to_idx = {v: k for k, v in idx_to_concept.items()}
+                for concept_name, count in concept_counts.items():
+                    if concept_name in concept_to_idx:
+                        concept_idx = concept_to_idx[concept_name]
+                        train_counts[concept_idx] = int(count)
+                print(f"   Loaded training counts for {len(train_counts)} concepts")
+            else:
+                print(f"   Warning: 'generalized' column not found in training CSV, skipping counts")
+        else:
+            print(f"   Warning: Training CSV not found at {train_csv_path}, skipping counts")
+        
+        distribution_path = output_dir / "activation_distributions.png"
+        visualize_activation_distributions(
+            concept_probs,
+            top_concept_indices,
+            idx_to_concept,
+            ground_truth_labels,
+            distribution_path,
+            train_counts=train_counts,
         )
+        print(f"   ✅ Activation distributions saved to: {distribution_path}")
     
     print(f"\n✅ Visualizations saved to: {output_dir}")
-    print(f"   Generated {len(top_concept_indices)} concept visualizations")
+    if not args.distribution_only:
+        print(f"   Generated {len(top_concept_indices)} concept visualizations")
+    else:
+        print(f"   Generated activation distribution plot for {len(top_concept_indices)} concepts")
 
 
 if __name__ == "__main__":
